@@ -3,7 +3,7 @@ from app.components.sidebar import render_sidebar
 
 # redireciona para login caso não esteja autenticado
 if not st.session_state.get('tenant_id'):
-    st.switch_page('app/main.py')
+    st.switch_page('main.py')
 
 render_sidebar()
 
