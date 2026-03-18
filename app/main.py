@@ -1,6 +1,9 @@
 import streamlit as st
 from app.utils.db import get_session, engine
-from app.models.base import Base, init_db
+from app.models.base import Base
+from app.models.tenant import Tenant
+from app.models.produto import Produto
+from app.models.documento_fiscal import DocumentoFiscal
 
 # Criar tabelas no banco caso não existam
 Base.metadata.create_all(bind=engine)
@@ -10,7 +13,7 @@ st.set_page_config(
     page_title="SPED Manager",
     page_icon="🛒",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Verificação se usuário está logado
@@ -22,6 +25,13 @@ if "tenant_nome" not in st.session_state:
 
 # Guard de autenticação - bloqueia acesso sem login
 if not st.session_state.tenant_id:
+    st.markdown("""
+        <style>
+            [data-testid="stSidebar"] { display: none; }
+            [data-testid="collapsedControl"] { display: none; }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.title('SPED Manager')
     st.subheader('Acesse sua conta')
 
