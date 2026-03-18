@@ -11,3 +11,6 @@ class Tenant(Base):
     cnpj = Column(String(18), unique=True, nullable=False)
     ativo = Column(Boolean, default=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
+
+    produtos = relationship("Produto", back_populates="tenant")
+    documentos_fiscais = relationship("DocumentoFiscal", back_populates="tenant")
