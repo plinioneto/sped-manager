@@ -1,4 +1,5 @@
 import streamlit as st
+import app.models
 from app.components.sidebar import render_sidebar
 
 # redireciona para login caso não esteja autenticado
