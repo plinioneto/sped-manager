@@ -3,19 +3,21 @@ from datetime import datetime
 
 
 def extrair_registro_0000(conteudo: str) -> dict:
-
     for linha in conteudo.splitlines():
-        campos = linha.strip().split('|')
-        # remove campos vazios das bordas
-        campos = [c for c in campos if c != '']
+        linha = linha.strip()
+        if not linha:
+            continue
 
-        if campos and campos[0] == '0000':
+        # não remove campos vazios — mantém índices corretos
+        campos = linha.split('|')
+
+        if len(campos) > 1 and campos[1] == '0000':
             return {
-                'dt_ini':       campos[3],
-                'dt_fin':       campos[4],
-                'razao_social': campos[5],
-                'cnpj':         campos[6],
-                'uf':           campos[8],
+                'dt_ini':       campos[4],
+                'dt_fin':       campos[5],
+                'razao_social': campos[6],
+                'cnpj':         campos[7],
+                'uf':           campos[9],
             }
 
     raise ValueError("Registro |0000| não encontrado no arquivo EFD.")

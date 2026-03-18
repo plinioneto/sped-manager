@@ -1,6 +1,5 @@
 from app.utils.db import get_session, engine
 from app.models.base import Base
-
 from app.models.tenant import Tenant
 from app.models.produto import Produto
 from app.models.documento_fiscal import DocumentoFiscal
