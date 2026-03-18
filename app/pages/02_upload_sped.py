@@ -16,46 +16,69 @@ render_sidebar()
 st.title("Upload SPED")
 st.divider()
 
-arquivo = st.file_uploader(
-    "Selecione o arquivo EFD (.txt)",
+arquivos = st.file_uploader(
+    "Selecione os arquivos EFD (.txt)",
     type=["txt"],
-    help="Arquivo SPED Fiscal no formato .txt gerado pelo SPED"
+    accept_multiple_files=True,
+    help="Arquivos SPED Fiscal no formato .txt gerado pelo SPED"
 )
 
-if arquivo:
-    conteudo = arquivo.read().decode("latin-1")
+if arquivos:
+    st.subheader(f"{len(arquivos)} arquivo(s) selecionado(s)")
+    st.divider()
 
-    with st.spinner("Lendo cabeçalho do arquivo..."):
+    # pré-visualiza os metadados de cada arquivo
+    metadados_lista = []
+    erro = False
+
+    for arquivo in arquivos:
+        conteudo = arquivo.read().decode("latin-1")
         try:
             metadados = processar_renomeacao(conteudo, arquivo.name)
+            metadados['conteudo'] = conteudo
+            metadados_lista.append(metadados)
 
-            st.success("Arquivo lido com sucesso!")
+            with st.expander(f"{metadados['razao_social']} — {metadados['periodo_ini']} a {metadados['periodo_fin']}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"**Empresa:** {metadados['razao_social']}")
+                    st.info(f"**CNPJ:** {metadados['cnpj']}")
+                    st.info(f"**UF:** {metadados['uf']}")
+                with col2:
+                    st.info(f"**Período:** {metadados['periodo_ini']} a {metadados['periodo_fin']}")
+                    st.info(f"**Nome original:** {metadados['nome_original']}")
+                    st.info(f"**Nome padronizado:** {metadados['novo_nome']}")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info(f"**Empresa:** {metadados['razao_social']}")
-                st.info(f"**CNPJ:** {metadados['cnpj']}")
-                st.info(f"**UF:** {metadados['uf']}")
-            with col2:
-                st.info(f"**Período:** {metadados['periodo_ini']} a {metadados['periodo_fin']}")
-                st.info(f"**Nome original:** {metadados['nome_original']}")
-                st.info(f"**Nome padronizado:** {metadados['novo_nome']}")
+        except ValueError as e:
+            st.error(f"Erro em {arquivo.name}: {str(e)}")
+            erro = True
 
-            st.divider()
+    st.divider()
 
-            if st.button("Confirmar e processar", type="primary", use_container_width=True):
+    if not erro:
+        if st.button("Confirmar e processar todos", type="primary", use_container_width=True):
 
-                db = next(get_session())
-                bronze = BronzeProcessor(db, st.session_state.tenant_id)
+            db = next(get_session())
+            resultados = []
 
-                if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
-                    st.warning("Este arquivo já foi importado anteriormente.")
-                else:
-                    with st.spinner("Salvando arquivo..."):
-                        caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                        with open(caminho, "w", encoding="latin-1") as f:
-                            f.write(conteudo)
+            for metadados in metadados_lista:
+                with st.spinner(f"Processando {metadados['novo_nome']}..."):
+                    bronze = BronzeProcessor(db, st.session_state.tenant_id)
 
+                    if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
+                        resultados.append({
+                            "arquivo": metadados['novo_nome'],
+                            "status": "ignorado",
+                            "linhas": 0
+                        })
+                        continue
+
+                    # salva arquivo renomeado
+                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                    with open(caminho, "w", encoding="latin-1") as f:
+                        f.write(metadados['conteudo'])
+
+                    # registra no banco
                     registro = ArquivoImportado(
                         tenant_id=st.session_state.tenant_id,
                         nome_original=metadados['nome_original'],
@@ -68,20 +91,36 @@ if arquivo:
                     db.add(registro)
                     db.commit()
 
-                    with st.spinner("Ingerindo camada bronze..."):
-                        try:
-                            resultado_bronze = bronze.ingerir(conteudo, metadados['novo_nome'])
-                            registro.status = "bronze_concluido"
-                            registro.processado_em = datetime.utcnow()
-                            db.commit()
-                            st.success(f"Bronze concluído! {resultado_bronze['linhas']} linhas ingeridas.")
-                        except Exception as e:
-                            registro.status = "erro"
-                            registro.erro_msg = str(e)
-                            db.commit()
-                            st.error(f"Erro no bronze: {str(e)}")
+                    # camada bronze
+                    try:
+                        resultado_bronze = bronze.ingerir(metadados['conteudo'], metadados['novo_nome'])
+                        registro.status = "bronze_concluido"
+                        registro.processado_em = datetime.utcnow()
+                        db.commit()
+                        resultados.append({
+                            "arquivo": metadados['novo_nome'],
+                            "status": "concluido",
+                            "linhas": resultado_bronze['linhas']
+                        })
+                    except Exception as e:
+                        registro.status = "erro"
+                        registro.erro_msg = str(e)
+                        db.commit()
+                        resultados.append({
+                            "arquivo": metadados['novo_nome'],
+                            "status": "erro",
+                            "linhas": 0,
+                            "erro": str(e)
+                        })
 
-        except ValueError as e:
-            st.error(f"Erro ao ler o arquivo: {str(e)}")
-        except Exception as e:
-            st.error(f"Erro inesperado: {str(e)}")
+            # exibe resumo final
+            st.divider()
+            st.subheader("Resumo da importação")
+
+            for r in resultados:
+                if r['status'] == "concluido":
+                    st.success(f"{r['arquivo']} — {r['linhas']} linhas ingeridas")
+                elif r['status'] == "ignorado":
+                    st.warning(f"{r['arquivo']} — já importado anteriormente")
+                else:
+                    st.error(f"{r['arquivo']} — erro: {r.get('erro', '')}")
