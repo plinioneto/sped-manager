@@ -20,11 +20,12 @@ def extrair_registro_0000(conteudo: str) -> dict:
 
     raise ValueError("Registro |0000| não encontrado no arquivo EFD.")
 
-# Converte datas do formato DDMMYYYY para YYYYMM.
+# Pega as datas para o nome do arquivo
 def formatar_periodo(dt_ini: str, dt_fin: str) -> tuple[str, str]:
     ini = datetime.strptime(dt_ini, '%d%m%Y')
     fin = datetime.strptime(dt_fin, '%d%m%Y')
-    return ini.strftime('%Y%m'), fin.strftime('%Y%m')
+    # agora inclui o dia: YYYYMMDD
+    return ini.strftime('%Y%m%d'), fin.strftime('%Y%m%d')
 
 # Gera o nome padronizado do arquivo.
 def gerar_nome_arquivo(cnpj: str, periodo_ini: str, periodo_fin: str) -> str:
