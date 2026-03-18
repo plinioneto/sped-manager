@@ -4,9 +4,13 @@ from app.models.base import Base
 from app.models.tenant import Tenant
 from app.models.produto import Produto
 from app.models.documento_fiscal import DocumentoFiscal
+from app.models.itens_fiscal_c170 import ItemFiscal
+from app.models.arquivo_importado import ArquivoImportado
 
 # Criar tabelas no banco caso não existam
 Base.metadata.create_all(bind=engine)
+
+
 
 # Config da página
 st.set_page_config(
@@ -16,12 +20,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# esconde navegação automática do Streamlit em todas as situações
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] { display: none; }
+    </style>
+""", unsafe_allow_html=True)
+
 # Verificação se usuário está logado
 if "tenant_id" not in st.session_state:
     st.session_state.tenant_id = None
 
 if "tenant_nome" not in st.session_state:
     st.session_state.tenant_nome = None
+
+if "tenant_cnpj" not in st.session_state:
+    st.session_state.tenant_cnpj = None
 
 # Guard de autenticação - bloqueia acesso sem login
 if not st.session_state.tenant_id:
@@ -50,19 +64,15 @@ if not st.session_state.tenant_id:
         if tenant:
             st.session_state.tenant_id = tenant.id
             st.session_state.tenant_nome = tenant.nome
+            st.session_state.tenant_cnpj = tenant.cnpj
             st.rerun()
         else:
             st.error("CNPJ não encontrado")
 else:
     # sucesso no login
 
-    st.sidebar.title(f"🏚 {st.session_state.tenant_nome}")
-    st.sidebar.divider()
-
-    if st.sidebar.button("Sair"):
-        st.session_state.tenant_id = None
-        st.session_state.tenant_nome = None
-        st.rerun()
+    from app.components.sidebar import render_sidebar
+    render_sidebar()
 
     st.title("Bem vindo ao SPED Manager")
     st.write("Selecione uma opção no menu lateral.")

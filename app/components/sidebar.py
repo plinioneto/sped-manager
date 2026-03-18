@@ -1,7 +1,7 @@
 import streamlit as st
+from app.utils.formatters import formatar_cnpj
 
 def render_sidebar():
-
     # esconde a navegação automática do Streamlit
     st.markdown("""
         <style>
@@ -9,7 +9,8 @@ def render_sidebar():
         </style>
     """, unsafe_allow_html=True)
 
-    st.sidebar.title(f"🛒 {st.session_state.tenant_nome}")
+    st.sidebar.title(f"🏪 {st.session_state.tenant_nome}")
+    st.sidebar.caption(formatar_cnpj(st.session_state.tenant_cnpj))
     st.sidebar.divider()
 
     st.sidebar.page_link("pages/01_dashboard.py", label="Dashboard")
@@ -22,4 +23,5 @@ def render_sidebar():
     if st.sidebar.button("Sair", use_container_width=True):
         st.session_state.tenant_id = None
         st.session_state.tenant_nome = None
+        st.session_state.tenant_cnpj = None
         st.rerun()

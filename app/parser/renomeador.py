@@ -1,0 +1,60 @@
+import re
+from datetime import datetime
+
+
+def extrair_registro_0000(conteudo: str) -> dict:
+
+    for linha in conteudo.splitlines():
+        campos = linha.strip().split('|')
+        # remove campos vazios das bordas
+        campos = [c for c in campos if c != '']
+
+        if campos and campos[0] == '0000':
+            return {
+                'dt_ini': campos[3],        
+                'dt_fin': campos[4],        
+                'cnpj': campos[5],          
+                'razao_social': campos[6], 
+                'uf': campos[7],
+            }
+
+    raise ValueError("Registro |0000| não encontrado no arquivo EFD.")
+
+# Converte datas do formato DDMMYYYY para YYYYMM.
+def formatar_periodo(dt_ini: str, dt_fin: str) -> tuple[str, str]:
+    ini = datetime.strptime(dt_ini, '%d%m%Y')
+    fin = datetime.strptime(dt_fin, '%d%m%Y')
+    return ini.strftime('%Y%m'), fin.strftime('%Y%m')
+
+# Gera o nome padronizado do arquivo.
+def gerar_nome_arquivo(cnpj: str, periodo_ini: str, periodo_fin: str) -> str:
+    cnpj_limpo = re.sub(r'\D', '', cnpj)
+    return f"{cnpj_limpo}_{periodo_ini}_{periodo_fin}.txt"
+
+# Ponto de entrada — recebe o conteúdo do arquivo e retorna os metadados extraídos e o novo nome.
+def processar_renomeacao(conteudo: str, nome_original: str) -> dict:
+
+    dados = extrair_registro_0000(conteudo)
+
+    periodo_ini, periodo_fin = formatar_periodo(
+        dados['dt_ini'],
+        dados['dt_fin']
+    )
+
+    novo_nome = gerar_nome_arquivo(
+        dados['cnpj'],
+        periodo_ini,
+        periodo_fin
+    )
+
+    return {
+        'nome_original': nome_original,
+        'novo_nome': novo_nome,
+        'cnpj': re.sub(r'\D', '', dados['cnpj']),
+        'razao_social': dados['razao_social'],
+        'uf': dados['uf'],
+        'periodo_ini': periodo_ini,
+        'periodo_fin': periodo_fin,
+        'dt_ini': dados['dt_ini'],
+        'dt_fin': dados['dt_fin'],
+    }

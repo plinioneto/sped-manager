@@ -1,8 +1,10 @@
 import streamlit as st
-import pandas as pd
+import os
 from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
-from app.services.importacao_service import ImportacaoService
+from app.parser.renomeador import processar_renomeacao
+from app.models.arquivo_importado import ArquivoImportado
+from datetime import datetime
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -12,38 +14,59 @@ render_sidebar()
 st.title("Upload SPED")
 st.divider()
 
-st.subheader("Importar arquivos do parser")
-st.caption("Exporte as tabelas do Databricks como CSV e faça o upload aqui.")
+arquivo = st.file_uploader(
+    "Selecione o arquivo EFD (.txt)",
+    type=["txt"],
+    help="Arquivo SPED Fiscal no formato .txt gerado pelo SPED"
+)
 
-col1, col2 = st.columns(2)
+if arquivo:
+    conteudo = arquivo.read().decode("latin-1")
 
-with col1:
-    arquivo_0200 = st.file_uploader("Tabela 0200 (produtos)", type=["csv"], key="f0200")
-    arquivo_c100 = st.file_uploader("Tabela C100 (documentos)", type=["csv"], key="fc100")
+    with st.spinner("Lendo cabeçalho do arquivo..."):
+        try:
+            metadados = processar_renomeacao(conteudo, arquivo.name)
 
-with col2:
-    arquivo_c170 = st.file_uploader("Tabela C170 (itens)", type=["csv"], key="fc170")
-    arquivo_c190 = st.file_uploader("Tabela C190 (ICMS)", type=["csv"], key="fc190")
+            st.success("Arquivo lido com sucesso!")
 
-st.divider()
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info(f"**Empresa:** {metadados['razao_social']}")
+                st.info(f"**CNPJ:** {metadados['cnpj']}")
+                st.info(f"**UF:** {metadados['uf']}")
+            with col2:
+                st.info(f"**Período:** {metadados['periodo_ini']} a {metadados['periodo_fin']}")
+                st.info(f"**Nome original:** {metadados['nome_original']}")
+                st.info(f"**Nome padronizado:** {metadados['novo_nome']}")
 
-if st.button("Importar", type="primary", use_container_width=True):
-    if not arquivo_0200 or not arquivo_c100 or not arquivo_c170:
-        st.error("Envie pelo menos os arquivos 0200, C100 e C170.")
-    else:
-        with st.spinner("Importando dados..."):
-            try:
-                df_0200 = pd.read_csv(arquivo_0200, sep=",", dtype=str)
-                df_c100 = pd.read_csv(arquivo_c100, sep=",", dtype=str)
-                df_c170 = pd.read_csv(arquivo_c170, sep=",", dtype=str)
+            st.divider()
 
-                db = next(get_session())
-                service = ImportacaoService(db, st.session_state.tenant_id)
+            if st.button("Confirmar e processar", type="primary", use_container_width=True):
+                with st.spinner("Salvando arquivo..."):
 
-                qtd_produtos = service.importar_produtos(df_0200)
-                qtd_docs = service.importar_documentos(df_c100, df_c170)
+                    # salva o arquivo renomeado na pasta storage
+                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                    with open(caminho, "w", encoding="latin-1") as f:
+                        f.write(conteudo)
 
-                st.success(f"Importação concluída! {qtd_produtos} produtos e {qtd_docs} documentos importados.")
+                    # registra no banco
+                    db = next(get_session())
+                    registro = ArquivoImportado(
+                        tenant_id=st.session_state.tenant_id,
+                        nome_original=metadados['nome_original'],
+                        nome_padronizado=metadados['novo_nome'],
+                        cnpj=metadados['cnpj'],
+                        periodo_ini=metadados['periodo_ini'],
+                        periodo_fin=metadados['periodo_fin'],
+                        status="pendente"
+                    )
+                    db.add(registro)
+                    db.commit()
 
-            except Exception as e:
-                st.error(f"Erro na importação: {str(e)}")
+                    st.success(f"Arquivo salvo como **{metadados['novo_nome']}**")
+                    st.info("Processamento bronze/silver será iniciado na próxima etapa.")
+
+        except ValueError as e:
+            st.error(f"Erro ao ler o arquivo: {str(e)}")
+        except Exception as e:
+            st.error(f"Erro inesperado: {str(e)}")
