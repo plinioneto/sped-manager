@@ -5,6 +5,7 @@ from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.parser.renomeador import processar_renomeacao
 from app.parser.bronze import BronzeProcessor
+from app.parser.silver import SilverProcessor
 from app.models.arquivo_importado import ArquivoImportado
 from datetime import datetime
 
@@ -27,7 +28,6 @@ if arquivos:
     st.subheader(f"{len(arquivos)} arquivo(s) selecionado(s)")
     st.divider()
 
-    # pré-visualiza os metadados de cada arquivo
     metadados_lista = []
     erro = False
 
@@ -62,45 +62,71 @@ if arquivos:
             resultados = []
 
             for metadados in metadados_lista:
-                with st.spinner(f"Processando {metadados['novo_nome']}..."):
-                    bronze = BronzeProcessor(db, st.session_state.tenant_id)
+                bronze = BronzeProcessor(db, st.session_state.tenant_id)
 
-                    if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
-                        resultados.append({
-                            "arquivo": metadados['novo_nome'],
-                            "status": "ignorado",
-                            "linhas": 0
-                        })
-                        continue
+                if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
+                    resultados.append({
+                        "arquivo": metadados['novo_nome'],
+                        "status": "ignorado",
+                        "linhas": 0
+                    })
+                    continue
 
-                    # salva arquivo renomeado
-                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                    with open(caminho, "w", encoding="latin-1") as f:
-                        f.write(metadados['conteudo'])
+                # etapa 1 — salva arquivo renomeado
+                caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                with open(caminho, "w", encoding="latin-1") as f:
+                    f.write(metadados['conteudo'])
 
-                    # registra no banco
-                    registro = ArquivoImportado(
-                        tenant_id=st.session_state.tenant_id,
-                        nome_original=metadados['nome_original'],
-                        nome_padronizado=metadados['novo_nome'],
-                        cnpj=metadados['cnpj'],
-                        periodo_ini=metadados['periodo_ini'],
-                        periodo_fin=metadados['periodo_fin'],
-                        status="processando"
-                    )
-                    db.add(registro)
-                    db.commit()
+                registro = ArquivoImportado(
+                    tenant_id=st.session_state.tenant_id,
+                    nome_original=metadados['nome_original'],
+                    nome_padronizado=metadados['novo_nome'],
+                    cnpj=metadados['cnpj'],
+                    periodo_ini=metadados['periodo_ini'],
+                    periodo_fin=metadados['periodo_fin'],
+                    status="processando"
+                )
+                db.add(registro)
+                db.commit()
 
-                    # camada bronze
+                # etapa 2 — bronze
+                with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
                     try:
-                        resultado_bronze = bronze.ingerir(metadados['conteudo'], metadados['novo_nome'])
+                        resultado_bronze = bronze.ingerir(
+                            metadados['conteudo'],
+                            metadados['novo_nome']
+                        )
                         registro.status = "bronze_concluido"
-                        registro.processado_em = datetime.utcnow()
+                        db.commit()
+                    except Exception as e:
+                        registro.status = "erro"
+                        registro.erro_msg = str(e)
                         db.commit()
                         resultados.append({
                             "arquivo": metadados['novo_nome'],
+                            "status": "erro",
+                            "erro": str(e)
+                        })
+                        continue
+
+                # etapa 3 — silver
+                with st.spinner(f"Silver: {metadados['novo_nome']}..."):
+                    try:
+                        silver = SilverProcessor(db, st.session_state.tenant_id)
+                        resultado_silver = silver.processar(metadados['novo_nome'])
+
+                        registro.status = "concluido"
+                        registro.processado_em = datetime.utcnow()
+                        db.commit()
+
+                        resultados.append({
+                            "arquivo": metadados['novo_nome'],
                             "status": "concluido",
-                            "linhas": resultado_bronze['linhas']
+                            "linhas_bronze": resultado_bronze['linhas'],
+                            "documentos": resultado_silver['documentos'],
+                            "itens": resultado_silver['itens'],
+                            "produtos_criados": resultado_silver['produtos_criados'],
+                            "produtos_atualizados": resultado_silver['produtos_atualizados'],
                         })
                     except Exception as e:
                         registro.status = "erro"
@@ -109,17 +135,25 @@ if arquivos:
                         resultados.append({
                             "arquivo": metadados['novo_nome'],
                             "status": "erro",
-                            "linhas": 0,
                             "erro": str(e)
                         })
 
-            # exibe resumo final
+            # resumo final
             st.divider()
             st.subheader("Resumo da importação")
 
             for r in resultados:
                 if r['status'] == "concluido":
-                    st.success(f"{r['arquivo']} — {r['linhas']} linhas ingeridas")
+                    with st.expander(f"{r['arquivo']} — concluído", expanded=True):
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Linhas bronze", r['linhas_bronze'])
+                        with col2:
+                            st.metric("Documentos", r['documentos'])
+                        with col3:
+                            st.metric("Itens", r['itens'])
+                        with col4:
+                            st.metric("Produtos novos", r['produtos_criados'])
                 elif r['status'] == "ignorado":
                     st.warning(f"{r['arquivo']} — já importado anteriormente")
                 else:
