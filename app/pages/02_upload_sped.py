@@ -1,8 +1,10 @@
 import streamlit as st
 import os
+import app.models
 from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.parser.renomeador import processar_renomeacao
+from app.parser.bronze import BronzeProcessor
 from app.models.arquivo_importado import ArquivoImportado
 from datetime import datetime
 
@@ -42,15 +44,18 @@ if arquivo:
             st.divider()
 
             if st.button("Confirmar e processar", type="primary", use_container_width=True):
-                with st.spinner("Salvando arquivo..."):
 
-                    # salva o arquivo renomeado na pasta storage
-                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                    with open(caminho, "w", encoding="latin-1") as f:
-                        f.write(conteudo)
+                db = next(get_session())
+                bronze = BronzeProcessor(db, st.session_state.tenant_id)
 
-                    # registra no banco
-                    db = next(get_session())
+                if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
+                    st.warning("Este arquivo já foi importado anteriormente.")
+                else:
+                    with st.spinner("Salvando arquivo..."):
+                        caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                        with open(caminho, "w", encoding="latin-1") as f:
+                            f.write(conteudo)
+
                     registro = ArquivoImportado(
                         tenant_id=st.session_state.tenant_id,
                         nome_original=metadados['nome_original'],
@@ -58,13 +63,23 @@ if arquivo:
                         cnpj=metadados['cnpj'],
                         periodo_ini=metadados['periodo_ini'],
                         periodo_fin=metadados['periodo_fin'],
-                        status="pendente"
+                        status="processando"
                     )
                     db.add(registro)
                     db.commit()
 
-                    st.success(f"Arquivo salvo como **{metadados['novo_nome']}**")
-                    st.info("Processamento bronze/silver será iniciado na próxima etapa.")
+                    with st.spinner("Ingerindo camada bronze..."):
+                        try:
+                            resultado_bronze = bronze.ingerir(conteudo, metadados['novo_nome'])
+                            registro.status = "bronze_concluido"
+                            registro.processado_em = datetime.utcnow()
+                            db.commit()
+                            st.success(f"Bronze concluído! {resultado_bronze['linhas']} linhas ingeridas.")
+                        except Exception as e:
+                            registro.status = "erro"
+                            registro.erro_msg = str(e)
+                            db.commit()
+                            st.error(f"Erro no bronze: {str(e)}")
 
         except ValueError as e:
             st.error(f"Erro ao ler o arquivo: {str(e)}")
