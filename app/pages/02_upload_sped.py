@@ -147,13 +147,29 @@ if arquivos:
                     with st.expander(f"{r['arquivo']} — concluído", expanded=True):
                         col1, col2, col3, col4 = st.columns(4)
                         with col1:
-                            st.metric("Linhas bronze", r['linhas_bronze'])
+                            st.metric(
+                                label="Linhas brutas",
+                                value=r['linhas_bronze'],
+                                help="Total de linhas lidas do arquivo EFD"
+                            )
                         with col2:
-                            st.metric("Documentos", r['documentos'])
+                            st.metric(
+                                label="Notas fiscais",
+                                value=r['documentos'],
+                                help="Quantidade de NFes únicas importadas (bloco C100)"
+                            )
                         with col3:
-                            st.metric("Itens", r['itens'])
+                            st.metric(
+                                label="Itens de notas",
+                                value=r['itens'],
+                                help="Linhas de produtos dentro das notas fiscais (bloco C170)"
+                            )
                         with col4:
-                            st.metric("Produtos novos", r['produtos_criados'])
+                            st.metric(
+                                label="Produtos novos",
+                                value=r['produtos_criados'],
+                                help="Produtos cadastrados pela primeira vez (bloco 0200)"
+                            )
                 elif r['status'] == "ignorado":
                     st.warning(f"{r['arquivo']} — já importado anteriormente")
                 else:
