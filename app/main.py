@@ -73,6 +73,7 @@ else:
 
     from app.components.sidebar import render_sidebar
     render_sidebar()
-
+    st.switch_page("pages/01_dashboard.py")
+    
     st.title("Bem vindo ao SPED Manager")
     st.write("Selecione uma opção no menu lateral.")
