@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 
@@ -13,5 +12,3 @@ class EfdRaw(Base):
     tipo_registro = Column(String(10), nullable=False)
     conteudo_linha = Column(Text, nullable=False)
     ingest_timestamp = Column(DateTime, nullable=False)
-
-    tenant = relationship("Tenant")
