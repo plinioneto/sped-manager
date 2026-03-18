@@ -11,11 +11,11 @@ def extrair_registro_0000(conteudo: str) -> dict:
 
         if campos and campos[0] == '0000':
             return {
-                'dt_ini': campos[3],        
-                'dt_fin': campos[4],        
-                'cnpj': campos[5],          
-                'razao_social': campos[6], 
-                'uf': campos[7],
+                'dt_ini':       campos[3],
+                'dt_fin':       campos[4],
+                'razao_social': campos[5],
+                'cnpj':         campos[6],
+                'uf':           campos[8],
             }
 
     raise ValueError("Registro |0000| não encontrado no arquivo EFD.")
