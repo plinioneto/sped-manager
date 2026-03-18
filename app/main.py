@@ -6,6 +6,7 @@ from app.models.produto import Produto
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.arquivo_importado import ArquivoImportado
+from app.models.efd_raw import EfdRaw
 
 # Criar tabelas no banco caso não existam
 Base.metadata.create_all(bind=engine)
@@ -74,6 +75,6 @@ else:
     from app.components.sidebar import render_sidebar
     render_sidebar()
     st.switch_page("pages/01_dashboard.py")
-    
+
     st.title("Bem vindo ao SPED Manager")
     st.write("Selecione uma opção no menu lateral.")
