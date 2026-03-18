@@ -35,9 +35,7 @@ if not st.session_state.tenant_id:
         db = next(get_session())
         from app.services.tenant_service import TenantService
         service = TenantService(db)
-        tenants = service.listar()
-
-        tenant = next((t for t in tenants if t.cnpj == cnpj), None)
+        tenant = service.buscar_por_cnpj(cnpj)
 
         if tenant:
             st.session_state.tenant_id = tenant.id
