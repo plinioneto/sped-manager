@@ -4,3 +4,4 @@ __pycache__/
 .envsped_manager.egg-info/ 
 criar_tenant.py  echo checar_banco.py  
 storage/ 
+.claude/ 
