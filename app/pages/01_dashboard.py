@@ -6,6 +6,7 @@ from app.utils.db import get_session
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.produto import Produto
 from app.models.itens_fiscal_c170 import ItemFiscal
+from app.models.arquivo_importado import ArquivoImportado
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -43,6 +44,14 @@ total_itens = (
     .scalar()
 ) or 0
 
+ultimos_arquivos = (
+    db.query(ArquivoImportado)
+    .filter(ArquivoImportado.tenant_id == tenant_id)
+    .order_by(ArquivoImportado.criado_em.desc())
+    .limit(10)
+    .all()
+)
+
 db.close()
 
 col1, col2 = st.columns(2)
@@ -77,3 +86,23 @@ with col4:
         value=f"{total_itens:,}".replace(",", "."),
         help="Total de itens nas notas fiscais (bloco C170)"
     )
+
+st.divider()
+st.subheader("Últimos arquivos importados")
+
+if not ultimos_arquivos:
+    st.info("Nenhum arquivo importado ainda.")
+else:
+    for arq in ultimos_arquivos:
+        periodo = f"{arq.periodo_ini[:4]}-{arq.periodo_ini[4:6]} → {arq.periodo_fin[:4]}-{arq.periodo_fin[4:6]}"
+        from datetime import timezone, timedelta
+        brt = timezone(timedelta(hours=-3))
+        data = arq.criado_em.replace(tzinfo=timezone.utc).astimezone(brt).strftime("%d/%m/%Y %H:%M") if arq.criado_em else "—"
+        status_icon = "✅" if arq.status == "concluido" else ("❌" if arq.status == "erro" else "⏳")
+
+        with st.container(border=True):
+            c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+            c1.write(f"**{arq.nome_padronizado}**")
+            c2.write(f"Período: {periodo}")
+            c3.write(f"Importado em: {data}")
+            c4.write(f"{status_icon} {arq.status}")
