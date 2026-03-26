@@ -48,9 +48,10 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 |--------|--------|-------------|
 | 01_dashboard.py | ✅ concluído | 4 métricas reais do banco |
 | 02_upload_sped.py | ✅ concluído | bronze + silver, múltiplos arquivos |
-| 03_estoque.py | ⏳ pendente | |
-| 04_relatorios.py | ⏳ pendente | |
-| 05_configuracoes.py | ⏳ pendente | |
+| 03_cadastro_produto.py | ✅ concluído | |
+| 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
+| 05_relatorios.py | ⏳ pendente | |
+| 06_configuracoes.py | ⏳ pendente | |
 
 ## Status dos models
 | Model | Status | Observações |
@@ -62,6 +63,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | EfdRaw | ✅ | |
 | ArquivoImportado | ✅ | |
 | IcmsC190 | ✅ | constraint única (tenant_id, chv_doc, cst_icms, cfop, aliq_icms); aliq_icms como String |
+| InventarioH005 | ✅ | cabeçalho H005; constraint (tenant_id, dt_inv, mot_inv) |
+| InventarioH010 | ✅ | itens H010; dt_inv desnormalizado; constraint (tenant_id, dt_inv, cod_item, ind_prop) |
+| EstoqueK200 | ✅ | saldo K200; constraint (tenant_id, dt_est, cod_item, ind_est) |
 
 ## Status do parser
 | Etapa | Status | Observações |
@@ -72,6 +76,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | Silver C170 | ✅ | todos os campos |
 | Silver 0200 | ✅ | todos os campos |
 | Silver C190 | ✅ | campos completos, upsert por CST/CFOP/aliq |
+| Silver H005 | ✅ | cabeçalho inventário, upsert por dt_inv+mot_inv |
+| Silver H010 | ✅ | itens inventário, propaga dt_inv do H005 pai |
+| Silver K200 | ✅ | saldo de estoque, upsert por dt_est+cod_item+ind_est |
 
 ## Decisões de arquitetura
 - SQLite no dev, PostgreSQL na produção — troca só o .env
@@ -81,7 +88,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Autenticação temporária só por CNPJ — senha ainda não implementada
 
 ## Pendente
-- [ ] Página de estoque com listagem e filtros
+- [x] Página de cadastro de produto com listagem e filtros
+- [ ] Testar página de inventário com arquivo EFD real contendo Bloco H e K200
 - [ ] Relatórios fiscais (ICMS, PIS, COFINS)
 - [ ] Autenticação completa com senha criptografada
 - [x] Silver C190 com tratamento correto de constraint

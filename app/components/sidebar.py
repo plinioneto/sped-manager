@@ -15,9 +15,10 @@ def render_sidebar():
 
     st.sidebar.page_link("pages/01_dashboard.py", label="Dashboard")
     st.sidebar.page_link("pages/02_upload_sped.py", label="Upload SPED")
-    st.sidebar.page_link("pages/03_estoque.py", label="Estoque")
-    st.sidebar.page_link("pages/04_relatorios.py", label="Relatórios")
-    st.sidebar.page_link("pages/05_configuracoes.py", label="Configurações")
+    st.sidebar.page_link("pages/03_estoque.py", label="Cadastro de Produtos")
+    st.sidebar.page_link("pages/04_inventario.py", label="Estoque & Inventário")
+    st.sidebar.page_link("pages/05_relatorios.py", label="Relatórios")
+    st.sidebar.page_link("pages/06_configuracoes.py", label="Configurações")
 
     st.sidebar.divider()
     if st.sidebar.button("Sair", use_container_width=True):
