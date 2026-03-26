@@ -31,3 +31,4 @@ class DocumentoFiscal(Base):
 
     tenant = relationship("Tenant", back_populates="documentos_fiscais")
     itens = relationship("ItemFiscal", back_populates="documento")
+    icms_c190 = relationship("IcmsC190", back_populates="documento")
