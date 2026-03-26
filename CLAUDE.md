@@ -61,7 +61,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | ItemFiscal | ✅ | campos C170 completos |
 | EfdRaw | ✅ | |
 | ArquivoImportado | ✅ | |
-| IcmsC190 | ❌ removido | problema de constraint — reimplementar |
+| IcmsC190 | ✅ | constraint única (tenant_id, chv_doc, cst_icms, cfop, aliq_icms); aliq_icms como String |
 
 ## Status do parser
 | Etapa | Status | Observações |
@@ -71,7 +71,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | Silver C100 | ✅ | todos os campos |
 | Silver C170 | ✅ | todos os campos |
 | Silver 0200 | ✅ | todos os campos |
-| Silver C190 | ❌ pendente | constraint única com problema |
+| Silver C190 | ✅ | campos completos, upsert por CST/CFOP/aliq |
 
 ## Decisões de arquitetura
 - SQLite no dev, PostgreSQL na produção — troca só o .env
@@ -84,7 +84,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Página de estoque com listagem e filtros
 - [ ] Relatórios fiscais (ICMS, PIS, COFINS)
 - [ ] Autenticação completa com senha criptografada
-- [ ] Silver C190 com tratamento correto de constraint
+- [x] Silver C190 com tratamento correto de constraint
 - [ ] Documentação técnica completa
 - [ ] Migração para PostgreSQL (produção)
 - [ ] Deploy no Streamlit Cloud

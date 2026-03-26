@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
+from app.models.icms_c190 import IcmsC190
 from app.models.produto import Produto
 
 
@@ -184,6 +185,63 @@ class SilverProcessor:
         self.session.commit()
         return criados
 
+    def _processar_c190(self, registros: list) -> int:
+        """
+        Extrai campos do C190 — registro analítico de ICMS por CST/CFOP/alíquota.
+        Upsert por tenant_id + chv_doc + cst_icms + cfop + aliq_icms.
+        """
+        criados = 0
+
+        for reg in registros:
+            c = reg['campos']
+            chv = reg['chv_doc']
+
+            if not chv:
+                continue
+
+            cst = c[2] if len(c) > 2 else ''
+            cfop = c[3] if len(c) > 3 else ''
+            aliq = c[4] if len(c) > 4 else ''
+
+            existente = self.session.query(IcmsC190).filter(
+                IcmsC190.tenant_id == self.tenant_id,
+                IcmsC190.chv_doc == chv,
+                IcmsC190.cst_icms == cst,
+                IcmsC190.cfop == cfop,
+                IcmsC190.aliq_icms == aliq,
+            ).first()
+
+            if existente:
+                continue
+
+            doc = self.session.query(DocumentoFiscal).filter(
+                DocumentoFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.chv_nfe == chv
+            ).first()
+
+            registro = IcmsC190(
+                tenant_id=self.tenant_id,
+                chv_doc=chv,
+                documento_id=doc.id if doc else None,
+                cst_icms=cst,
+                cfop=cfop,
+                aliq_icms=aliq,
+                vl_opr=self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
+                vl_bc_icms=self._cast_decimal(c[6]) if len(c) > 6 else 0.0,
+                vl_icms=self._cast_decimal(c[7]) if len(c) > 7 else 0.0,
+                vl_bc_icms_st=self._cast_decimal(c[8]) if len(c) > 8 else 0.0,
+                vl_icms_st=self._cast_decimal(c[9]) if len(c) > 9 else 0.0,
+                vl_red_bc=self._cast_decimal(c[10]) if len(c) > 10 else 0.0,
+                vl_pis=self._cast_decimal(c[11]) if len(c) > 11 else 0.0,
+                vl_cofins=self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
+                cod_obs=c[13] if len(c) > 13 else '',
+            )
+            self.session.add(registro)
+            criados += 1
+
+        self.session.commit()
+        return criados
+
     def _processar_0200(self, registros: list) -> dict:
         """
         Equivalente à célula 9 do Databricks — extrai campos do 0200.
@@ -257,15 +315,17 @@ class SilverProcessor:
         # equivalente às células 3, 4 e 5
         registros = self._parse_linhas(linhas_raw)
 
-        # equivalente às células 6, 7 e 9
+        # equivalente às células 6, 7, 8 e 9
         docs = self._processar_c100(registros['c100'])
         itens = self._processar_c170(registros['c170'])
+        c190 = self._processar_c190(registros['c190'])
         resultado_produtos = self._processar_0200(registros['0200'])
 
         return {
             "status": "concluido",
             "documentos": docs,
             "itens": itens,
+            "c190": c190,
             "produtos_criados": resultado_produtos['criados'],
             "produtos_atualizados": resultado_produtos['atualizados'],
         }
