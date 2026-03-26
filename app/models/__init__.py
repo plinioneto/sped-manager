@@ -5,3 +5,6 @@ from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.icms_c190 import IcmsC190
 from app.models.arquivo_importado import ArquivoImportado
 from app.models.efd_raw import EfdRaw
+from app.models.inventario_h005 import InventarioH005
+from app.models.inventario_h010 import InventarioH010
+from app.models.estoque_k200 import EstoqueK200
