@@ -6,6 +6,9 @@ from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.icms_c190 import IcmsC190
 from app.models.produto import Produto
+from app.models.inventario_h005 import InventarioH005
+from app.models.inventario_h010 import InventarioH010
+from app.models.estoque_k200 import EstoqueK200
 
 
 class SilverProcessor:
@@ -47,10 +50,14 @@ class SilverProcessor:
             'c170': [],
             'c190': [],
             '0200': [],
-            'loja': []
+            'loja': [],
+            'h005': [],
+            'h010': [],
+            'k200': [],
         }
 
         chv_doc_atual = None
+        dt_inv_atual = None
 
         for linha in linhas_raw:
             campos = linha.split('|')
@@ -78,6 +85,13 @@ class SilverProcessor:
                 registros['0200'].append(registros_bloco)
             elif bloco == '0000':
                 registros['loja'].append(registros_bloco)
+            elif bloco == 'H005' and len(campos) > 2:
+                dt_inv_atual = campos[2]
+                registros['h005'].append({'campos': campos})
+            elif bloco == 'H010':
+                registros['h010'].append({'campos': campos, 'dt_inv': dt_inv_atual})
+            elif bloco == 'K200':
+                registros['k200'].append({'campos': campos})
 
         return registros
 
@@ -289,6 +303,138 @@ class SilverProcessor:
         self.session.commit()
         return {"criados": criados, "atualizados": atualizados}
 
+    def _processar_h005(self, registros: list) -> int:
+        """
+        Extrai campos do H005 — cabeçalho do inventário físico.
+        Upsert por tenant_id + dt_inv + mot_inv.
+        """
+        criados = 0
+
+        for reg in registros:
+            c = reg['campos']
+            dt_inv = self._cast_data(c[2]) if len(c) > 2 else None
+            mot_inv = c[4] if len(c) > 4 else ''
+
+            if not dt_inv:
+                continue
+
+            existente = self.session.query(InventarioH005).filter(
+                InventarioH005.tenant_id == self.tenant_id,
+                InventarioH005.dt_inv == dt_inv,
+                InventarioH005.mot_inv == mot_inv,
+            ).first()
+
+            if existente:
+                existente.vl_inv = self._cast_decimal(c[3]) if len(c) > 3 else 0.0
+                continue
+
+            registro = InventarioH005(
+                tenant_id=self.tenant_id,
+                dt_inv=dt_inv,
+                vl_inv=self._cast_decimal(c[3]) if len(c) > 3 else 0.0,
+                mot_inv=mot_inv,
+            )
+            self.session.add(registro)
+            criados += 1
+
+        self.session.commit()
+        return criados
+
+    def _processar_h010(self, registros: list) -> int:
+        """
+        Extrai campos do H010 — itens do inventário físico.
+        Upsert por tenant_id + dt_inv + cod_item + ind_prop.
+        Deve ser chamado após _processar_h005() (precisa do FK do pai).
+        """
+        criados = 0
+
+        for reg in registros:
+            c = reg['campos']
+            dt_inv = self._cast_data(reg.get('dt_inv')) if reg.get('dt_inv') else None
+            cod_item = c[2] if len(c) > 2 else ''
+            ind_prop = c[7] if len(c) > 7 else '0'
+
+            if not dt_inv or not cod_item:
+                continue
+
+            existente = self.session.query(InventarioH010).filter(
+                InventarioH010.tenant_id == self.tenant_id,
+                InventarioH010.dt_inv == dt_inv,
+                InventarioH010.cod_item == cod_item,
+                InventarioH010.ind_prop == ind_prop,
+            ).first()
+
+            if existente:
+                existente.qtd = self._cast_decimal(c[4]) if len(c) > 4 else 0.0
+                existente.vl_unit = self._cast_decimal(c[5]) if len(c) > 5 else 0.0
+                existente.vl_item = self._cast_decimal(c[6]) if len(c) > 6 else 0.0
+                continue
+
+            pai = self.session.query(InventarioH005).filter(
+                InventarioH005.tenant_id == self.tenant_id,
+                InventarioH005.dt_inv == dt_inv,
+            ).first()
+
+            item = InventarioH010(
+                tenant_id=self.tenant_id,
+                inventario_id=pai.id if pai else None,
+                dt_inv=dt_inv,
+                cod_item=cod_item,
+                unid=c[3] if len(c) > 3 else '',
+                qtd=self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
+                vl_unit=self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
+                vl_item=self._cast_decimal(c[6]) if len(c) > 6 else 0.0,
+                ind_prop=ind_prop,
+                cod_part=c[8] if len(c) > 8 else '',
+                txt_compl=c[9] if len(c) > 9 else '',
+                cod_cta=c[10] if len(c) > 10 else '',
+            )
+            self.session.add(item)
+            criados += 1
+
+        self.session.commit()
+        return criados
+
+    def _processar_k200(self, registros: list) -> int:
+        """
+        Extrai campos do K200 — saldo de estoque por data.
+        Upsert por tenant_id + dt_est + cod_item + ind_est.
+        """
+        criados = 0
+
+        for reg in registros:
+            c = reg['campos']
+            dt_est = self._cast_data(c[2]) if len(c) > 2 else None
+            cod_item = c[3] if len(c) > 3 else ''
+            ind_est = c[5] if len(c) > 5 else '0'
+
+            if not dt_est or not cod_item:
+                continue
+
+            existente = self.session.query(EstoqueK200).filter(
+                EstoqueK200.tenant_id == self.tenant_id,
+                EstoqueK200.dt_est == dt_est,
+                EstoqueK200.cod_item == cod_item,
+                EstoqueK200.ind_est == ind_est,
+            ).first()
+
+            if existente:
+                existente.qt_est = self._cast_decimal(c[4]) if len(c) > 4 else 0.0
+                continue
+
+            saldo = EstoqueK200(
+                tenant_id=self.tenant_id,
+                dt_est=dt_est,
+                cod_item=cod_item,
+                qt_est=self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
+                ind_est=ind_est,
+            )
+            self.session.add(saldo)
+            criados += 1
+
+        self.session.commit()
+        return criados
+
     def processar(self, file_path: str) -> dict:
         """
         Ponto de entrada — lê o efd_raw do banco e processa todas as tabelas.
@@ -320,6 +466,9 @@ class SilverProcessor:
         itens = self._processar_c170(registros['c170'])
         c190 = self._processar_c190(registros['c190'])
         resultado_produtos = self._processar_0200(registros['0200'])
+        h005 = self._processar_h005(registros['h005'])
+        h010 = self._processar_h010(registros['h010'])
+        k200 = self._processar_k200(registros['k200'])
 
         return {
             "status": "concluido",
@@ -328,4 +477,7 @@ class SilverProcessor:
             "c190": c190,
             "produtos_criados": resultado_produtos['criados'],
             "produtos_atualizados": resultado_produtos['atualizados'],
+            "h005": h005,
+            "h010": h010,
+            "k200": k200,
         }
