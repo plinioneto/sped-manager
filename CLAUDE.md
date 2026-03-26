@@ -1,7 +1,7 @@
 # SPED Manager
 
 ## Contexto
-Sistema de gestão para supermercados baseado em arquivos EFD (SPED Fiscal).
+Sistema de gestão fiscal para supermercados baseado em arquivos EFD (SPED Fiscal).
 MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 
 ## Stack
@@ -33,19 +33,67 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Arquivos renomeados: CNPJ_YYYYMMDD_YYYYMMDD.txt
 - imports de models sempre via: import app.models
 - session_state guarda: tenant_id, tenant_nome, tenant_cnpj
+- Guard de autenticação no topo de cada página:
+  if not st.session_state.get("tenant_id"):
+      st.switch_page("main.py")
 
 ## Padrões de código
 - Repositories herdam de BaseRepository (tem tenant_id)
 - Services recebem session + tenant_id
 - Upsert em todos os registros silver
-- Guard de autenticação no topo de cada página:
-  if not st.session_state.get("tenant_id"):
-      st.switch_page("main.py")
+- db.close() após cada query no Streamlit
+
+## Status das páginas
+| Página | Status | Observações |
+|--------|--------|-------------|
+| 01_dashboard.py | ✅ concluído | 4 métricas reais do banco |
+| 02_upload_sped.py | ✅ concluído | bronze + silver, múltiplos arquivos |
+| 03_estoque.py | ⏳ pendente | |
+| 04_relatorios.py | ⏳ pendente | |
+| 05_configuracoes.py | ⏳ pendente | |
+
+## Status dos models
+| Model | Status | Observações |
+|-------|--------|-------------|
+| Tenant | ✅ | |
+| Produto | ✅ | campos 0200 completos |
+| DocumentoFiscal | ✅ | campos C100 completos |
+| ItemFiscal | ✅ | campos C170 completos |
+| EfdRaw | ✅ | |
+| ArquivoImportado | ✅ | |
+| IcmsC190 | ❌ removido | problema de constraint — reimplementar |
+
+## Status do parser
+| Etapa | Status | Observações |
+|-------|--------|-------------|
+| Renomeação | ✅ | CNPJ_YYYYMMDD_YYYYMMDD.txt |
+| Bronze | ✅ | efd_raw linha a linha |
+| Silver C100 | ✅ | todos os campos |
+| Silver C170 | ✅ | todos os campos |
+| Silver 0200 | ✅ | todos os campos |
+| Silver C190 | ❌ pendente | constraint única com problema |
+
+## Decisões de arquitetura
+- SQLite no dev, PostgreSQL na produção — troca só o .env
+- Multi-tenant via tenant_id em todos os models
+- Bronze/Silver seguindo padrão do Databricks original
+- Storage local em storage/arquivos/ — vira S3 na produção
+- Autenticação temporária só por CNPJ — senha ainda não implementada
 
 ## Pendente
-- Dashboard com métricas reais do banco
-- Página de estoque com listagem e filtros
-- Relatórios fiscais (ICMS, PIS, COFINS)
-- Autenticação completa com senha criptografada
-- C190 no silver (pendente — teve problema de constraint)
-- Documentação
+- [ ] Página de estoque com listagem e filtros
+- [ ] Relatórios fiscais (ICMS, PIS, COFINS)
+- [ ] Autenticação completa com senha criptografada
+- [ ] Silver C190 com tratamento correto de constraint
+- [ ] Documentação técnica completa
+- [ ] Migração para PostgreSQL (produção)
+- [ ] Deploy no Streamlit Cloud
+```
+
+**How to maintain it — simple rule:**
+
+After every commit, ask yourself 3 questions:
+```
+1. Did I add or change a model?       → update "Status dos models"
+2. Did I finish or start a page?      → update "Status das páginas"  
+3. Did I make an architectural decision? → update "Decisões de arquitetura"
