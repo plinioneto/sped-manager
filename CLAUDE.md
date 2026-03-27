@@ -98,6 +98,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Documentação técnica completa
 - [ ] Migração para PostgreSQL (produção)
 - [ ] Deploy no Streamlit Cloud
+- [ ] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
+- [ ] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
 ```
 
 **How to maintain it — simple rule:**
