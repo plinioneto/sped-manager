@@ -100,6 +100,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Deploy no Streamlit Cloud
 - [ ] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
 - [ ] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
+- [ ] Mudar legenda dos gráficos de barra pra cima pra que os rótulos de dados não atrapalhem a leitura da legenda
 ```
 
 **How to maintain it — simple rule:**
