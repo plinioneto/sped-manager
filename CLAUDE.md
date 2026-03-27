@@ -52,6 +52,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
 | 05_relatorios.py | ⏳ pendente | |
 | 06_configuracoes.py | ⏳ pendente | |
+| 07_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
 
 ## Status dos models
 | Model | Status | Observações |
@@ -89,6 +90,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 
 ## Pendente
 - [x] Página de cadastro de produto com listagem e filtros
+- [x] Página de gestão de compras com filtros independentes por período, fornecedor, nº nota e produto
 - [ ] Testar página de inventário com arquivo EFD real contendo Bloco H e K200
 - [ ] Relatórios fiscais (ICMS, PIS, COFINS)
 - [ ] Autenticação completa com senha criptografada
