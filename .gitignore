@@ -1,7 +1,10 @@
-.venv/ 
-__pycache__/ 
-*.pyc 
-.envsped_manager.egg-info/ 
-criar_tenant.py  echo checar_banco.py  
-storage/ 
-.claude/ 
+.venv/
+__pycache__/
+*.pyc
+.env
+sped_manager.egg-info/
+criar_tenant.py
+checar_banco.py
+storage/
+.claude/
+*.db
