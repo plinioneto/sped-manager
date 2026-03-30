@@ -83,7 +83,7 @@ PLOTLY_LAYOUT = dict(
     plot_bgcolor="rgba(0,0,0,0)",
     margin=dict(l=20, r=20, t=40, b=20),
     font=dict(size=12),
-    legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
 )
 
 
