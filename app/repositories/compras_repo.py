@@ -21,17 +21,24 @@ def _aplicar_filtros_doc(q, session, tenant_id, mes=None, fornecedor=None, num_n
         termo = f"%{fornecedor}%"
         subq_part = (
             session.query(Participante.cod_part)
-            .filter(
-                Participante.tenant_id == tenant_id,
+            .filter(Participante.tenant_id == tenant_id)
+        )
+        if cnpj_norm:
+            subq_part = subq_part.filter(
                 Participante.nome.ilike(termo)
                 | Participante.cnpj.ilike(f"%{cnpj_norm}%"),
             )
-            .subquery()
-        )
-        q = q.filter(
-            DocumentoFiscal.cod_part.ilike(f"%{cnpj_norm}%")
-            | DocumentoFiscal.cod_part.in_(subq_part)
-        )
+        else:
+            subq_part = subq_part.filter(Participante.nome.ilike(termo))
+        subq_part = subq_part.subquery().select()
+
+        if cnpj_norm:
+            q = q.filter(
+                DocumentoFiscal.cod_part.ilike(f"%{cnpj_norm}%")
+                | DocumentoFiscal.cod_part.in_(subq_part)
+            )
+        else:
+            q = q.filter(DocumentoFiscal.cod_part.in_(subq_part))
     if num_nota:
         q = q.filter(DocumentoFiscal.num_doc.ilike(f"%{num_nota}%"))
     if produto:
