@@ -18,7 +18,7 @@ def render_sidebar():
     st.sidebar.page_link("pages/03_estoque.py", label="Cadastro de Produtos")
     st.sidebar.page_link("pages/04_inventario.py", label="Estoque & Inventário")
     st.sidebar.page_link("pages/07_compras.py", label="Gestão de Compras")
-    st.sidebar.page_link("pages/05_relatorios.py", label="Relatórios")
+    st.sidebar.page_link("pages/05_gestao_fiscal.py", label="Gestão Fiscal")
     st.sidebar.page_link("pages/06_configuracoes.py", label="Configurações")
 
     st.sidebar.divider()

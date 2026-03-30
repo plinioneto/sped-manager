@@ -50,7 +50,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 02_upload_sped.py | ✅ concluído | bronze + silver, múltiplos arquivos |
 | 03_cadastro_produto.py | ✅ concluído | |
 | 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
-| 05_relatorios.py | ⏳ pendente | |
+| 05_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 06_configuracoes.py | ⏳ pendente | |
 | 07_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
 
@@ -94,7 +94,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Página de cadastro de produto com listagem e filtros
 - [x] Página de gestão de compras com filtros independentes por período, fornecedor, nº nota e produto
 - [ ] Testar página de inventário com arquivo EFD real contendo Bloco H e K200
-- [ ] Relatórios fiscais (ICMS, PIS, COFINS)
+- [x] Relatórios fiscais (ICMS, PIS, COFINS) → renomeado para Gestao Fiscal com 5 abas
 - [ ] Autenticação completa com senha criptografada
 - [x] Silver C190 com tratamento correto de constraint
 - [ ] Documentação técnica completa
