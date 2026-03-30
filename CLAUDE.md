@@ -100,7 +100,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Documentação técnica completa
 - [ ] Migração para PostgreSQL (produção)
 - [ ] Deploy no Streamlit Cloud
-- [ ] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
+- [x] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
 - [x] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
 - [ ] Mudar legenda dos gráficos de barra pra cima pra que os rótulos de dados não atrapalhem a leitura da legenda
 - [x] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos

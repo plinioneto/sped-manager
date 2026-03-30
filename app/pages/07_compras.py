@@ -33,16 +33,49 @@ COD_SIT = {
 }
 
 CFOP_DESCR = {
-    "1102": "Compra p/ comercialização",
-    "1403": "Compra p/ comercialização c/ ST",
-    "1556": "Compra de material de uso e consumo",
-    "1551": "Compra de ativo imobilizado",
     "1101": "Compra p/ industrialização",
+    "1102": "Compra p/ comercialização",
     "1126": "Compra p/ utilização na prestação de serviço",
+    "1152": "Transferência p/ comercialização",
+    "1403": "Compra p/ comercialização c/ ST",
+    "1406": "Compra de ativo imobilizado c/ ST",
+    "1407": "Compra de uso e consumo c/ ST",
+    "1409": "Transferência de mercadoria c/ ST",
+    "1551": "Compra de ativo imobilizado",
+    "1556": "Compra de material de uso e consumo",
     "1652": "Compra de energia elétrica",
     "1653": "Compra de energia elétrica p/ distribuição",
+    "1910": "Entrada de bonificação/doação",
+    "1949": "Outra entrada não especificada",
     "2102": "Compra p/ comercialização (interestadual)",
     "2403": "Compra p/ comercialização c/ ST (interestadual)",
+    "2406": "Compra de ativo imobilizado c/ ST (interestadual)",
+    "2407": "Compra de uso e consumo c/ ST (interestadual)",
+    "2551": "Compra de ativo imobilizado (interestadual)",
+    "2556": "Compra de uso e consumo (interestadual)",
+    "2910": "Entrada de bonificação/doação (interestadual)",
+}
+
+CFOP_GRUPO = {
+    "1102": "Mercadoria p/ Revenda",
+    "1403": "Mercadoria p/ Revenda",
+    "2102": "Mercadoria p/ Revenda",
+    "2403": "Mercadoria p/ Revenda",
+    "1152": "Transferências",
+    "1409": "Transferências",
+    "1101": "Industrialização",
+    "1407": "Uso e Consumo",
+    "1556": "Uso e Consumo",
+    "2407": "Uso e Consumo",
+    "2556": "Uso e Consumo",
+    "1406": "Ativo Imobilizado",
+    "1551": "Ativo Imobilizado",
+    "2406": "Ativo Imobilizado",
+    "2551": "Ativo Imobilizado",
+    "1652": "Energia Elétrica",
+    "1653": "Energia Elétrica",
+    "1910": "Bonificação/Doação",
+    "2910": "Bonificação/Doação",
 }
 
 PLOTLY_LAYOUT = dict(
@@ -280,25 +313,64 @@ with aba_geral:
             st.info("Nenhum fornecedor encontrado.")
 
     with col_chart2:
-        st.subheader("Distribuição por CFOP")
+        st.subheader("Distribuição por Finalidade (CFOP)")
         if cfop_data:
-            df_cfop = pd.DataFrame([{
-                "CFOP": f"{r.cfop} - {CFOP_DESCR.get(r.cfop, 'Outros')}" if r.cfop else "N/I",
-                "Valor (R$)": r.valor_total or 0.0,
-                "Itens": r.qtd_itens or 0,
-            } for r in cfop_data])
+            # Agrupa CFOPs por finalidade
+            grupos = {}
+            for r in cfop_data:
+                grupo = CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros"
+                if grupo not in grupos:
+                    grupos[grupo] = {"Valor (R$)": 0.0, "Itens": 0}
+                grupos[grupo]["Valor (R$)"] += r.valor_total or 0.0
+                grupos[grupo]["Itens"] += r.qtd_itens or 0
+
+            df_cfop = pd.DataFrame([
+                {"Finalidade": g, "Valor (R$)": v["Valor (R$)"], "Itens": v["Itens"]}
+                for g, v in grupos.items()
+            ]).sort_values("Valor (R$)", ascending=False)
+
+            cores_grupo = {
+                "Mercadoria p/ Revenda": "#4F8BF9",
+                "Transferências": "#36B37E",
+                "Industrialização": "#FF8B00",
+                "Uso e Consumo": "#6554C0",
+                "Ativo Imobilizado": "#00B8D9",
+                "Energia Elétrica": "#FFAB00",
+                "Bonificação/Doação": "#FF5630",
+                "Outros": "#97A0AF",
+            }
 
             fig_cfop = px.pie(
-                df_cfop, values="Valor (R$)", names="CFOP",
+                df_cfop, values="Valor (R$)", names="Finalidade",
                 hole=0.45,
+                color="Finalidade",
+                color_discrete_map=cores_grupo,
             )
             fig_cfop.update_layout(**PLOTLY_LAYOUT, height=380)
             fig_cfop.update_traces(
                 textposition="inside",
                 textinfo="percent+label",
-                textfont=dict(size=10),
+                textfont=dict(size=11),
             )
             st.plotly_chart(fig_cfop, use_container_width=True)
+
+            # Detalhamento por CFOP individual em expander
+            with st.expander("Ver detalhamento por CFOP"):
+                df_detalhe = pd.DataFrame([{
+                    "CFOP": r.cfop or "N/I",
+                    "Descrição": CFOP_DESCR.get(r.cfop, "Outros") if r.cfop else "N/I",
+                    "Finalidade": CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros",
+                    "Valor (R$)": r.valor_total or 0.0,
+                    "Itens": r.qtd_itens or 0,
+                } for r in cfop_data])
+                st.dataframe(
+                    df_detalhe,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                    },
+                )
         else:
             st.info("Nenhum dado de CFOP encontrado.")
 
