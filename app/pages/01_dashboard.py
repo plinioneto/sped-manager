@@ -120,6 +120,10 @@ total_itens = db.query(func.count(ItemFiscal.id)).filter(
     ItemFiscal.tenant_id == tenant_id
 ).scalar() or 0
 
+ultima_data = db.query(func.max(DocumentoFiscal.dt_doc)).filter(
+    DocumentoFiscal.tenant_id == tenant_id
+).scalar()
+
 todos_arquivos = (
     db.query(ArquivoImportado)
     .filter(ArquivoImportado.tenant_id == tenant_id)
@@ -166,7 +170,7 @@ if arquivos_problema:
     st.divider()
 
 # --- métricas globais ---
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Notas fiscais", f"{total_notas:,}".replace(",", "."), help="Total de documentos fiscais (C100)")
 col2.metric("Produtos cadastrados", f"{total_produtos:,}".replace(",", "."), help="Total de produtos no cadastro (0200)")
 col3.metric(
@@ -175,6 +179,11 @@ col3.metric(
     help="Soma do vl_doc de todos os documentos fiscais"
 )
 col4.metric("Itens de NF", f"{total_itens:,}".replace(",", "."), help="Total de itens nas notas fiscais (C170)")
+col5.metric(
+    "Última data na análise",
+    ultima_data.strftime("%d/%m/%Y") if ultima_data else "—",
+    help="Data mais recente entre os documentos fiscais importados"
+)
 
 st.divider()
 

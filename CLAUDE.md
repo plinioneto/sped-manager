@@ -46,7 +46,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 ## Status das páginas
 | Página | Status | Observações |
 |--------|--------|-------------|
-| 01_dashboard.py | ✅ concluído | 4 métricas reais do banco |
+| 01_dashboard.py | ✅ concluído | 5 métricas reais do banco (inclui última data na análise) |
 | 02_upload_sped.py | ✅ concluído | bronze + silver, múltiplos arquivos |
 | 03_cadastro_produto.py | ✅ concluído | |
 | 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
@@ -67,6 +67,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | InventarioH005 | ✅ | cabeçalho H005; constraint (tenant_id, dt_inv, mot_inv) |
 | InventarioH010 | ✅ | itens H010; dt_inv desnormalizado; constraint (tenant_id, dt_inv, cod_item, ind_prop) |
 | EstoqueK200 | ✅ | saldo K200; constraint (tenant_id, dt_est, cod_item, ind_est) |
+| Participante | ✅ | registro 0150; constraint (tenant_id, cod_part); nome, cnpj, endereço |
 
 ## Status do parser
 | Etapa | Status | Observações |
@@ -80,6 +81,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | Silver H005 | ✅ | cabeçalho inventário, upsert por dt_inv+mot_inv |
 | Silver H010 | ✅ | itens inventário, propaga dt_inv do H005 pai |
 | Silver K200 | ✅ | saldo de estoque, upsert por dt_est+cod_item+ind_est |
+| Silver 0150 | ✅ | participantes, upsert por cod_part |
 
 ## Decisões de arquitetura
 - SQLite no dev, PostgreSQL na produção — troca só o .env
@@ -99,9 +101,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Migração para PostgreSQL (produção)
 - [ ] Deploy no Streamlit Cloud
 - [ ] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
-- [ ] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
+- [x] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
 - [ ] Mudar legenda dos gráficos de barra pra cima pra que os rótulos de dados não atrapalhem a leitura da legenda
-- [ ] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos
+- [x] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos
 ```
 
 **How to maintain it — simple rule:**

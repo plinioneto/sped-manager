@@ -8,3 +8,4 @@ from app.models.efd_raw import EfdRaw
 from app.models.inventario_h005 import InventarioH005
 from app.models.inventario_h010 import InventarioH010
 from app.models.estoque_k200 import EstoqueK200
+from app.models.participante import Participante

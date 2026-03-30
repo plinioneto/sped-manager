@@ -81,6 +81,18 @@ def cnpj_curto(cnpj: str) -> str:
     return cnpj or "N/I"
 
 
+def nome_fornecedor(row) -> str:
+    """Retorna nome do participante ou CNPJ formatado como fallback."""
+    nome = getattr(row, "nome_part", None)
+    if nome:
+        return nome
+    cnpj = getattr(row, "cnpj_part", None)
+    if cnpj and len(cnpj) == 14:
+        return formatar_cnpj(cnpj)
+    cod = getattr(row, "cod_part", None)
+    return cnpj_curto(cod) if cod else "N/I"
+
+
 # ---------------------------------------------------------------------------
 # Dados iniciais e filtros
 # ---------------------------------------------------------------------------
@@ -246,7 +258,7 @@ with aba_geral:
         if top_forn:
             top10 = top_forn[:10]
             df_top = pd.DataFrame([{
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": nome_fornecedor(r),
                 "Valor (R$)": r.total_compras or 0.0,
             } for r in top10])
             df_top = df_top.sort_values("Valor (R$)", ascending=True)
@@ -318,7 +330,7 @@ with aba_forn:
             val = r.total_compras or 0.0
             acumulado += val
             pareto_data.append({
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": nome_fornecedor(r),
                 "Valor (R$)": val,
                 "% Acumulado": (acumulado / grand_total * 100) if grand_total else 0.0,
             })
@@ -360,7 +372,7 @@ with aba_forn:
 
             df_forn_evo = pd.DataFrame([{
                 "Mês": formatar_mes_curto(r.mes),
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": r.nome_part or cnpj_curto(r.cod_part),
                 "Valor (R$)": r.valor_total or 0.0,
             } for r in forn_evolucao])
 
@@ -375,7 +387,8 @@ with aba_forn:
         st.subheader("Ranking de Fornecedores")
 
         df_forn = pd.DataFrame([{
-            "Fornecedor (CNPJ)": formatar_cnpj(r.cod_part) if r.cod_part else "Não informado",
+            "Fornecedor": nome_fornecedor(r),
+            "CNPJ": formatar_cnpj(r.cnpj_part) if r.cnpj_part and len(r.cnpj_part) == 14 else (r.cnpj_part or "—"),
             "Qtd. Notas": r.qtd_notas,
             "Total Compras (R$)": r.total_compras or 0.0,
             "Total ICMS (R$)": r.total_icms or 0.0,
@@ -560,7 +573,8 @@ with aba_notas:
             "Data": doc.dt_doc.strftime("%d/%m/%Y") if doc.dt_doc else "—",
             "Nº Doc": doc.num_doc or "—",
             "Série": doc.ser or "—",
-            "Fornecedor (CNPJ)": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
+            "Fornecedor": nome_part or cnpj_curto(doc.cod_part),
+            "CNPJ Fornecedor": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
             "Situação": COD_SIT.get(doc.cod_sit, doc.cod_sit or "—"),
             "Vlr. Doc (R$)": doc.vl_doc or 0.0,
             "Vlr. Merc (R$)": doc.vl_merc or 0.0,
@@ -569,7 +583,7 @@ with aba_notas:
             "PIS (R$)": doc.vl_pis or 0.0,
             "COFINS (R$)": doc.vl_cofins or 0.0,
             "Chave NF-e": doc.chv_nfe or "—",
-        } for doc in notas])
+        } for doc, nome_part in notas])
 
         st.dataframe(
             df_notas,
@@ -584,7 +598,7 @@ with aba_notas:
                 "COFINS (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
             },
         )
-        total_notas_val = sum(d.vl_doc or 0.0 for d in notas)
+        total_notas_val = sum(doc.vl_doc or 0.0 for doc, _ in notas)
         st.caption(f"{len(notas)} nota(s) | Total: {formatar_br(total_notas_val)}")
 
     # --- Itens Comprados ---
@@ -604,7 +618,7 @@ with aba_notas:
         df_itens = pd.DataFrame([{
             "Data NF": doc.dt_doc.strftime("%d/%m/%Y") if doc.dt_doc else "—",
             "Nº Doc": doc.num_doc or "—",
-            "Fornecedor (CNPJ)": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
+            "Fornecedor": nome_part or cnpj_curto(doc.cod_part),
             "Nº Item": item.num_item,
             "Código": item.cod_item or "—",
             "Descrição": (produto.descr_item if produto else None) or item.descr_compl or "—",
@@ -616,7 +630,7 @@ with aba_notas:
             "CST ICMS": item.cst_icms or "—",
             "Alíq. ICMS (%)": item.aliq_icms or 0.0,
             "ICMS (R$)": item.vl_icms or 0.0,
-        } for item, doc, produto in itens_rows])
+        } for item, doc, produto, nome_part in itens_rows])
 
         st.dataframe(
             df_itens,
@@ -630,5 +644,5 @@ with aba_notas:
                 "ICMS (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
             },
         )
-        total_itens_val = sum(i.vl_item or 0.0 for i, _, _ in itens_rows)
+        total_itens_val = sum(i.vl_item or 0.0 for i, _, _, _ in itens_rows)
         st.caption(f"{len(itens_rows)} item(ns) | Total: {formatar_br(total_itens_val)}")
