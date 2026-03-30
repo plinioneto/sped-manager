@@ -104,6 +104,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
 - [x] Mudar legenda dos gráficos de barra pra cima pra que os rótulos de dados não atrapalhem a leitura da legenda
 - [x] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos
+- [ ] Criar página de gestão de vendas (saídas)
+- [ ] Criar um padrão de cores para a ferramenta, as páginas estão usando cores diferentes (definir quantas cores e quais devem ser usadas)
+- [ ] Renomear as páginas e reordená-las por ordem de importância na sidebar
 ```
 
 **How to maintain it — simple rule:**
