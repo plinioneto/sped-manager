@@ -46,14 +46,13 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 ## Status das páginas
 | Página | Status | Observações |
 |--------|--------|-------------|
-| 01_dashboard.py | ✅ concluído | 5 métricas reais do banco (inclui última data na análise) |
-| 02_upload_sped.py | ✅ concluído | bronze + silver, múltiplos arquivos |
-| 03_cadastro_produto.py | ✅ concluído | |
+| 01_gestao_vendas.py | ✅ concluído | gestão de vendas: visão geral com evolução mensal, ritmo de vendas (heatmap dia×mês, histograma de ticket), mix comercial (CFOP/CST via C190), clientes B2B e notas; 2 filtros (período, dia da semana) |
+| 02_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
+| 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
-| 05_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
-| 06_configuracoes.py | ⏳ pendente | |
-| 07_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
-| 08_gestao_vendas.py | ✅ concluído | gestão de vendas: visão geral com evolução mensal, ritmo de vendas (heatmap dia×mês, histograma de ticket), mix comercial (CFOP/CST via C190), clientes B2B e notas; 2 filtros (período, dia da semana) |
+| 05_produtos.py | ✅ concluído | cadastro de produtos com listagem e filtros |
+| 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
+| 07_configuracoes.py | ⏳ pendente | |
 
 ## Status dos models
 | Model | Status | Observações |
@@ -107,8 +106,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos
 - [x] Criar página de gestão de vendas (saídas)
 - [ ] Criar um padrão de cores para a ferramenta, as páginas estão usando cores diferentes (definir quantas cores e quais devem ser usadas)
-- [ ] Renomear as páginas e reordená-las por ordem de importância na sidebar
-- [ ] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
+- [x] Renomear as páginas e reordená-las por ordem de importância na sidebar
+- [x] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
 - [ ] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero. 
 - [ ] Revisitar cadastro de produto, verificar se tem alguma gestão que pode ser feita ali (opção: "Inteligência de Produtos" com preço médio, concentração de fornecedor, carga tributária)
 - [ ] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
