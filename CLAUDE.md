@@ -107,6 +107,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Criar página de gestão de vendas (saídas)
 - [ ] Criar um padrão de cores para a ferramenta, as páginas estão usando cores diferentes (definir quantas cores e quais devem ser usadas)
 - [ ] Renomear as páginas e reordená-las por ordem de importância na sidebar
+- [ ] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
 ```
 
 **How to maintain it — simple rule:**
