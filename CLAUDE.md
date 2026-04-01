@@ -111,6 +111,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero. 
 - [ ] Revisitar cadastro de produto, verificar se tem alguma gestão que pode ser feita ali (opção: "Inteligência de Produtos" com preço médio, concentração de fornecedor, carga tributária)
 - [ ] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
+- [ ] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
 ```
 
 **How to maintain it — simple rule:**
