@@ -154,13 +154,15 @@ meses_num_raw = sorted({m[4:] for m in meses_raw})
 col_ano, col_mes, col_forn, col_nota, col_prod = st.columns(5)
 
 sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
-sel_mes_num = col_mes.selectbox(
-    "Mês", ["Todos"] + meses_num_raw,
-    format_func=lambda m: "Todos" if m == "Todos" else MESES_ABREV.get(m, m),
+sel_meses = col_mes.multiselect(
+    "Mês",
+    options=meses_num_raw,
+    format_func=lambda m: MESES_ABREV.get(m, m),
+    placeholder="Todos",
 )
 
 ano_filtro = None if sel_ano == "Todos" else sel_ano
-mes_num_filtro = None if sel_mes_num == "Todos" else sel_mes_num
+meses_filtro = sel_meses if sel_meses else None
 
 busca_forn = col_forn.text_input("Fornecedor", placeholder="CNPJ ou parte do nome")
 busca_nota = col_nota.text_input("Nº da Nota", placeholder="Ex: 000123456")
@@ -170,7 +172,7 @@ busca_forn = busca_forn.strip() or None
 busca_nota = busca_nota.strip() or None
 busca_prod = busca_prod.strip() or None
 
-filtros = dict(ano=ano_filtro, mes_num=mes_num_filtro, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+filtros = dict(ano=ano_filtro, meses=meses_filtro, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
 
 # ---------------------------------------------------------------------------
 # Métricas globais com delta
@@ -187,13 +189,13 @@ try:
     delta_valor = None
     delta_itens = None
 
-    if ano_filtro and mes_num_filtro and len(meses_raw) > 1:
-        yyyymm = ano_filtro + mes_num_filtro
+    if ano_filtro and meses_filtro and len(meses_filtro) == 1 and len(meses_raw) > 1:
+        yyyymm = ano_filtro + meses_filtro[0]
         idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
             ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
-            filtros_ant = dict(ano=ano_ant, mes_num=mes_num_ant, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+            filtros_ant = dict(ano=ano_ant, meses=[mes_num_ant], fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
             metricas_ant = repo.metricas_globais(**filtros_ant)
             delta_notas = metricas["total_notas"] - metricas_ant["total_notas"]
             delta_forn = metricas["total_fornecedores"] - metricas_ant["total_fornecedores"]

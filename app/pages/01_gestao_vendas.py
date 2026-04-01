@@ -103,11 +103,13 @@ with col_f1:
     sel_ano = st.selectbox("Ano", ["Todos"] + anos_raw)
     ano_filtro = None if sel_ano == "Todos" else sel_ano
 with col_f2:
-    sel_mes_num = st.selectbox(
-        "Mês", ["Todos"] + meses_num_raw,
-        format_func=lambda m: "Todos" if m == "Todos" else MESES_NOME.get(m, m),
+    sel_meses = st.multiselect(
+        "Mês",
+        options=meses_num_raw,
+        format_func=lambda m: MESES_NOME.get(m, m),
+        placeholder="Todos os meses",
     )
-    mes_num_filtro = None if sel_mes_num == "Todos" else sel_mes_num
+    meses_filtro = sel_meses if sel_meses else None
 with col_f3:
     dias_sel = st.multiselect(
         "Dia da semana",
@@ -124,9 +126,9 @@ with col_f3:
 db = next(get_session())
 try:
     repo = VendasRepository(db, tenant_id)
-    metricas = repo.metricas_globais(ano_filtro, mes_num_filtro, dias_filtro)
+    metricas = repo.metricas_globais(ano_filtro, meses_filtro, dias_filtro)
     evolucao = repo.evolucao_mensal(dias_filtro)
-    dia_semana_data = repo.faturamento_por_dia_semana(ano_filtro, mes_num_filtro, dias_filtro)
+    dia_semana_data = repo.faturamento_por_dia_semana(ano_filtro, meses_filtro, dias_filtro)
 finally:
     db.close()
 
@@ -266,7 +268,7 @@ with tab2:
     try:
         repo = VendasRepository(db, tenant_id)
         heatmap_data = repo.heatmap_dia_mes()
-        ticket_data = repo.distribuicao_ticket(ano_filtro, mes_num_filtro, dias_filtro)
+        ticket_data = repo.distribuicao_ticket(ano_filtro, meses_filtro, dias_filtro)
     finally:
         db.close()
 
@@ -375,7 +377,7 @@ with tab3:
     db = next(get_session())
     try:
         repo = VendasRepository(db, tenant_id)
-        cfop_data = repo.distribuicao_cfop(ano_filtro, mes_num_filtro, dias_filtro)
+        cfop_data = repo.distribuicao_cfop(ano_filtro, meses_filtro, dias_filtro)
         cfop_evol = repo.evolucao_cfop_mensal(cfops_top=3)
     finally:
         db.close()
@@ -453,7 +455,7 @@ with tab4:
     db = next(get_session())
     try:
         repo = VendasRepository(db, tenant_id)
-        clientes = repo.ranking_clientes(ano_filtro, mes_num_filtro, dias_filtro)
+        clientes = repo.ranking_clientes(ano_filtro, meses_filtro, dias_filtro)
         top_clientes_evol = repo.evolucao_top_clientes(limit=5)
     finally:
         db.close()

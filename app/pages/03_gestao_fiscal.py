@@ -110,13 +110,15 @@ meses_num_raw = sorted({m[4:] for m in meses_raw})
 col_ano, col_mes, col_cst, col_cfop = st.columns(4)
 
 sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
-sel_mes_num = col_mes.selectbox(
-    "Mês", ["Todos"] + meses_num_raw,
-    format_func=lambda m: "Todos" if m == "Todos" else MESES_ABREV.get(m, m),
+sel_meses = col_mes.multiselect(
+    "Mês",
+    options=meses_num_raw,
+    format_func=lambda m: MESES_ABREV.get(m, m),
+    placeholder="Todos",
 )
 
 ano_filtro = None if sel_ano == "Todos" else sel_ano
-mes_num_filtro = None if sel_mes_num == "Todos" else sel_mes_num
+meses_filtro = sel_meses if sel_meses else None
 
 sel_cst = col_cst.multiselect(
     "CST ICMS",
@@ -126,7 +128,7 @@ sel_cst = col_cst.multiselect(
 
 sel_cfop = col_cfop.multiselect("CFOP", options=cfops_raw)
 
-filtros = dict(ano=ano_filtro, mes_num=mes_num_filtro, cst_icms=sel_cst or None, cfop=sel_cfop or None)
+filtros = dict(ano=ano_filtro, meses=meses_filtro, cst_icms=sel_cst or None, cfop=sel_cfop or None)
 
 # ---------------------------------------------------------------------------
 # Metricas globais com delta
@@ -143,13 +145,13 @@ try:
     delta_pis_cof = None
     delta_fat = None
 
-    if ano_filtro and mes_num_filtro and len(meses_raw) > 1:
-        yyyymm = ano_filtro + mes_num_filtro
+    if ano_filtro and meses_filtro and len(meses_filtro) == 1 and len(meses_raw) > 1:
+        yyyymm = ano_filtro + meses_filtro[0]
         idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
             ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
-            f_ant = dict(ano=ano_ant, mes_num=mes_num_ant, cst_icms=sel_cst or None, cfop=sel_cfop or None)
+            f_ant = dict(ano=ano_ant, meses=[mes_num_ant], cst_icms=sel_cst or None, cfop=sel_cfop or None)
             m_ant = repo.metricas_visao_geral(**f_ant)
             delta_icms = metricas["icms_a_pagar"] - m_ant["icms_a_pagar"]
             delta_aliq = metricas["aliquota_efetiva"] - m_ant["aliquota_efetiva"]
@@ -459,9 +461,9 @@ with aba_st:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        m_st = repo.metricas_st(ano=ano_filtro, mes_num=mes_num_filtro)
-        top_st = repo.top_produtos_st_entrada(ano=ano_filtro, mes_num=mes_num_filtro, limit=20)
-        evo_st = repo.evolucao_st_vs_proprio(ano=ano_filtro, mes_num=mes_num_filtro)
+        m_st = repo.metricas_st(ano=ano_filtro, meses=meses_filtro)
+        top_st = repo.top_produtos_st_entrada(ano=ano_filtro, meses=meses_filtro, limit=20)
+        evo_st = repo.evolucao_st_vs_proprio(ano=ano_filtro, meses=meses_filtro)
     finally:
         db.close()
 
@@ -563,8 +565,8 @@ with aba_pis:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        m_pis = repo.metricas_pis_cofins(ano=ano_filtro, mes_num=mes_num_filtro)
-        evo_pis = repo.evolucao_pis_cofins(ano=ano_filtro, mes_num=mes_num_filtro)
+        m_pis = repo.metricas_pis_cofins(ano=ano_filtro, meses=meses_filtro)
+        evo_pis = repo.evolucao_pis_cofins(ano=ano_filtro, meses=meses_filtro)
     finally:
         db.close()
 
@@ -640,9 +642,9 @@ with aba_diag:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        alertas = repo.alertas_cst_inconsistente(ano=ano_filtro, mes_num=mes_num_filtro)
-        sem_cst = repo.produtos_sem_cst(ano=ano_filtro, mes_num=mes_num_filtro)
-        concentracao = repo.concentracao_tributaria(ano=ano_filtro, mes_num=mes_num_filtro, limit=20)
+        alertas = repo.alertas_cst_inconsistente(ano=ano_filtro, meses=meses_filtro)
+        sem_cst = repo.produtos_sem_cst(ano=ano_filtro, meses=meses_filtro)
+        concentracao = repo.concentracao_tributaria(ano=ano_filtro, meses=meses_filtro, limit=20)
     finally:
         db.close()
 

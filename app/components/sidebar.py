@@ -13,6 +13,7 @@ def render_sidebar():
     st.sidebar.caption(formatar_cnpj(st.session_state.tenant_cnpj))
     st.sidebar.divider()
 
+    st.sidebar.page_link("pages/00_inicio.py", label="Início")
     st.sidebar.page_link("pages/01_gestao_vendas.py", label="Gestão de Vendas")
     st.sidebar.page_link("pages/02_compras.py", label="Gestão de Compras")
     st.sidebar.page_link("pages/03_gestao_fiscal.py", label="Gestão Fiscal")
