@@ -7,6 +7,7 @@ from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.utils.formatters import formatar_cnpj
 from app.repositories.compras_repo import ComprasRepository
+from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -33,16 +34,49 @@ COD_SIT = {
 }
 
 CFOP_DESCR = {
-    "1102": "Compra p/ comercialização",
-    "1403": "Compra p/ comercialização c/ ST",
-    "1556": "Compra de material de uso e consumo",
-    "1551": "Compra de ativo imobilizado",
     "1101": "Compra p/ industrialização",
+    "1102": "Compra p/ comercialização",
     "1126": "Compra p/ utilização na prestação de serviço",
+    "1152": "Transferência p/ comercialização",
+    "1403": "Compra p/ comercialização c/ ST",
+    "1406": "Compra de ativo imobilizado c/ ST",
+    "1407": "Compra de uso e consumo c/ ST",
+    "1409": "Transferência de mercadoria c/ ST",
+    "1551": "Compra de ativo imobilizado",
+    "1556": "Compra de material de uso e consumo",
     "1652": "Compra de energia elétrica",
     "1653": "Compra de energia elétrica p/ distribuição",
+    "1910": "Entrada de bonificação/doação",
+    "1949": "Outra entrada não especificada",
     "2102": "Compra p/ comercialização (interestadual)",
     "2403": "Compra p/ comercialização c/ ST (interestadual)",
+    "2406": "Compra de ativo imobilizado c/ ST (interestadual)",
+    "2407": "Compra de uso e consumo c/ ST (interestadual)",
+    "2551": "Compra de ativo imobilizado (interestadual)",
+    "2556": "Compra de uso e consumo (interestadual)",
+    "2910": "Entrada de bonificação/doação (interestadual)",
+}
+
+CFOP_GRUPO = {
+    "1102": "Mercadoria p/ Revenda",
+    "1403": "Mercadoria p/ Revenda",
+    "2102": "Mercadoria p/ Revenda",
+    "2403": "Mercadoria p/ Revenda",
+    "1152": "Transferências",
+    "1409": "Transferências",
+    "1101": "Industrialização",
+    "1407": "Uso e Consumo",
+    "1556": "Uso e Consumo",
+    "2407": "Uso e Consumo",
+    "2556": "Uso e Consumo",
+    "1406": "Ativo Imobilizado",
+    "1551": "Ativo Imobilizado",
+    "2406": "Ativo Imobilizado",
+    "2551": "Ativo Imobilizado",
+    "1652": "Energia Elétrica",
+    "1653": "Energia Elétrica",
+    "1910": "Bonificação/Doação",
+    "2910": "Bonificação/Doação",
 }
 
 PLOTLY_LAYOUT = dict(
@@ -50,7 +84,7 @@ PLOTLY_LAYOUT = dict(
     plot_bgcolor="rgba(0,0,0,0)",
     margin=dict(l=20, r=20, t=40, b=20),
     font=dict(size=12),
-    legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
 )
 
 
@@ -81,6 +115,18 @@ def cnpj_curto(cnpj: str) -> str:
     return cnpj or "N/I"
 
 
+def nome_fornecedor(row) -> str:
+    """Retorna nome do participante ou CNPJ formatado como fallback."""
+    nome = getattr(row, "nome_part", None)
+    if nome:
+        return nome
+    cnpj = getattr(row, "cnpj_part", None)
+    if cnpj and len(cnpj) == 14:
+        return formatar_cnpj(cnpj)
+    cod = getattr(row, "cod_part", None)
+    return cnpj_curto(cod) if cod else "N/I"
+
+
 # ---------------------------------------------------------------------------
 # Dados iniciais e filtros
 # ---------------------------------------------------------------------------
@@ -96,13 +142,27 @@ st.title("Gestão de Compras")
 st.divider()
 
 # Filtros
-col_mes, col_forn, col_nota, col_prod = st.columns(4)
+MESES_ABREV = {
+    "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+    "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+    "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
+}
 
-opcoes_mes = ["Todos os meses"] + [formatar_mes(m) for m in meses_raw]
-sel_mes = col_mes.selectbox("Período", opcoes_mes)
+anos_raw = sorted({m[:4] for m in meses_raw}, reverse=True)
+meses_num_raw = sorted({m[4:] for m in meses_raw})
 
-mes_map = {formatar_mes(m): m for m in meses_raw}
-mes_selecionado = mes_map.get(sel_mes)
+col_ano, col_mes, col_forn, col_nota, col_prod = st.columns(5)
+
+sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
+sel_meses = col_mes.multiselect(
+    "Mês",
+    options=meses_num_raw,
+    format_func=lambda m: MESES_ABREV.get(m, m),
+    placeholder="Todos",
+)
+
+ano_filtro = None if sel_ano == "Todos" else sel_ano
+meses_filtro = sel_meses if sel_meses else None
 
 busca_forn = col_forn.text_input("Fornecedor", placeholder="CNPJ ou parte do nome")
 busca_nota = col_nota.text_input("Nº da Nota", placeholder="Ex: 000123456")
@@ -112,7 +172,7 @@ busca_forn = busca_forn.strip() or None
 busca_nota = busca_nota.strip() or None
 busca_prod = busca_prod.strip() or None
 
-filtros = dict(mes=mes_selecionado, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+filtros = dict(ano=ano_filtro, meses=meses_filtro, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
 
 # ---------------------------------------------------------------------------
 # Métricas globais com delta
@@ -129,11 +189,13 @@ try:
     delta_valor = None
     delta_itens = None
 
-    if mes_selecionado and len(meses_raw) > 1:
-        idx = meses_raw.index(mes_selecionado) if mes_selecionado in meses_raw else -1
+    if ano_filtro and meses_filtro and len(meses_filtro) == 1 and len(meses_raw) > 1:
+        yyyymm = ano_filtro + meses_filtro[0]
+        idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
-            filtros_ant = dict(mes=mes_ant, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+            ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
+            filtros_ant = dict(ano=ano_ant, meses=[mes_num_ant], fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
             metricas_ant = repo.metricas_globais(**filtros_ant)
             delta_notas = metricas["total_notas"] - metricas_ant["total_notas"]
             delta_forn = metricas["total_fornecedores"] - metricas_ant["total_fornecedores"]
@@ -214,7 +276,7 @@ with aba_geral:
             x=df_evo["Mês"],
             y=df_evo["Valor Total (R$)"],
             name="Valor Total",
-            marker_color="#4F8BF9",
+            marker_color=AZUL,
             text=[formatar_br(v) for v in df_evo["Valor Total (R$)"]],
             textposition="outside",
             textfont=dict(size=10),
@@ -225,7 +287,7 @@ with aba_geral:
             name="Ticket Médio",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=6),
         ))
         fig_evo.update_layout(
@@ -246,7 +308,7 @@ with aba_geral:
         if top_forn:
             top10 = top_forn[:10]
             df_top = pd.DataFrame([{
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": nome_fornecedor(r),
                 "Valor (R$)": r.total_compras or 0.0,
             } for r in top10])
             df_top = df_top.sort_values("Valor (R$)", ascending=True)
@@ -268,25 +330,64 @@ with aba_geral:
             st.info("Nenhum fornecedor encontrado.")
 
     with col_chart2:
-        st.subheader("Distribuição por CFOP")
+        st.subheader("Distribuição por Finalidade (CFOP)")
         if cfop_data:
-            df_cfop = pd.DataFrame([{
-                "CFOP": f"{r.cfop} - {CFOP_DESCR.get(r.cfop, 'Outros')}" if r.cfop else "N/I",
-                "Valor (R$)": r.valor_total or 0.0,
-                "Itens": r.qtd_itens or 0,
-            } for r in cfop_data])
+            # Agrupa CFOPs por finalidade
+            grupos = {}
+            for r in cfop_data:
+                grupo = CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros"
+                if grupo not in grupos:
+                    grupos[grupo] = {"Valor (R$)": 0.0, "Itens": 0}
+                grupos[grupo]["Valor (R$)"] += r.valor_total or 0.0
+                grupos[grupo]["Itens"] += r.qtd_itens or 0
+
+            df_cfop = pd.DataFrame([
+                {"Finalidade": g, "Valor (R$)": v["Valor (R$)"], "Itens": v["Itens"]}
+                for g, v in grupos.items()
+            ]).sort_values("Valor (R$)", ascending=False)
+
+            cores_grupo = {
+                "Mercadoria p/ Revenda": AZUL,
+                "Transferências": COLOR_SEQ[5],
+                "Industrialização": AMBAR,
+                "Uso e Consumo": COLOR_SEQ[4],
+                "Ativo Imobilizado": COLOR_SEQ[1],
+                "Energia Elétrica": COLOR_SEQ[2],
+                "Bonificação/Doação": VERMELHO,
+                "Outros": "#97A0AF",
+            }
 
             fig_cfop = px.pie(
-                df_cfop, values="Valor (R$)", names="CFOP",
+                df_cfop, values="Valor (R$)", names="Finalidade",
                 hole=0.45,
+                color="Finalidade",
+                color_discrete_map=cores_grupo,
             )
             fig_cfop.update_layout(**PLOTLY_LAYOUT, height=380)
             fig_cfop.update_traces(
                 textposition="inside",
                 textinfo="percent+label",
-                textfont=dict(size=10),
+                textfont=dict(size=11),
             )
             st.plotly_chart(fig_cfop, use_container_width=True)
+
+            # Detalhamento por CFOP individual em expander
+            with st.expander("Ver detalhamento por CFOP"):
+                df_detalhe = pd.DataFrame([{
+                    "CFOP": r.cfop or "N/I",
+                    "Descrição": CFOP_DESCR.get(r.cfop, "Outros") if r.cfop else "N/I",
+                    "Finalidade": CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros",
+                    "Valor (R$)": r.valor_total or 0.0,
+                    "Itens": r.qtd_itens or 0,
+                } for r in cfop_data])
+                st.dataframe(
+                    df_detalhe,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                    },
+                )
         else:
             st.info("Nenhum dado de CFOP encontrado.")
 
@@ -318,7 +419,7 @@ with aba_forn:
             val = r.total_compras or 0.0
             acumulado += val
             pareto_data.append({
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": nome_fornecedor(r),
                 "Valor (R$)": val,
                 "% Acumulado": (acumulado / grand_total * 100) if grand_total else 0.0,
             })
@@ -330,7 +431,7 @@ with aba_forn:
             x=df_pareto["Fornecedor"],
             y=df_pareto["Valor (R$)"],
             name="Valor",
-            marker_color="#4F8BF9",
+            marker_color=AZUL,
         ))
         fig_pareto.add_trace(go.Scatter(
             x=df_pareto["Fornecedor"],
@@ -338,7 +439,7 @@ with aba_forn:
             name="% Acumulado",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=6),
         ))
         fig_pareto.add_hline(
@@ -360,7 +461,7 @@ with aba_forn:
 
             df_forn_evo = pd.DataFrame([{
                 "Mês": formatar_mes_curto(r.mes),
-                "Fornecedor": cnpj_curto(r.cod_part),
+                "Fornecedor": r.nome_part or cnpj_curto(r.cod_part),
                 "Valor (R$)": r.valor_total or 0.0,
             } for r in forn_evolucao])
 
@@ -375,7 +476,8 @@ with aba_forn:
         st.subheader("Ranking de Fornecedores")
 
         df_forn = pd.DataFrame([{
-            "Fornecedor (CNPJ)": formatar_cnpj(r.cod_part) if r.cod_part else "Não informado",
+            "Fornecedor": nome_fornecedor(r),
+            "CNPJ": formatar_cnpj(r.cnpj_part) if r.cnpj_part and len(r.cnpj_part) == 14 else (r.cnpj_part or "—"),
             "Qtd. Notas": r.qtd_notas,
             "Total Compras (R$)": r.total_compras or 0.0,
             "Total ICMS (R$)": r.total_icms or 0.0,
@@ -453,7 +555,7 @@ with aba_prod:
 
         # Gráfico top 20 com curva acumulada
         df_abc_top = df_abc.head(20)
-        cores_abc = {"A": "#4F8BF9", "B": "#FFA726", "C": "#BDBDBD"}
+        cores_abc = {"A": AZUL, "B": AMBAR, "C": "#BDBDBD"}
 
         fig_abc = go.Figure()
         for classe in ["A", "B", "C"]:
@@ -471,7 +573,7 @@ with aba_prod:
             name="% Acumulado",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=5),
         ))
         fig_abc.add_hline(y=80, line_dash="dash", line_color="rgba(79,139,249,0.4)", annotation_text="80%", yref="y2")
@@ -560,7 +662,8 @@ with aba_notas:
             "Data": doc.dt_doc.strftime("%d/%m/%Y") if doc.dt_doc else "—",
             "Nº Doc": doc.num_doc or "—",
             "Série": doc.ser or "—",
-            "Fornecedor (CNPJ)": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
+            "Fornecedor": nome_part or cnpj_curto(doc.cod_part),
+            "CNPJ Fornecedor": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
             "Situação": COD_SIT.get(doc.cod_sit, doc.cod_sit or "—"),
             "Vlr. Doc (R$)": doc.vl_doc or 0.0,
             "Vlr. Merc (R$)": doc.vl_merc or 0.0,
@@ -569,7 +672,7 @@ with aba_notas:
             "PIS (R$)": doc.vl_pis or 0.0,
             "COFINS (R$)": doc.vl_cofins or 0.0,
             "Chave NF-e": doc.chv_nfe or "—",
-        } for doc in notas])
+        } for doc, nome_part in notas])
 
         st.dataframe(
             df_notas,
@@ -584,7 +687,7 @@ with aba_notas:
                 "COFINS (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
             },
         )
-        total_notas_val = sum(d.vl_doc or 0.0 for d in notas)
+        total_notas_val = sum(doc.vl_doc or 0.0 for doc, _ in notas)
         st.caption(f"{len(notas)} nota(s) | Total: {formatar_br(total_notas_val)}")
 
     # --- Itens Comprados ---
@@ -604,7 +707,7 @@ with aba_notas:
         df_itens = pd.DataFrame([{
             "Data NF": doc.dt_doc.strftime("%d/%m/%Y") if doc.dt_doc else "—",
             "Nº Doc": doc.num_doc or "—",
-            "Fornecedor (CNPJ)": formatar_cnpj(doc.cod_part) if doc.cod_part else "—",
+            "Fornecedor": nome_part or cnpj_curto(doc.cod_part),
             "Nº Item": item.num_item,
             "Código": item.cod_item or "—",
             "Descrição": (produto.descr_item if produto else None) or item.descr_compl or "—",
@@ -616,7 +719,7 @@ with aba_notas:
             "CST ICMS": item.cst_icms or "—",
             "Alíq. ICMS (%)": item.aliq_icms or 0.0,
             "ICMS (R$)": item.vl_icms or 0.0,
-        } for item, doc, produto in itens_rows])
+        } for item, doc, produto, nome_part in itens_rows])
 
         st.dataframe(
             df_itens,
@@ -630,5 +733,5 @@ with aba_notas:
                 "ICMS (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
             },
         )
-        total_itens_val = sum(i.vl_item or 0.0 for i, _, _ in itens_rows)
+        total_itens_val = sum(i.vl_item or 0.0 for i, _, _, _ in itens_rows)
         st.caption(f"{len(itens_rows)} item(ns) | Total: {formatar_br(total_itens_val)}")

@@ -3,6 +3,7 @@ from sqlalchemy import func, case
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
+from app.models.participante import Participante
 from app.repositories.base_repo import BaseRepository
 
 
@@ -11,12 +12,35 @@ def _normalizar_cnpj(valor: str) -> str:
     return re.sub(r"\D", "", valor)
 
 
-def _aplicar_filtros_doc(q, session, tenant_id, mes=None, fornecedor=None, num_nota=None, produto=None):
+def _aplicar_filtros_doc(q, session, tenant_id, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None):
     """Aplica os 4 filtros padrão a uma query que já contém DocumentoFiscal."""
-    if mes:
-        q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+    if ano:
+        q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+    if meses:
+        q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
     if fornecedor:
-        q = q.filter(DocumentoFiscal.cod_part.ilike(f"%{_normalizar_cnpj(fornecedor)}%"))
+        cnpj_norm = _normalizar_cnpj(fornecedor)
+        termo = f"%{fornecedor}%"
+        subq_part = (
+            session.query(Participante.cod_part)
+            .filter(Participante.tenant_id == tenant_id)
+        )
+        if cnpj_norm:
+            subq_part = subq_part.filter(
+                Participante.nome.ilike(termo)
+                | Participante.cnpj.ilike(f"%{cnpj_norm}%"),
+            )
+        else:
+            subq_part = subq_part.filter(Participante.nome.ilike(termo))
+        subq_part = subq_part.subquery().select()
+
+        if cnpj_norm:
+            q = q.filter(
+                DocumentoFiscal.cod_part.ilike(f"%{cnpj_norm}%")
+                | DocumentoFiscal.cod_part.in_(subq_part)
+            )
+        else:
+            q = q.filter(DocumentoFiscal.cod_part.in_(subq_part))
     if num_nota:
         q = q.filter(DocumentoFiscal.num_doc.ilike(f"%{num_nota}%"))
     if produto:
@@ -47,15 +71,15 @@ class ComprasRepository(BaseRepository):
             DocumentoFiscal.ind_oper == "0",
         )
 
-    def _filtrar(self, q, mes=None, fornecedor=None, num_nota=None, produto=None):
-        return _aplicar_filtros_doc(q, self.session, self.tenant_id, mes, fornecedor, num_nota, produto)
+    def _filtrar(self, q, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None):
+        return _aplicar_filtros_doc(q, self.session, self.tenant_id, ano, meses, fornecedor, num_nota, produto)
 
     # ------------------------------------------------------------------
     # Métricas
     # ------------------------------------------------------------------
 
-    def metricas_globais(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> dict:
-        base = self._filtrar(self._base_entrada(), mes, fornecedor, num_nota, produto)
+    def metricas_globais(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> dict:
+        base = self._filtrar(self._base_entrada(), ano, meses, fornecedor, num_nota, produto)
 
         total_notas = base.with_entities(
             func.count(DocumentoFiscal.id)
@@ -79,7 +103,7 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q_itens = self._filtrar(q_itens, mes, fornecedor, num_nota, produto)
+        q_itens = self._filtrar(q_itens, ano, meses, fornecedor, num_nota, produto)
         total_itens_comprados = q_itens.scalar() or 0
 
         return {
@@ -108,25 +132,42 @@ class ComprasRepository(BaseRepository):
     # Listagens detalhadas
     # ------------------------------------------------------------------
 
-    def listar_notas(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
-        q = self._filtrar(self._base_entrada(), mes, fornecedor, num_nota, produto)
+    def listar_notas(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
+        q = (
+            self.session.query(DocumentoFiscal, Participante.nome.label("nome_part"))
+            .outerjoin(
+                Participante,
+                (Participante.tenant_id == self.tenant_id)
+                & (Participante.cod_part == DocumentoFiscal.cod_part),
+            )
+            .filter(
+                DocumentoFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return q.order_by(DocumentoFiscal.dt_doc.desc()).all()
 
-    def listar_itens(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def listar_itens(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         q = (
-            self.session.query(ItemFiscal, DocumentoFiscal, Produto)
+            self.session.query(ItemFiscal, DocumentoFiscal, Produto, Participante.nome.label("nome_part"))
             .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
             .outerjoin(
                 Produto,
                 (Produto.tenant_id == self.tenant_id)
                 & (Produto.cod_item == ItemFiscal.cod_item),
             )
+            .outerjoin(
+                Participante,
+                (Participante.tenant_id == self.tenant_id)
+                & (Participante.cod_part == DocumentoFiscal.cod_part),
+            )
             .filter(
                 ItemFiscal.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto=None)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto=None)
         if produto:
             termo = f"%{produto}%"
             q = q.filter(
@@ -140,29 +181,36 @@ class ComprasRepository(BaseRepository):
     # Agrupamentos
     # ------------------------------------------------------------------
 
-    def agrupar_por_fornecedor(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def agrupar_por_fornecedor(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         q = (
             self.session.query(
                 DocumentoFiscal.cod_part,
+                Participante.nome.label("nome_part"),
+                Participante.cnpj.label("cnpj_part"),
                 func.count(DocumentoFiscal.id.distinct()).label("qtd_notas"),
                 func.sum(DocumentoFiscal.vl_doc).label("total_compras"),
                 func.sum(DocumentoFiscal.vl_icms).label("total_icms"),
                 func.sum(DocumentoFiscal.vl_pis).label("total_pis"),
                 func.sum(DocumentoFiscal.vl_cofins).label("total_cofins"),
             )
+            .outerjoin(
+                Participante,
+                (Participante.tenant_id == self.tenant_id)
+                & (Participante.cod_part == DocumentoFiscal.cod_part),
+            )
             .filter(
                 DocumentoFiscal.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
-            q.group_by(DocumentoFiscal.cod_part)
+            q.group_by(DocumentoFiscal.cod_part, Participante.nome, Participante.cnpj)
             .order_by(func.sum(DocumentoFiscal.vl_doc).desc())
             .all()
         )
 
-    def agrupar_por_produto(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def agrupar_por_produto(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         q = (
             self.session.query(
                 ItemFiscal.cod_item,
@@ -189,7 +237,7 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto=None)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto=None)
         if produto:
             termo = f"%{produto}%"
             q = q.filter(
@@ -205,7 +253,7 @@ class ComprasRepository(BaseRepository):
     # Novas queries para gráficos
     # ------------------------------------------------------------------
 
-    def evolucao_mensal(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def evolucao_mensal(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         """Agrupa compras por mês: valor, notas, ticket médio."""
         q = (
             self.session.query(
@@ -219,14 +267,14 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
             q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
             .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
             .all()
         )
 
-    def top_fornecedores_evolucao(self, limit=5, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def top_fornecedores_evolucao(self, limit=5, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         """Série temporal mensal dos top N fornecedores por valor."""
         top_q = (
             self.session.query(DocumentoFiscal.cod_part)
@@ -236,7 +284,7 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.cod_part.isnot(None),
             )
         )
-        top_q = self._filtrar(top_q, mes, fornecedor, num_nota, produto)
+        top_q = self._filtrar(top_q, ano, meses, fornecedor, num_nota, produto)
         top_fornecedores = [
             r[0] for r in top_q.group_by(DocumentoFiscal.cod_part)
             .order_by(func.sum(DocumentoFiscal.vl_doc).desc())
@@ -250,7 +298,13 @@ class ComprasRepository(BaseRepository):
             self.session.query(
                 func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
                 DocumentoFiscal.cod_part,
+                Participante.nome.label("nome_part"),
                 func.sum(DocumentoFiscal.vl_doc).label("valor_total"),
+            )
+            .outerjoin(
+                Participante,
+                (Participante.tenant_id == self.tenant_id)
+                & (Participante.cod_part == DocumentoFiscal.cod_part),
             )
             .filter(
                 DocumentoFiscal.tenant_id == self.tenant_id,
@@ -258,17 +312,18 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.cod_part.in_(top_fornecedores),
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
             q.group_by(
                 func.strftime("%Y%m", DocumentoFiscal.dt_doc),
                 DocumentoFiscal.cod_part,
+                Participante.nome,
             )
             .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
             .all()
         )
 
-    def distribuicao_cfop(self, mes=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def distribuicao_cfop(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
         """Agrupa itens de entrada por CFOP: valor e contagem."""
         q = (
             self.session.query(
@@ -282,7 +337,7 @@ class ComprasRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        q = self._filtrar(q, mes, fornecedor, num_nota, produto)
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
             q.group_by(ItemFiscal.cfop)
             .order_by(func.sum(ItemFiscal.vl_item).desc())

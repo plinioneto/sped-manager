@@ -9,6 +9,7 @@ from app.models.produto import Produto
 from app.models.inventario_h005 import InventarioH005
 from app.models.inventario_h010 import InventarioH010
 from app.models.estoque_k200 import EstoqueK200
+from app.models.participante import Participante
 
 
 class SilverProcessor:
@@ -50,6 +51,7 @@ class SilverProcessor:
             'c170': [],
             'c190': [],
             '0200': [],
+            '0150': [],
             'loja': [],
             'h005': [],
             'h010': [],
@@ -81,6 +83,8 @@ class SilverProcessor:
                 registros['c170'].append(registros_bloco)
             elif bloco == 'C190':
                 registros['c190'].append(registros_bloco)
+            elif bloco == '0150':
+                registros['0150'].append({'campos': campos})
             elif bloco == '0200':
                 registros['0200'].append(registros_bloco)
             elif bloco == '0000':
@@ -435,6 +439,53 @@ class SilverProcessor:
         self.session.commit()
         return criados
 
+    def _processar_0150(self, registros: list) -> int:
+        """
+        Extrai campos do 0150 — cadastro de participantes.
+        Upsert por tenant_id + cod_part.
+        Layout: |0150|COD_PART|NOME|COD_PAIS|CNPJ|CPF|IE|COD_MUN|SUFRAMA|END|NUM|COMPL|BAIRRO|
+        """
+        criados = 0
+
+        for reg in registros:
+            c = reg['campos']
+            cod_part = c[2] if len(c) > 2 else ''
+
+            if not cod_part:
+                continue
+
+            existente = self.session.query(Participante).filter(
+                Participante.tenant_id == self.tenant_id,
+                Participante.cod_part == cod_part,
+            ).first()
+
+            if existente:
+                existente.nome = c[3] if len(c) > 3 else existente.nome
+                existente.cnpj = c[5] if len(c) > 5 else existente.cnpj
+                existente.cpf = c[6] if len(c) > 6 else existente.cpf
+                continue
+
+            part = Participante(
+                tenant_id=self.tenant_id,
+                cod_part=cod_part,
+                nome=c[3] if len(c) > 3 else '',
+                cod_pais=c[4] if len(c) > 4 else '',
+                cnpj=c[5] if len(c) > 5 else '',
+                cpf=c[6] if len(c) > 6 else '',
+                ie=c[7] if len(c) > 7 else '',
+                cod_mun=c[8] if len(c) > 8 else '',
+                suframa=c[9] if len(c) > 9 else '',
+                endereco=c[10] if len(c) > 10 else '',
+                num=c[11] if len(c) > 11 else '',
+                compl=c[12] if len(c) > 12 else '',
+                bairro=c[13] if len(c) > 13 else '',
+            )
+            self.session.add(part)
+            criados += 1
+
+        self.session.commit()
+        return criados
+
     def processar(self, file_path: str) -> dict:
         """
         Ponto de entrada — lê o efd_raw do banco e processa todas as tabelas.
@@ -462,6 +513,7 @@ class SilverProcessor:
         registros = self._parse_linhas(linhas_raw)
 
         # equivalente às células 6, 7, 8 e 9
+        participantes = self._processar_0150(registros['0150'])
         docs = self._processar_c100(registros['c100'])
         itens = self._processar_c170(registros['c170'])
         c190 = self._processar_c190(registros['c190'])
@@ -472,6 +524,7 @@ class SilverProcessor:
 
         return {
             "status": "concluido",
+            "participantes": participantes,
             "documentos": docs,
             "itens": itens,
             "c190": c190,

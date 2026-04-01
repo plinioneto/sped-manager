@@ -17,3 +17,4 @@ class Tenant(Base):
     documentos_fiscais = relationship("DocumentoFiscal", back_populates="tenant")
     arquivos_importados = relationship("ArquivoImportado")
     efd_raw = relationship("EfdRaw")
+    participantes = relationship("Participante", back_populates="tenant")

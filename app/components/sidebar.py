@@ -13,13 +13,14 @@ def render_sidebar():
     st.sidebar.caption(formatar_cnpj(st.session_state.tenant_cnpj))
     st.sidebar.divider()
 
-    st.sidebar.page_link("pages/01_dashboard.py", label="Dashboard")
-    st.sidebar.page_link("pages/02_upload_sped.py", label="Upload SPED")
-    st.sidebar.page_link("pages/03_estoque.py", label="Cadastro de Produtos")
+    st.sidebar.page_link("pages/00_inicio.py", label="Início")
+    st.sidebar.page_link("pages/01_gestao_vendas.py", label="Gestão de Vendas")
+    st.sidebar.page_link("pages/02_compras.py", label="Gestão de Compras")
+    st.sidebar.page_link("pages/03_gestao_fiscal.py", label="Gestão Fiscal")
     st.sidebar.page_link("pages/04_inventario.py", label="Estoque & Inventário")
-    st.sidebar.page_link("pages/07_compras.py", label="Gestão de Compras")
-    st.sidebar.page_link("pages/05_relatorios.py", label="Relatórios")
-    st.sidebar.page_link("pages/06_configuracoes.py", label="Configurações")
+    st.sidebar.page_link("pages/05_produtos.py", label="Cadastro de Produtos")
+    st.sidebar.page_link("pages/06_dados.py", label="Dados")
+    st.sidebar.page_link("pages/07_configuracoes.py", label="Configurações")
 
     st.sidebar.divider()
     if st.sidebar.button("Sair", use_container_width=True):
