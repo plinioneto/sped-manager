@@ -6,6 +6,7 @@ import app.models
 from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.repositories.fiscal_repo import FiscalRepository, _parse_aliq
+from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -234,20 +235,20 @@ with aba_geral:
         fig_evo = go.Figure()
         fig_evo.add_trace(go.Bar(
             x=df_evo["mes_label"], y=df_evo["icms_debito"],
-            name="ICMS Debito (Saida)", marker_color="#EF553B",
+            name="ICMS Debito (Saida)", marker_color=VERMELHO,
             text=[formatar_br(v) for v in df_evo["icms_debito"]],
             textposition="outside", textfont=dict(size=9),
         ))
         fig_evo.add_trace(go.Bar(
             x=df_evo["mes_label"], y=df_evo["icms_credito"],
-            name="ICMS Credito (Entrada)", marker_color="#00CC96",
+            name="ICMS Credito (Entrada)", marker_color=VERDE,
             text=[formatar_br(v) for v in df_evo["icms_credito"]],
             textposition="outside", textfont=dict(size=9),
         ))
         fig_evo.add_trace(go.Scatter(
             x=df_evo["mes_label"], y=df_evo["icms_a_pagar"],
             name="ICMS a Pagar", mode="lines+markers",
-            line=dict(color="#636EFA", width=3), marker=dict(size=8),
+            line=dict(color=AZUL, width=3), marker=dict(size=8),
         ))
         fig_evo.update_layout(
             **PLOTLY_LAYOUT, barmode="group", height=420,
@@ -268,10 +269,10 @@ with aba_geral:
                 {"Tributo": k, "Valor (R$)": v} for k, v in comp_filtrado.items()
             ])
             cores_comp = {
-                "ICMS Proprio": "#636EFA",
-                "ICMS-ST": "#EF553B",
-                "PIS": "#00CC96",
-                "COFINS": "#AB63FA",
+                "ICMS Proprio": AZUL,
+                "ICMS-ST": VERMELHO,
+                "PIS": VERDE,
+                "COFINS": COLOR_SEQ[4],
             }
             fig_comp = px.pie(
                 df_comp, values="Valor (R$)", names="Tributo",
@@ -386,13 +387,13 @@ with aba_icms:
             fig_aliq = go.Figure()
             fig_aliq.add_trace(go.Bar(
                 x=df_aliq["Aliquota"], y=df_aliq["Valor Operacoes (R$)"],
-                name="Valor Operacoes", marker_color="#636EFA",
+                name="Valor Operacoes", marker_color=AZUL,
                 text=[formatar_br(v) for v in df_aliq["Valor Operacoes (R$)"]],
                 textposition="outside", textfont=dict(size=9),
             ))
             fig_aliq.add_trace(go.Bar(
                 x=df_aliq["Aliquota"], y=df_aliq["ICMS (R$)"],
-                name="ICMS", marker_color="#EF553B",
+                name="ICMS", marker_color=VERMELHO,
                 text=[formatar_br(v) for v in df_aliq["ICMS (R$)"]],
                 textposition="outside", textfont=dict(size=9),
             ))
@@ -540,12 +541,12 @@ with aba_st:
         fig_evo_st.add_trace(go.Scatter(
             x=df_evo_st["Mes"], y=df_evo_st["Operacoes ST (R$)"],
             name="ST (CST 060)", mode="lines+markers",
-            line=dict(color="#EF553B", width=3), marker=dict(size=8),
+            line=dict(color=VERMELHO, width=3), marker=dict(size=8),
         ))
         fig_evo_st.add_trace(go.Scatter(
             x=df_evo_st["Mes"], y=df_evo_st["Operacoes ICMS Proprio (R$)"],
             name="ICMS Proprio (CST 000/020)", mode="lines+markers",
-            line=dict(color="#636EFA", width=3), marker=dict(size=8),
+            line=dict(color=AZUL, width=3), marker=dict(size=8),
         ))
         fig_evo_st.update_layout(**PLOTLY_LAYOUT, height=380,
             yaxis=dict(title="Valor (R$)", showgrid=True, gridcolor="rgba(128,128,128,0.2)"))
@@ -610,19 +611,19 @@ with aba_pis:
         fig_pis = go.Figure()
         fig_pis.add_trace(go.Bar(
             x=df_pis["mes_label"], y=df_pis["pis_entrada"],
-            name="PIS Entrada", marker_color="#00CC96",
+            name="PIS Entrada", marker_color=VERDE,
         ))
         fig_pis.add_trace(go.Bar(
             x=df_pis["mes_label"], y=df_pis["cofins_entrada"],
-            name="COFINS Entrada", marker_color="#AB63FA",
+            name="COFINS Entrada", marker_color=COLOR_SEQ[4],
         ))
         fig_pis.add_trace(go.Bar(
             x=df_pis["mes_label"], y=df_pis["pis_saida"],
-            name="PIS Saida", marker_color="#FFA15A",
+            name="PIS Saida", marker_color=AMBAR,
         ))
         fig_pis.add_trace(go.Bar(
             x=df_pis["mes_label"], y=df_pis["cofins_saida"],
-            name="COFINS Saida", marker_color="#EF553B",
+            name="COFINS Saida", marker_color=VERMELHO,
         ))
         fig_pis.update_layout(**PLOTLY_LAYOUT, barmode="group", height=400,
             yaxis=dict(title="Valor (R$)", showgrid=True, gridcolor="rgba(128,128,128,0.2)"))

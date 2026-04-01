@@ -7,6 +7,7 @@ from app.components.sidebar import render_sidebar
 from app.repositories.vendas_repo import VendasRepository, DIA_SEMANA_MAP
 from app.utils.db import get_session
 from app.utils.formatters import formatar_cnpj
+from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -59,7 +60,7 @@ MESES_NOME = {
     "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
 }
 
-CORES_ANO = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6"]
+CORES_ANO = COLOR_SEQ
 
 # ------------------------------------------------------------------
 # Helpers
@@ -196,7 +197,7 @@ with tab1:
         df_evol["label_mes"] = df_evol["mes"].apply(fmt_mes)
 
         cores = [
-            "#2ecc71" if (c is None or c >= 0) else "#e74c3c"
+            VERDE if (c is None or c >= 0) else VERMELHO
             for c in df_evol["cresc_pct"]
         ]
 
@@ -215,7 +216,7 @@ with tab1:
             y=df_evol["cresc_pct"],
             name="Crescimento %",
             mode="lines+markers",
-            line=dict(color="#f39c12", width=2),
+            line=dict(color=AMBAR, width=2),
             yaxis="y2",
         ))
         fig.update_layout(
@@ -240,7 +241,7 @@ with tab1:
                 fill="tozeroy",
                 mode="lines+markers",
                 name="Acumulado",
-                line=dict(color="#3498db"),
+                line=dict(color=AZUL),
             ))
             fig_acum.update_layout(
                 title="Faturamento Acumulado",
@@ -322,14 +323,14 @@ with tab2:
                 x=df_dia["dia_label"],
                 y=df_dia["faturamento"],
                 name="Faturamento",
-                marker_color="#3498db",
+                marker_color=AZUL,
             ))
             fig_dia.add_trace(go.Scatter(
                 x=df_dia["dia_label"],
                 y=df_dia["ticket_medio"],
                 name="Ticket Médio",
                 mode="lines+markers",
-                line=dict(color="#e67e22", width=2),
+                line=dict(color=AMBAR, width=2),
                 yaxis="y2",
             ))
             fig_dia.update_layout(
@@ -353,7 +354,7 @@ with tab2:
             y=contagens,
             text=[f"{p:.2f}%" for p in pcts],
             textposition="outside",
-            marker_color="#9b59b6",
+            marker_color=COLOR_SEQ[4],
         ))
         fig_hist.update_layout(
             title="Notas por Faixa de Valor",
@@ -395,7 +396,7 @@ with tab3:
                 x=df_cfop_g["Valor (R$)"],
                 y=df_cfop_g["Grupo"],
                 orientation="h",
-                marker_color="#2980b9",
+                marker_color=AZUL,
                 text=[fmt_brl_int(v) for v in df_cfop_g["Valor (R$)"]],
                 textposition="outside",
             ))
@@ -477,7 +478,7 @@ with tab4:
             x=df_cli_bar["fat_total"],
             y=df_cli_bar["nome_part"],
             orientation="h",
-            marker_color="#8e44ad",
+            marker_color=COLOR_SEQ[4],
             text=[fmt_brl_int(v) for v in df_cli_bar["fat_total"]],
             textposition="outside",
         ))

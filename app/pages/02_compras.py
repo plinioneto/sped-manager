@@ -7,6 +7,7 @@ from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.utils.formatters import formatar_cnpj
 from app.repositories.compras_repo import ComprasRepository
+from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -273,7 +274,7 @@ with aba_geral:
             x=df_evo["Mês"],
             y=df_evo["Valor Total (R$)"],
             name="Valor Total",
-            marker_color="#4F8BF9",
+            marker_color=AZUL,
             text=[formatar_br(v) for v in df_evo["Valor Total (R$)"]],
             textposition="outside",
             textfont=dict(size=10),
@@ -284,7 +285,7 @@ with aba_geral:
             name="Ticket Médio",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=6),
         ))
         fig_evo.update_layout(
@@ -344,13 +345,13 @@ with aba_geral:
             ]).sort_values("Valor (R$)", ascending=False)
 
             cores_grupo = {
-                "Mercadoria p/ Revenda": "#4F8BF9",
-                "Transferências": "#36B37E",
-                "Industrialização": "#FF8B00",
-                "Uso e Consumo": "#6554C0",
-                "Ativo Imobilizado": "#00B8D9",
-                "Energia Elétrica": "#FFAB00",
-                "Bonificação/Doação": "#FF5630",
+                "Mercadoria p/ Revenda": AZUL,
+                "Transferências": COLOR_SEQ[5],
+                "Industrialização": AMBAR,
+                "Uso e Consumo": COLOR_SEQ[4],
+                "Ativo Imobilizado": COLOR_SEQ[1],
+                "Energia Elétrica": COLOR_SEQ[2],
+                "Bonificação/Doação": VERMELHO,
                 "Outros": "#97A0AF",
             }
 
@@ -428,7 +429,7 @@ with aba_forn:
             x=df_pareto["Fornecedor"],
             y=df_pareto["Valor (R$)"],
             name="Valor",
-            marker_color="#4F8BF9",
+            marker_color=AZUL,
         ))
         fig_pareto.add_trace(go.Scatter(
             x=df_pareto["Fornecedor"],
@@ -436,7 +437,7 @@ with aba_forn:
             name="% Acumulado",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=6),
         ))
         fig_pareto.add_hline(
@@ -552,7 +553,7 @@ with aba_prod:
 
         # Gráfico top 20 com curva acumulada
         df_abc_top = df_abc.head(20)
-        cores_abc = {"A": "#4F8BF9", "B": "#FFA726", "C": "#BDBDBD"}
+        cores_abc = {"A": AZUL, "B": AMBAR, "C": "#BDBDBD"}
 
         fig_abc = go.Figure()
         for classe in ["A", "B", "C"]:
@@ -570,7 +571,7 @@ with aba_prod:
             name="% Acumulado",
             yaxis="y2",
             mode="lines+markers",
-            line=dict(color="#FF6B6B", width=2),
+            line=dict(color=VERMELHO, width=2),
             marker=dict(size=5),
         ))
         fig_abc.add_hline(y=80, line_dash="dash", line_color="rgba(79,139,249,0.4)", annotation_text="80%", yref="y2")
