@@ -97,12 +97,25 @@ finally:
 st.title("Gestão Fiscal")
 st.divider()
 
-col_mes, col_cst, col_cfop = st.columns(3)
+MESES_ABREV = {
+    "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+    "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+    "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
+}
 
-opcoes_mes = ["Todos os meses"] + [formatar_mes(m) for m in meses_raw]
-sel_mes = col_mes.selectbox("Periodo", opcoes_mes)
-mes_map = {formatar_mes(m): m for m in meses_raw}
-mes_selecionado = mes_map.get(sel_mes)
+anos_raw = sorted({m[:4] for m in meses_raw}, reverse=True)
+meses_num_raw = sorted({m[4:] for m in meses_raw})
+
+col_ano, col_mes, col_cst, col_cfop = st.columns(4)
+
+sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
+sel_mes_num = col_mes.selectbox(
+    "Mês", ["Todos"] + meses_num_raw,
+    format_func=lambda m: "Todos" if m == "Todos" else MESES_ABREV.get(m, m),
+)
+
+ano_filtro = None if sel_ano == "Todos" else sel_ano
+mes_num_filtro = None if sel_mes_num == "Todos" else sel_mes_num
 
 sel_cst = col_cst.multiselect(
     "CST ICMS",
@@ -112,7 +125,7 @@ sel_cst = col_cst.multiselect(
 
 sel_cfop = col_cfop.multiselect("CFOP", options=cfops_raw)
 
-filtros = dict(mes=mes_selecionado, cst_icms=sel_cst or None, cfop=sel_cfop or None)
+filtros = dict(ano=ano_filtro, mes_num=mes_num_filtro, cst_icms=sel_cst or None, cfop=sel_cfop or None)
 
 # ---------------------------------------------------------------------------
 # Metricas globais com delta
@@ -129,11 +142,13 @@ try:
     delta_pis_cof = None
     delta_fat = None
 
-    if mes_selecionado and len(meses_raw) > 1:
-        idx = meses_raw.index(mes_selecionado) if mes_selecionado in meses_raw else -1
+    if ano_filtro and mes_num_filtro and len(meses_raw) > 1:
+        yyyymm = ano_filtro + mes_num_filtro
+        idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
-            f_ant = dict(mes=mes_ant, cst_icms=sel_cst or None, cfop=sel_cfop or None)
+            ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
+            f_ant = dict(ano=ano_ant, mes_num=mes_num_ant, cst_icms=sel_cst or None, cfop=sel_cfop or None)
             m_ant = repo.metricas_visao_geral(**f_ant)
             delta_icms = metricas["icms_a_pagar"] - m_ant["icms_a_pagar"]
             delta_aliq = metricas["aliquota_efetiva"] - m_ant["aliquota_efetiva"]
@@ -443,9 +458,9 @@ with aba_st:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        m_st = repo.metricas_st(mes=mes_selecionado)
-        top_st = repo.top_produtos_st_entrada(mes=mes_selecionado, limit=20)
-        evo_st = repo.evolucao_st_vs_proprio(mes=mes_selecionado)
+        m_st = repo.metricas_st(ano=ano_filtro, mes_num=mes_num_filtro)
+        top_st = repo.top_produtos_st_entrada(ano=ano_filtro, mes_num=mes_num_filtro, limit=20)
+        evo_st = repo.evolucao_st_vs_proprio(ano=ano_filtro, mes_num=mes_num_filtro)
     finally:
         db.close()
 
@@ -547,8 +562,8 @@ with aba_pis:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        m_pis = repo.metricas_pis_cofins(mes=mes_selecionado)
-        evo_pis = repo.evolucao_pis_cofins(mes=mes_selecionado)
+        m_pis = repo.metricas_pis_cofins(ano=ano_filtro, mes_num=mes_num_filtro)
+        evo_pis = repo.evolucao_pis_cofins(ano=ano_filtro, mes_num=mes_num_filtro)
     finally:
         db.close()
 
@@ -624,9 +639,9 @@ with aba_diag:
     db = next(get_session())
     try:
         repo = FiscalRepository(db, tenant_id)
-        alertas = repo.alertas_cst_inconsistente(mes=mes_selecionado)
-        sem_cst = repo.produtos_sem_cst(mes=mes_selecionado)
-        concentracao = repo.concentracao_tributaria(mes=mes_selecionado, limit=20)
+        alertas = repo.alertas_cst_inconsistente(ano=ano_filtro, mes_num=mes_num_filtro)
+        sem_cst = repo.produtos_sem_cst(ano=ano_filtro, mes_num=mes_num_filtro)
+        concentracao = repo.concentracao_tributaria(ano=ano_filtro, mes_num=mes_num_filtro, limit=20)
     finally:
         db.close()
 

@@ -365,27 +365,36 @@ with tab_historico:
     if not todos_arquivos:
         st.info("Nenhum arquivo importado ainda.")
     else:
-        meses_raw = sorted({
+        MESES_ABREV = {
+            "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+            "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+            "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
+        }
+
+        periodos_raw = sorted({
             arq.periodo_ini[:6]
             for arq in todos_arquivos
             if arq.periodo_ini and len(arq.periodo_ini) == 8
         }, reverse=True)
+        anos_hist = sorted({p[:4] for p in periodos_raw}, reverse=True)
+        meses_num_hist = sorted({p[4:] for p in periodos_raw})
 
-        def formatar_mes(yyyymm: str) -> str:
-            return f"{MESES[yyyymm[4:6]]}/{yyyymm[:4]}"
+        col_h1, col_h2, _ = st.columns([1, 1, 3])
+        sel_ano_h = col_h1.selectbox("Ano", ["Todos"] + anos_hist, key="hist_ano")
+        sel_mes_h = col_h2.selectbox(
+            "Mês", ["Todos"] + meses_num_hist,
+            format_func=lambda m: "Todos" if m == "Todos" else MESES_ABREV.get(m, m),
+            key="hist_mes",
+        )
 
-        opcoes_mes = ["Todos os meses"] + [formatar_mes(m) for m in meses_raw]
-        filtro = st.selectbox("Filtrar por mês", opcoes_mes, label_visibility="collapsed")
+        ano_hist = None if sel_ano_h == "Todos" else sel_ano_h
+        mes_num_hist = None if sel_mes_h == "Todos" else sel_mes_h
 
-        if filtro != "Todos os meses":
-            idx = opcoes_mes.index(filtro) - 1
-            mes_selecionado = meses_raw[idx]
-            arquivos_filtrados = [
-                a for a in todos_arquivos
-                if a.periodo_ini and a.periodo_ini[:6] == mes_selecionado
-            ]
-        else:
-            arquivos_filtrados = todos_arquivos
+        arquivos_filtrados = [
+            a for a in todos_arquivos
+            if (not ano_hist or (a.periodo_ini and a.periodo_ini[:4] == ano_hist))
+            and (not mes_num_hist or (a.periodo_ini and len(a.periodo_ini) >= 6 and a.periodo_ini[4:6] == mes_num_hist))
+        ]
 
         rows = []
         for arq in arquivos_filtrados:

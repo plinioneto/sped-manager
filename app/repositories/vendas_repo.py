@@ -25,18 +25,22 @@ class VendasRepository(BaseRepository):
             DocumentoFiscal.dt_doc.isnot(None),
         )
 
-    def _filtrar(self, q, mes=None, dias_semana=None):
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+    def _filtrar(self, q, ano=None, mes_num=None, dias_semana=None):
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         if dias_semana:
             codigos = [DIA_SEMANA_MAP[d] for d in dias_semana if d in DIA_SEMANA_MAP]
             if codigos:
                 q = q.filter(func.strftime("%w", DocumentoFiscal.dt_doc).in_(codigos))
         return q
 
-    def _filtrar_c190(self, q, mes=None, dias_semana=None):
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+    def _filtrar_c190(self, q, ano=None, mes_num=None, dias_semana=None):
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         if dias_semana:
             codigos = [DIA_SEMANA_MAP[d] for d in dias_semana if d in DIA_SEMANA_MAP]
             if codigos:
@@ -67,8 +71,8 @@ class VendasRepository(BaseRepository):
     # Métricas globais
     # ------------------------------------------------------------------
 
-    def metricas_globais(self, mes=None, dias_semana=None) -> dict:
-        base = self._filtrar(self._base_saida(), mes, dias_semana)
+    def metricas_globais(self, ano=None, mes_num=None, dias_semana=None) -> dict:
+        base = self._filtrar(self._base_saida(), ano, mes_num, dias_semana)
 
         fat = base.with_entities(func.sum(DocumentoFiscal.vl_doc)).scalar() or 0.0
         notas = base.with_entities(func.count(DocumentoFiscal.id)).scalar() or 0
@@ -79,29 +83,22 @@ class VendasRepository(BaseRepository):
             .scalar() or 0
         )
 
-        # Mês anterior para crescimento
+        # Deltas (só quando mês específico selecionado)
         crescimento_pct = None
-        if mes:
-            meses = self.meses_disponiveis()
-            idx = meses.index(mes) if mes in meses else -1
-            if idx >= 0 and idx + 1 < len(meses):
-                mes_ant = meses[idx + 1]
-                base_ant = self._filtrar(self._base_saida(), mes_ant, dias_semana)
-                fat_ant = base_ant.with_entities(func.sum(DocumentoFiscal.vl_doc)).scalar() or 0.0
-                if fat_ant:
-                    crescimento_pct = (fat - fat_ant) / fat_ant * 100
-
-        # Deltas para cards (vs mês anterior)
         delta_fat = delta_notas = delta_ticket = None
-        if mes:
+        if ano and mes_num:
+            yyyymm = ano + mes_num
             meses = self.meses_disponiveis()
-            idx = meses.index(mes) if mes in meses else -1
+            idx = meses.index(yyyymm) if yyyymm in meses else -1
             if idx >= 0 and idx + 1 < len(meses):
                 mes_ant = meses[idx + 1]
-                base_ant = self._filtrar(self._base_saida(), mes_ant, dias_semana)
+                ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
+                base_ant = self._filtrar(self._base_saida(), ano_ant, mes_num_ant, dias_semana)
                 fat_ant = base_ant.with_entities(func.sum(DocumentoFiscal.vl_doc)).scalar() or 0.0
                 notas_ant = base_ant.with_entities(func.count(DocumentoFiscal.id)).scalar() or 0
                 ticket_ant = fat_ant / notas_ant if notas_ant else 0.0
+                if fat_ant:
+                    crescimento_pct = (fat - fat_ant) / fat_ant * 100
                 delta_fat = fat - fat_ant
                 delta_notas = notas - notas_ant
                 delta_ticket = ticket - ticket_ant
@@ -131,8 +128,8 @@ class VendasRepository(BaseRepository):
     # ------------------------------------------------------------------
 
     def evolucao_mensal(self, dias_semana=None) -> list:
-        """Série mensal completa (sem filtro de mês)."""
-        q = self._filtrar(self._base_saida(), mes=None, dias_semana=dias_semana)
+        """Série mensal completa (sem filtro de período)."""
+        q = self._filtrar(self._base_saida(), ano=None, mes_num=None, dias_semana=dias_semana)
         q = q.with_entities(
             func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
@@ -158,8 +155,8 @@ class VendasRepository(BaseRepository):
     # Ritmo de Vendas
     # ------------------------------------------------------------------
 
-    def faturamento_por_dia_semana(self, mes=None, dias_semana=None) -> list:
-        q = self._filtrar(self._base_saida(), mes, dias_semana)
+    def faturamento_por_dia_semana(self, ano=None, mes_num=None, dias_semana=None) -> list:
+        q = self._filtrar(self._base_saida(), ano, mes_num, dias_semana)
         q = q.with_entities(
             func.strftime("%w", DocumentoFiscal.dt_doc).label("dia_semana"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
@@ -201,9 +198,9 @@ class VendasRepository(BaseRepository):
             for r in rows
         ]
 
-    def distribuicao_ticket(self, mes=None, dias_semana=None) -> dict:
+    def distribuicao_ticket(self, ano=None, mes_num=None, dias_semana=None) -> dict:
         """Contagem de notas por faixa de valor."""
-        base = self._filtrar(self._base_saida(), mes, dias_semana)
+        base = self._filtrar(self._base_saida(), ano, mes_num, dias_semana)
         faixas = {
             "Até R$25": 0,
             "R$25–50": 0,
@@ -241,8 +238,8 @@ class VendasRepository(BaseRepository):
             )
         )
 
-    def distribuicao_cfop(self, mes=None, dias_semana=None) -> list:
-        q = self._filtrar_c190(self._base_c190_saida(), mes, dias_semana)
+    def distribuicao_cfop(self, ano=None, mes_num=None, dias_semana=None) -> list:
+        q = self._filtrar_c190(self._base_c190_saida(), ano, mes_num, dias_semana)
         q = q.with_entities(
             IcmsC190.cfop,
             func.sum(IcmsC190.vl_opr).label("vl_opr"),
@@ -254,8 +251,8 @@ class VendasRepository(BaseRepository):
             .all()
         )
 
-    def distribuicao_cst(self, mes=None, dias_semana=None) -> list:
-        q = self._filtrar_c190(self._base_c190_saida(), mes, dias_semana)
+    def distribuicao_cst(self, ano=None, mes_num=None, dias_semana=None) -> list:
+        q = self._filtrar_c190(self._base_c190_saida(), ano, mes_num, dias_semana)
         q = q.with_entities(
             IcmsC190.cst_icms,
             func.sum(IcmsC190.vl_opr).label("vl_opr"),
@@ -269,7 +266,6 @@ class VendasRepository(BaseRepository):
 
     def evolucao_cfop_mensal(self, cfops_top=3) -> list:
         """Série mensal para os top N CFOPs por valor total."""
-        # Descobre top CFOPs
         top_q = (
             self._base_c190_saida()
             .with_entities(IcmsC190.cfop)
@@ -305,7 +301,7 @@ class VendasRepository(BaseRepository):
     # Clientes B2B
     # ------------------------------------------------------------------
 
-    def ranking_clientes(self, mes=None, dias_semana=None) -> list:
+    def ranking_clientes(self, ano=None, mes_num=None, dias_semana=None) -> list:
         q = (
             self.session.query(
                 DocumentoFiscal.cod_part,
@@ -329,7 +325,7 @@ class VendasRepository(BaseRepository):
                 DocumentoFiscal.dt_doc.isnot(None),
             )
         )
-        q = self._filtrar(q, mes, dias_semana)
+        q = self._filtrar(q, ano, mes_num, dias_semana)
         rows = (
             q.group_by(DocumentoFiscal.cod_part, Participante.nome, Participante.cnpj)
             .order_by(func.sum(DocumentoFiscal.vl_doc).desc())
@@ -412,7 +408,7 @@ class VendasRepository(BaseRepository):
     # Notas de venda
     # ------------------------------------------------------------------
 
-    def listar_notas(self, mes=None, num_nota=None, cliente=None) -> list:
+    def listar_notas(self, ano=None, mes_num=None, num_nota=None, cliente=None) -> list:
         q = (
             self.session.query(
                 DocumentoFiscal,
@@ -431,8 +427,10 @@ class VendasRepository(BaseRepository):
                 DocumentoFiscal.dt_doc.isnot(None),
             )
         )
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         if num_nota:
             q = q.filter(DocumentoFiscal.num_doc.ilike(f"%{num_nota}%"))
         if cliente:

@@ -141,13 +141,25 @@ st.title("Gestão de Compras")
 st.divider()
 
 # Filtros
-col_mes, col_forn, col_nota, col_prod = st.columns(4)
+MESES_ABREV = {
+    "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+    "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+    "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
+}
 
-opcoes_mes = ["Todos os meses"] + [formatar_mes(m) for m in meses_raw]
-sel_mes = col_mes.selectbox("Período", opcoes_mes)
+anos_raw = sorted({m[:4] for m in meses_raw}, reverse=True)
+meses_num_raw = sorted({m[4:] for m in meses_raw})
 
-mes_map = {formatar_mes(m): m for m in meses_raw}
-mes_selecionado = mes_map.get(sel_mes)
+col_ano, col_mes, col_forn, col_nota, col_prod = st.columns(5)
+
+sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
+sel_mes_num = col_mes.selectbox(
+    "Mês", ["Todos"] + meses_num_raw,
+    format_func=lambda m: "Todos" if m == "Todos" else MESES_ABREV.get(m, m),
+)
+
+ano_filtro = None if sel_ano == "Todos" else sel_ano
+mes_num_filtro = None if sel_mes_num == "Todos" else sel_mes_num
 
 busca_forn = col_forn.text_input("Fornecedor", placeholder="CNPJ ou parte do nome")
 busca_nota = col_nota.text_input("Nº da Nota", placeholder="Ex: 000123456")
@@ -157,7 +169,7 @@ busca_forn = busca_forn.strip() or None
 busca_nota = busca_nota.strip() or None
 busca_prod = busca_prod.strip() or None
 
-filtros = dict(mes=mes_selecionado, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+filtros = dict(ano=ano_filtro, mes_num=mes_num_filtro, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
 
 # ---------------------------------------------------------------------------
 # Métricas globais com delta
@@ -174,11 +186,13 @@ try:
     delta_valor = None
     delta_itens = None
 
-    if mes_selecionado and len(meses_raw) > 1:
-        idx = meses_raw.index(mes_selecionado) if mes_selecionado in meses_raw else -1
+    if ano_filtro and mes_num_filtro and len(meses_raw) > 1:
+        yyyymm = ano_filtro + mes_num_filtro
+        idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
-            filtros_ant = dict(mes=mes_ant, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+            ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
+            filtros_ant = dict(ano=ano_ant, mes_num=mes_num_ant, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
             metricas_ant = repo.metricas_globais(**filtros_ant)
             delta_notas = metricas["total_notas"] - metricas_ant["total_notas"]
             delta_forn = metricas["total_fornecedores"] - metricas_ant["total_fornecedores"]

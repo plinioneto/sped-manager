@@ -34,20 +34,24 @@ class FiscalRepository(BaseRepository):
             q = q.filter(DocumentoFiscal.ind_oper == ind_oper)
         return q
 
-    def _filtrar(self, q, mes=None, cst_icms=None, cfop=None):
+    def _filtrar(self, q, ano=None, mes_num=None, cst_icms=None, cfop=None):
         """Aplica filtros padrão a queries que contêm C190 + DocumentoFiscal."""
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         if cst_icms:
             q = q.filter(IcmsC190.cst_icms.in_(cst_icms))
         if cfop:
             q = q.filter(IcmsC190.cfop.in_(cfop))
         return q
 
-    def _filtrar_doc(self, q, mes=None):
-        """Aplica filtro de mês a queries que só contêm DocumentoFiscal."""
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+    def _filtrar_doc(self, q, ano=None, mes_num=None):
+        """Aplica filtro de período a queries que só contêm DocumentoFiscal."""
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         return q
 
     # ------------------------------------------------------------------
@@ -90,78 +94,68 @@ class FiscalRepository(BaseRepository):
     # Visão Geral
     # ------------------------------------------------------------------
 
-    def metricas_visao_geral(self, mes=None, cst_icms=None, cfop=None) -> dict:
+    def metricas_visao_geral(self, ano=None, mes_num=None, cst_icms=None, cfop=None) -> dict:
         # ICMS Débito (saídas)
         q_deb = self._filtrar(
-            self.session.query(
-                func.sum(IcmsC190.vl_icms),
-            )
+            self.session.query(func.sum(IcmsC190.vl_icms))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         icms_debito = q_deb.scalar() or 0.0
 
         # ICMS Crédito (entradas)
         q_cred = self._filtrar(
-            self.session.query(
-                func.sum(IcmsC190.vl_icms),
-            )
+            self.session.query(func.sum(IcmsC190.vl_icms))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "0"),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         icms_credito = q_cred.scalar() or 0.0
 
         # Faturamento total (saídas)
         q_fat = self._filtrar(
-            self.session.query(
-                func.sum(IcmsC190.vl_opr),
-            )
+            self.session.query(func.sum(IcmsC190.vl_opr))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         faturamento_total = q_fat.scalar() or 0.0
 
         # Faturamento ST (CST 060)
         q_st = self._filtrar(
-            self.session.query(
-                func.sum(IcmsC190.vl_opr),
-            )
+            self.session.query(func.sum(IcmsC190.vl_opr))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(
                 IcmsC190.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "1",
                 IcmsC190.cst_icms == "060",
             ),
-            mes, None, cfop,  # não filtra por cst aqui
+            ano, mes_num, None, cfop,  # não filtra por cst aqui
         )
         faturamento_st = q_st.scalar() or 0.0
 
         # Faturamento tributado (excl 060 e 040) para alíquota efetiva
         q_trib = self._filtrar(
-            self.session.query(
-                func.sum(IcmsC190.vl_opr),
-            )
+            self.session.query(func.sum(IcmsC190.vl_opr))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(
                 IcmsC190.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "1",
                 ~IcmsC190.cst_icms.in_(["060", "040", "041"]),
             ),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         faturamento_tributado = q_trib.scalar() or 0.0
 
-        # PIS + COFINS saída (via DocumentoFiscal — C190 não tem PIS/COFINS confiável)
+        # PIS + COFINS saída (via DocumentoFiscal)
         q_pis_cof = self._filtrar_doc(
             self.session.query(
                 func.sum(DocumentoFiscal.vl_pis),
                 func.sum(DocumentoFiscal.vl_cofins),
             )
             .filter(DocumentoFiscal.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes,
+            ano, mes_num,
         )
         pis_cofins = q_pis_cof.first()
         total_pis = (pis_cofins[0] or 0.0) if pis_cofins else 0.0
@@ -183,7 +177,7 @@ class FiscalRepository(BaseRepository):
             "total_cofins": total_cofins,
         }
 
-    def evolucao_mensal_tributos(self, mes=None, cst_icms=None, cfop=None) -> list:
+    def evolucao_mensal_tributos(self, ano=None, mes_num=None, cst_icms=None, cfop=None) -> list:
         """Retorna por mês: icms_debito, icms_credito, pis_saida, cofins_saida."""
         resultado = {}
 
@@ -196,7 +190,7 @@ class FiscalRepository(BaseRepository):
                 )
                 .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
                 .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == ind_oper),
-                mes, cst_icms, cfop,
+                ano, mes_num, cst_icms, cfop,
             )
             rows = (
                 q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
@@ -211,7 +205,7 @@ class FiscalRepository(BaseRepository):
                     }
                 resultado[r.mes][f"icms_{label_icms}"] = r.icms or 0.0
 
-        # PIS/COFINS via DocumentoFiscal (C190 não tem dados confiáveis)
+        # PIS/COFINS via DocumentoFiscal
         q_pis = self._filtrar_doc(
             self.session.query(
                 func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
@@ -223,7 +217,7 @@ class FiscalRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "1",
                 DocumentoFiscal.dt_doc.isnot(None),
             ),
-            mes,
+            ano, mes_num,
         )
         for r in q_pis.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc)).all():
             if r.mes not in resultado:
@@ -236,9 +230,8 @@ class FiscalRepository(BaseRepository):
 
         return sorted(resultado.values(), key=lambda x: x["mes"])
 
-    def composicao_tributaria(self, mes=None, cst_icms=None, cfop=None) -> dict:
+    def composicao_tributaria(self, ano=None, mes_num=None, cst_icms=None, cfop=None) -> dict:
         """Totais para donut: ICMS Próprio, ICMS-ST, PIS, COFINS (saídas)."""
-        # ICMS via C190
         q = self._filtrar(
             self.session.query(
                 func.sum(IcmsC190.vl_icms).label("icms_proprio"),
@@ -246,18 +239,17 @@ class FiscalRepository(BaseRepository):
             )
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         r = q.first()
 
-        # PIS/COFINS via DocumentoFiscal
         q_pis = self._filtrar_doc(
             self.session.query(
                 func.sum(DocumentoFiscal.vl_pis),
                 func.sum(DocumentoFiscal.vl_cofins),
             )
             .filter(DocumentoFiscal.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes,
+            ano, mes_num,
         )
         r_pis = q_pis.first()
 
@@ -272,7 +264,7 @@ class FiscalRepository(BaseRepository):
     # ICMS
     # ------------------------------------------------------------------
 
-    def distribuicao_por_cst(self, mes=None, cst_icms=None, cfop=None) -> list:
+    def distribuicao_por_cst(self, ano=None, mes_num=None, cst_icms=None, cfop=None) -> list:
         """Agrupa C190 saídas por CST: vl_opr, vl_icms, contagem."""
         q = self._filtrar(
             self.session.query(
@@ -284,7 +276,7 @@ class FiscalRepository(BaseRepository):
             )
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         return (
             q.group_by(IcmsC190.cst_icms)
@@ -292,7 +284,7 @@ class FiscalRepository(BaseRepository):
             .all()
         )
 
-    def analise_por_aliquota(self, mes=None, cst_icms=None, cfop=None) -> list:
+    def analise_por_aliquota(self, ano=None, mes_num=None, cst_icms=None, cfop=None) -> list:
         """Agrupa C190 saídas por alíquota (excl CST 060/040)."""
         q = self._filtrar(
             self.session.query(
@@ -308,7 +300,7 @@ class FiscalRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "1",
                 ~IcmsC190.cst_icms.in_(["060", "040", "041"]),
             ),
-            mes, cst_icms, cfop,
+            ano, mes_num, cst_icms, cfop,
         )
         return (
             q.group_by(IcmsC190.aliq_icms)
@@ -316,7 +308,7 @@ class FiscalRepository(BaseRepository):
             .all()
         )
 
-    def detalhe_c190(self, mes=None, cst_icms=None, cfop=None, ind_oper=None) -> list:
+    def detalhe_c190(self, ano=None, mes_num=None, cst_icms=None, cfop=None, ind_oper=None) -> list:
         """Lista C190 completo com dados do documento e participante."""
         q = (
             self.session.query(
@@ -338,25 +330,23 @@ class FiscalRepository(BaseRepository):
         )
         if ind_oper is not None:
             q = q.filter(DocumentoFiscal.ind_oper == ind_oper)
-        q = self._filtrar(q, mes, cst_icms, cfop)
+        q = self._filtrar(q, ano, mes_num, cst_icms, cfop)
         return q.order_by(DocumentoFiscal.dt_doc.desc()).limit(500).all()
 
     # ------------------------------------------------------------------
     # Substituição Tributária
     # ------------------------------------------------------------------
 
-    def metricas_st(self, mes=None) -> dict:
+    def metricas_st(self, ano=None, mes_num=None) -> dict:
         """Métricas de ST: total operações, % faturamento, ST pago nas compras."""
-        # Faturamento total saída
         q_fat = self._filtrar_doc(
             self.session.query(func.sum(IcmsC190.vl_opr))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes,
+            ano, mes_num,
         )
         faturamento_total = q_fat.scalar() or 0.0
 
-        # Operações ST (CST 060) saída
         q_st = self._filtrar_doc(
             self.session.query(func.sum(IcmsC190.vl_opr))
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
@@ -365,18 +355,17 @@ class FiscalRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "1",
                 IcmsC190.cst_icms == "060",
             ),
-            mes,
+            ano, mes_num,
         )
         total_st_saida = q_st.scalar() or 0.0
 
-        # ICMS-ST pago nas compras (entradas)
         q_st_entrada = self._filtrar_doc(
             self.session.query(func.sum(DocumentoFiscal.vl_icms_st))
             .filter(
                 DocumentoFiscal.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "0",
             ),
-            mes,
+            ano, mes_num,
         )
         icms_st_compras = q_st_entrada.scalar() or 0.0
 
@@ -389,7 +378,7 @@ class FiscalRepository(BaseRepository):
             "faturamento_total": faturamento_total,
         }
 
-    def top_produtos_st_entrada(self, mes=None, limit=20) -> list:
+    def top_produtos_st_entrada(self, ano=None, mes_num=None, limit=20) -> list:
         """Top produtos com maior custo de ST nas compras (C170 CFOP 1403/2403)."""
         q = (
             self.session.query(
@@ -413,8 +402,10 @@ class FiscalRepository(BaseRepository):
                 ItemFiscal.cfop.in_(["1403", "2403"]),
             )
         )
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
@@ -422,7 +413,7 @@ class FiscalRepository(BaseRepository):
             .all()
         )
 
-    def evolucao_st_vs_proprio(self, mes=None) -> list:
+    def evolucao_st_vs_proprio(self, ano=None, mes_num=None) -> list:
         """Mensal: valor operações ST (CST 060) vs ICMS Próprio (CST 000/020) nas saídas."""
         q = self._filtrar_doc(
             self.session.query(
@@ -436,7 +427,7 @@ class FiscalRepository(BaseRepository):
             )
             .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
-            mes,
+            ano, mes_num,
         )
         return (
             q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
@@ -448,7 +439,7 @@ class FiscalRepository(BaseRepository):
     # PIS/COFINS
     # ------------------------------------------------------------------
 
-    def metricas_pis_cofins(self, mes=None) -> dict:
+    def metricas_pis_cofins(self, ano=None, mes_num=None) -> dict:
         """PIS/COFINS via DocumentoFiscal (C190 não tem dados confiáveis)."""
         result = {}
         for ind_oper, label in [("0", "entrada"), ("1", "saida")]:
@@ -458,14 +449,14 @@ class FiscalRepository(BaseRepository):
                     func.sum(DocumentoFiscal.vl_cofins),
                 )
                 .filter(DocumentoFiscal.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == ind_oper),
-                mes,
+                ano, mes_num,
             )
             r = q.first()
             result[f"pis_{label}"] = (r[0] or 0.0) if r else 0.0
             result[f"cofins_{label}"] = (r[1] or 0.0) if r else 0.0
         return result
 
-    def evolucao_pis_cofins(self, mes=None) -> list:
+    def evolucao_pis_cofins(self, ano=None, mes_num=None) -> list:
         """Evolução mensal PIS/COFINS via DocumentoFiscal."""
         resultado = {}
         for ind_oper, label in [("0", "entrada"), ("1", "saida")]:
@@ -480,7 +471,7 @@ class FiscalRepository(BaseRepository):
                     DocumentoFiscal.ind_oper == ind_oper,
                     DocumentoFiscal.dt_doc.isnot(None),
                 ),
-                mes,
+                ano, mes_num,
             )
             rows = (
                 q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
@@ -503,7 +494,7 @@ class FiscalRepository(BaseRepository):
     # Diagnóstico
     # ------------------------------------------------------------------
 
-    def alertas_cst_inconsistente(self, mes=None) -> list:
+    def alertas_cst_inconsistente(self, ano=None, mes_num=None) -> list:
         """Itens com CST 000 mas CFOP de ST (1403/2403) — possível erro."""
         q = (
             self.session.query(
@@ -529,15 +520,17 @@ class FiscalRepository(BaseRepository):
                 ItemFiscal.cfop.in_(["1403", "2403"]),
             )
         )
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item, ItemFiscal.cst_icms, ItemFiscal.cfop)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
             .all()
         )
 
-    def produtos_sem_cst(self, mes=None) -> list:
+    def produtos_sem_cst(self, ano=None, mes_num=None) -> list:
         """Itens de entrada com CST vazio ou nulo."""
         q = (
             self.session.query(
@@ -560,15 +553,17 @@ class FiscalRepository(BaseRepository):
                 (ItemFiscal.cst_icms.is_(None)) | (ItemFiscal.cst_icms == ""),
             )
         )
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
             .all()
         )
 
-    def concentracao_tributaria(self, mes=None, limit=20) -> list:
+    def concentracao_tributaria(self, ano=None, mes_num=None, limit=20) -> list:
         """Top produtos com maior carga tributária total nas entradas."""
         q = (
             self.session.query(
@@ -597,8 +592,10 @@ class FiscalRepository(BaseRepository):
                 DocumentoFiscal.ind_oper == "0",
             )
         )
-        if mes:
-            q = q.filter(func.strftime("%Y%m", DocumentoFiscal.dt_doc) == mes)
+        if ano:
+            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        if mes_num:
+            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc) == mes_num)
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(
