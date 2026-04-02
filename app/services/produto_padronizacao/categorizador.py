@@ -397,6 +397,14 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ SEÇÃO INFANTIL ═══════════════════════════════════════════════
     "FRALDA":           ("FRALDAS DESCARTÁVEIS PARA BEBĘ", "SECAO INFANTIL"),
     "LENCO UMEDECIDO":  ("LENCOS UMEDECIDOS",            "SECAO INFANTIL"),
+    # ══ APERITIVOS ═══════════════════════════════════════════════════
+    "APERITIVO":          ("APERITIVOS EM GERAL",      "EMPORIO GRANEL"),
+    # ══ PAPELARIA ════════════════════════════════════════════════════
+    "APONTADOR":          ("APONTADORES EM GERAL",     "ARTIGOS PARA PAPELARIA E ARMARINHO"),
+    # ══ CAPILARES — ESPECÍFICOS ══════════════════════════════════════
+    "ATIVADOR DE CACHOS": ("CREME PARA PENTEAR",       "PRODUTOS CAPILARES"),
+    # ══ MERCEARIA DOCE — CEREAIS ═════════════════════════════════════
+    "AVEIA":              ("CEREAIS",                  "MATINAIS"),
     # ══ BARBEARIA ════════════════════════════════════════════════════
     "APARELHO DE BARBEAR": ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),
     "APARELHO BARBEAR":    ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),

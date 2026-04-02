@@ -231,6 +231,12 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 | 2026-04-02 | Categoria | `aparelho de barbear` → Perfumaria > Barbearia > Aparelhos Descartáveis |
 | 2026-04-02 | Categoria | `odoriz` → Limpeza > Limpeza de Casa > Odorizador de Ambiente |
 | 2026-04-02 | Marca | GILLETTE \| P&G \| PRESTOBARBA, PRESTO BARBA |
+| 2026-04-02 | Abreviação | `aperit` → aperitivo |
+| 2026-04-02 | Abreviação | `ativ cachos` → ativador de cachos |
+| 2026-04-02 | Categoria | `aperitivo` → Perecíveis do Autoserviço > Empório Granel > Aperitivos em Geral |
+| 2026-04-02 | Categoria | `apontador` → Bazar Geral > Artigos para Papelaria e Armarinho > Apontadores em Geral |
+| 2026-04-02 | Categoria | `ativador de cachos` → Perfumaria > Produtos Capilares > Creme para Pentear |
+| 2026-04-02 | Categoria | `aveia` → Mercearia Doce > Matinais > Cereais |
 
 ---
 
