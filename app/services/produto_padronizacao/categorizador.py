@@ -105,12 +105,16 @@ def carregar_indice(session: Session) -> None:
 # Valor: nome exato do grupo no banco.
 _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     # Limpeza
-    "DETERGENTE":   "LIMPEZA DE COZINHA",
-    "DESINFETANTE": "LIMPEZA DE CASA",
-    "LAVA ROUPA":   "LIMPEZA PARA ROUPAS",
-    "LAVA-ROUPA":   "LIMPEZA PARA ROUPAS",
-    "AMACIANTE":    "LIMPEZA PARA ROUPAS",
-    "INSETICIDA":   "INSETICIDAS",
+    "DETERGENTE":       "LIMPEZA DE COZINHA",
+    "DESINFETANTE":     "LIMPEZA DE CASA",
+    "LAVA ROUPA":       "LIMPEZA PARA ROUPAS",
+    "LAVA-ROUPA":       "LIMPEZA PARA ROUPAS",
+    "AMACIANTE":        "LIMPEZA PARA ROUPAS",
+    "AGUA SANITARIA":   "LIMPEZA PARA ROUPAS",
+    "ALVEJANTE":        "LIMPEZA PARA ROUPAS",
+    "SABAO EM PO":      "LIMPEZA PARA ROUPAS",
+    "SABAO LIQUIDO":    "LIMPEZA PARA ROUPAS",
+    "INSETICIDA":       "INSETICIDAS",
     # Higiene
     "SABONETE":     "SABONETES",
     "ABSORVENTE":   "ABSORVENTES",
@@ -166,6 +170,16 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "SUCO":         "SUCOS",
     "AGUA":         "AGUAS",
     "ENERGETICO":   "OUTRAS CATEGORIAS NAO ALCOOLICAS",
+    # Perecíveis / Congelados
+    "ACAI":         "CONGELADOS",
+    "SORVETE":      "CONGELADOS",
+    "PICOLE":       "CONGELADOS",
+    "GELADINHO":    "CONGELADOS",
+    "POLPA":        "CONGELADOS",
+    "PAO DE QUEIJO": "CONGELADOS",
+    "LASANHA":      "CONGELADOS",
+    "HAMBURGUER":   "CONGELADOS",
+    "PIZZA":        "CONGELADOS",
     # Commodities
     "ARROZ":        "ARROZ",
     "FEIJAO":       "FEIJAO",
@@ -209,6 +223,69 @@ _VOCAB_HORTIFRUTI: dict[str, str] = {
     "OVO": "OVOS", "OVOS": "OVOS",
 }
 
+# Vocabulário de categoria exata: termo → (nome_categoria, grupo_preferido|None).
+# Usado quando queremos classificar no nível mais granular (Dep→Grp→Cat).
+# Verificado ANTES do vocabulário de tipo de produto.
+# Chave: token, bigrama ou trigrama em maiúsculas.
+# Valor: (nome exato da categoria, nome do grupo para desambiguar duplicatas ou None).
+_VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
+    # Limpeza para roupas (nomes exatos da tabela categorias)
+    "AGUA SANITARIA":   ("AGUA SANITARIA",              None),
+    "ALVEJANTE":        ("ALVEJANTES E CLORO",           None),
+    "ALVEJANTES":       ("ALVEJANTES E CLORO",           None),
+    "SABAO EM PO":      ("SABAO EM PO",                  None),
+    "SABAO LIQUIDO":    ("SABAO LIQUIDO",                None),
+    "SABAO EM BARRA":   ("SABAO EM BARRA E PASTA",       None),
+    "TIRA MANCHAS":     ("CORANTES, TIRA MANCHAS, GOMA", None),
+    "AMACIANTE":        ("AMACIANTE DE ROUPA",           None),
+    # Congelados — perecíveis do autoserviço
+    "ACAI":             ("SORVETEs / ACAI",              "CONGELADOS"),
+    "SORVETE":          ("SORVETEs / ACAI",              "CONGELADOS"),
+    "POLPA DE FRUTAS":  ("POLPA DE FRUTAS",              "CONGELADOS"),
+    "POLPA":            ("POLPA DE FRUTAS",              "CONGELADOS"),
+    "PAO DE QUEIJO":    ("PAO DE QUEIJO",                "CONGELADOS"),
+    "LASANHA":          ("LASANHA",                      "CONGELADOS"),
+    "PIZZA":            ("PIZZA / HAMBURGUER",           "CONGELADOS"),
+    "HAMBURGUER":       ("PIZZA / HAMBURGUER",           "CONGELADOS"),
+    "EMPANADO":         ("EMPANADOS",                    "CONGELADOS"),
+    "EMPANADOS":        ("EMPANADOS",                    "CONGELADOS"),
+}
+
+
+def _match_por_categoria_nome(
+    categoria_nome: str, session: Session, score: float,
+    grupo_preferido: str | None = None,
+) -> ResultadoCategorizacao:
+    """
+    Busca categoria pelo nome exato e retorna ResultadoCategorizacao preenchido.
+    Se `grupo_preferido` for informado, prioriza a categoria que pertence a esse grupo
+    (útil quando há duplicatas de nome em grupos diferentes, ex: PAO DE QUEIJO).
+    """
+    global _INDICE_CATEGORIAS
+    if _INDICE_CATEGORIAS is None:
+        carregar_indice(session)
+    candidatos = [
+        item for item in _INDICE_CATEGORIAS
+        if item["categoria_nome"].upper() == categoria_nome.upper()
+    ]
+    if not candidatos:
+        return _vazio()
+    # Prioriza o grupo preferido quando há ambiguidade
+    if grupo_preferido:
+        preferred = [c for c in candidatos if c["grupo_nome"].upper() == grupo_preferido.upper()]
+        if preferred:
+            candidatos = preferred
+    item = candidatos[0]
+    return ResultadoCategorizacao(
+        categoria_id=item["categoria_id"],
+        categoria_nome=item["categoria_nome"],
+        grupo_id=item["grupo_id"],
+        grupo_nome=item["grupo_nome"],
+        departamento_id=item["departamento_id"],
+        departamento_nome=item["departamento_nome"],
+        score=score,
+    )
+
 
 def categorizar(
     descricao: str,
@@ -239,7 +316,17 @@ def categorizar(
 
     palavras = descricao.upper().split()
 
-    # 0a. Vocabulário de tipo de produto (maior prioridade — evita conflitos)
+    # 0. Vocabulário de categoria exata (maior prioridade — resolve até o 3º nível)
+    #    Trigramas → bigramas → unigramas para evitar matches parciais ambíguos
+    for size in (3, 2, 1):
+        for i in range(len(palavras) - size + 1):
+            chave = " ".join(palavras[i:i + size])
+            if chave in _VOCAB_CATEGORIA:
+                cat_nome, grp_pref = _VOCAB_CATEGORIA[chave]
+                return _match_por_categoria_nome(cat_nome, session, score=0.98,
+                                                 grupo_preferido=grp_pref)
+
+    # 0a. Vocabulário de tipo de produto (evita conflitos como MACA → FRUTAS em VINAGRE DE MACA)
     #     Bigramas primeiro (ex: "FARINHA DE TRIGO" > "FARINHA")
     for i in range(len(palavras) - 1):
         bigrama = f"{palavras[i]} {palavras[i+1]}"

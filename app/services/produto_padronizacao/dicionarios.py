@@ -37,6 +37,8 @@ ABREVIACOES: dict[str, str] = {
     "FRA":          "FRANGO",
     "FRANG":        "FRANGO",
     "AMACIANTE":    "AMACIANTE",
+    "AMAC":         "AMACIANTE",
+    "ACAI":         "ACAI",
     # ── Alimentos / produtos específicos ─────────────────────────────
     "MIST":         "MISTURA",
     "MIXT":         "MISTURA",
