@@ -81,10 +81,16 @@ with aba_revisao:
             db.close()
 
 
+    # Origens que indicam revisão humana concluída — nunca reaparecem na fila
+    _ORIGENS_REVISADAS = ("manual", "manual_sem_cat")
+
     def _pendentes(db, filtro_tenant, apenas_sem_categoria, apenas_revisao, limit=200):
         q = (
             db.query(Produto, Tenant)
             .join(Tenant, Produto.tenant_id == Tenant.id)
+            # Exclui produtos que já passaram por revisão manual
+            .filter(Produto.origem_padronizacao.notin_(_ORIGENS_REVISADAS)
+                    | Produto.origem_padronizacao.is_(None))
         )
         if apenas_sem_categoria:
             q = q.filter(Produto.categoria_id.is_(None))
