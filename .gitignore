@@ -8,3 +8,5 @@ checar_banco.py
 storage/
 .claude/
 *.db
+*.db-shm
+*.db-wal

@@ -1,8 +1,11 @@
+import pandas as pd
 import streamlit as st
 import app.models
 from app.utils.db import get_session
+from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR
 from app.repositories.inventario_repo import InventarioRepository
 from app.repositories.estoque_repo import EstoqueRepository
+from app.repositories.estoque_virtual_repo import EstoqueVirtualRepository
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -10,7 +13,7 @@ if not st.session_state.get("tenant_id"):
 from app.components.sidebar import render_sidebar
 render_sidebar()
 
-st.title("Estoque — Inventário e Saldos")
+st.title("Estoque")
 
 MOTIVOS = {
     "01": "Fim de período",
@@ -41,9 +44,114 @@ def formatar_qtd(valor: float) -> str:
     return f"{valor:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-aba_h, aba_k = st.tabs(["📦 Inventário (Bloco H)", "📊 Saldo de Estoque (K200)"])
+aba_v, aba_h, aba_k = st.tabs([
+    "📊 Estoque Virtual",
+    "📦 Inventário (Bloco H)",
+    "🗃️ Saldo de Estoque (K200)",
+])
 
-# ─── ABA 1: INVENTÁRIO ────────────────────────────────────────────────────────
+# ─── ABA 1: ESTOQUE VIRTUAL ───────────────────────────────────────────────────
+
+with aba_v:
+
+    # Carrega fonte e métricas (sem filtro de busca)
+    db = next(get_session())
+    try:
+        repo_v = EstoqueVirtualRepository(db, st.session_state.tenant_id)
+        fonte_info = repo_v.fonte_estoque_inicial()
+        metricas_v = repo_v.metricas_virtual()
+    finally:
+        db.close()
+
+    # Banner informativo de fonte
+    data_fmt = (
+        fonte_info["data_base"].strftime("%d/%m/%Y")
+        if fonte_info["data_base"]
+        else None
+    )
+
+    if fonte_info["fonte"] == "k200":
+        st.info(
+            f"📋 Saldo inicial baseado no **K200** (Bloco K)  |  "
+            f"Data base: **{data_fmt}**  |  "
+            "Movimentações consideradas a partir dessa data."
+        )
+    elif fonte_info["fonte"] == "h010":
+        st.warning(
+            f"📦 Saldo inicial baseado no **Inventário H010** (Bloco H)  |  "
+            f"Data base: **{data_fmt}**  |  "
+            "Bloco K não encontrado — usando inventário físico como ponto de partida."
+        )
+    else:
+        st.warning(
+            "⚠️ Nenhum inventário (Bloco H ou K) encontrado. "
+            "Saldo inicial considerado **zero** — toda a movimentação importada é considerada."
+        )
+
+    # Cards de métricas
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total de SKUs", metricas_v["total_skus"])
+    col2.metric("Com saldo positivo", metricas_v["skus_positivo"])
+    col3.metric("Com saldo negativo", metricas_v["skus_negativo"])
+    col4.metric("Zerados", metricas_v["skus_zerado"])
+
+    # Alerta de inconsistência
+    if metricas_v["total_skus"] > 0:
+        pct_neg = metricas_v["skus_negativo"] / metricas_v["total_skus"]
+        if pct_neg > 0.10:
+            st.error(
+                f"⚠️ {metricas_v['skus_negativo']} produto(s) com saldo negativo "
+                f"({pct_neg:.0%} do total). Isso pode indicar notas de saída sem a "
+                "entrada correspondente importada no SPED."
+            )
+
+    st.divider()
+
+    # Filtro de busca
+    busca_v = st.text_input(
+        "Buscar produto (código ou descrição)",
+        placeholder="Ex: 0001 ou arroz",
+        key="busca_estoque_virtual",
+    )
+
+    # Carrega tabela com filtro
+    db = next(get_session())
+    try:
+        repo_v = EstoqueVirtualRepository(db, st.session_state.tenant_id)
+        saldos_v = repo_v.saldo_virtual(busca_v or None)
+    finally:
+        db.close()
+
+    if not saldos_v:
+        st.info("Nenhum produto encontrado.")
+    else:
+        df_v = pd.DataFrame(saldos_v)
+        df_v.rename(columns={
+            "cod_item":    "Código",
+            "descr_item":  "Produto",
+            "unid":        "Unidade",
+            "qt_inicial":  "Estoque Inicial",
+            "qt_entradas": "Entradas",
+            "qt_saidas":   "Saídas",
+            "qt_atual":    "Saldo Atual",
+        }, inplace=True)
+
+        st.dataframe(
+            df_v[["Código", "Produto", "Unidade",
+                  "Estoque Inicial", "Entradas", "Saídas", "Saldo Atual"]],
+            use_container_width=True,
+            column_config={
+                "Estoque Inicial": st.column_config.NumberColumn(format="%.3f"),
+                "Entradas":        st.column_config.NumberColumn(format="%.3f"),
+                "Saídas":          st.column_config.NumberColumn(format="%.3f"),
+                "Saldo Atual":     st.column_config.NumberColumn(format="%.3f"),
+            },
+            hide_index=True,
+        )
+
+        st.caption(f"**{len(saldos_v)} produto(s)** exibido(s)")
+
+# ─── ABA 2: INVENTÁRIO (BLOCO H) ──────────────────────────────────────────────
 
 with aba_h:
     db = next(get_session())
@@ -103,7 +211,6 @@ with aba_h:
                     "Cód. Participante": h010.cod_part or "—",
                 })
 
-            import pandas as pd
             df = pd.DataFrame(rows)
 
             st.dataframe(
@@ -124,7 +231,7 @@ with aba_h:
                 f"**Valor total do inventário:** {formatar_br(valor_total)}"
             )
 
-# ─── ABA 2: SALDO K200 ────────────────────────────────────────────────────────
+# ─── ABA 3: SALDO K200 ────────────────────────────────────────────────────────
 
 with aba_k:
     db = next(get_session())
@@ -159,7 +266,11 @@ with aba_k:
             data_label = st.selectbox("Data do saldo", list(opcoes_data.keys()))
             dt_selecionada = opcoes_data[data_label]
         with col_busca:
-            busca = st.text_input("Buscar produto (código ou descrição)", placeholder="Ex: 0001 ou arroz")
+            busca = st.text_input(
+                "Buscar produto (código ou descrição)",
+                placeholder="Ex: 0001 ou arroz",
+                key="busca_k200",
+            )
 
         db = next(get_session())
         try:
@@ -171,7 +282,6 @@ with aba_k:
         if not saldos:
             st.info("Nenhum item encontrado para os filtros selecionados.")
         else:
-            import pandas as pd
             rows = []
             for k200, produto in saldos:
                 rows.append({
