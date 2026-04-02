@@ -1,4 +1,7 @@
 from app.models.tenant import Tenant
+from app.models.fabricante import Fabricante
+from app.models.marca import Marca
+from app.models.categoria import Departamento, Grupo, Categoria
 from app.models.produto import Produto
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal

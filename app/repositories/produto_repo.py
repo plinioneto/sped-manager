@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.produto import Produto
 from app.repositories.base_repo import BaseRepository
 
+
 class ProdutoRepository(BaseRepository):
     def listar(self):
         return (
@@ -15,9 +16,20 @@ class ProdutoRepository(BaseRepository):
             self.session.query(Produto)
             .filter(
                 Produto.tenant_id == self.tenant_id,
-                Produto.codigo == codigo
+                Produto.cod_item == codigo,
             )
             .first()
+        )
+
+    def listar_para_revisao(self):
+        """Retorna produtos que precisam de revisão manual na padronização."""
+        return (
+            self.session.query(Produto)
+            .filter(
+                Produto.tenant_id == self.tenant_id,
+                Produto.revisao_necessaria == True,
+            )
+            .all()
         )
 
     def salvar(self, produto: Produto):
@@ -32,7 +44,7 @@ class ProdutoRepository(BaseRepository):
             self.session.query(Produto)
             .filter(
                 Produto.tenant_id == self.tenant_id,
-                Produto.id == produto_id
+                Produto.id == produto_id,
             )
             .first()
         )

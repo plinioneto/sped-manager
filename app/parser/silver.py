@@ -6,10 +6,17 @@ from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.icms_c190 import IcmsC190
 from app.models.produto import Produto
+from app.models.marca import Marca
 from app.models.inventario_h005 import InventarioH005
 from app.models.inventario_h010 import InventarioH010
 from app.models.estoque_k200 import EstoqueK200
 from app.models.participante import Participante
+
+try:
+    from app.services.produto_padronizacao import processar_descricao
+    _PADRONIZACAO_DISPONIVEL = True
+except Exception:
+    _PADRONIZACAO_DISPONIVEL = False
 
 
 class SilverProcessor:
@@ -280,20 +287,23 @@ class SilverProcessor:
                 Produto.cod_item == cod
             ).first()
 
+            descr_item = c[3] if len(c) > 3 else ''
+
             if existente:
-                existente.descr_item = c[3] if len(c) > 3 else ''
+                existente.descr_item = descr_item
                 existente.cod_barra = c[4] if len(c) > 4 else ''
                 existente.unid_inv = c[6] if len(c) > 6 else ''
                 existente.tipo_item = c[7] if len(c) > 7 else ''
                 existente.cod_ncm = c[8] if len(c) > 8 else ''
                 existente.aliq_icms = self._cast_decimal(c[12]) if len(c) > 12 else 0.0
                 existente.cest = c[13] if len(c) > 13 else ''
+                self._aplicar_padronizacao(existente, descr_item)
                 atualizados += 1
             else:
                 produto = Produto(
                     tenant_id=self.tenant_id,
                     cod_item=cod,
-                    descr_item=c[3] if len(c) > 3 else '',
+                    descr_item=descr_item,
                     cod_barra=c[4] if len(c) > 4 else '',
                     unid_inv=c[6] if len(c) > 6 else '',
                     tipo_item=c[7] if len(c) > 7 else '',
@@ -301,11 +311,44 @@ class SilverProcessor:
                     aliq_icms=self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
                     cest=c[13] if len(c) > 13 else '',
                 )
+                self._aplicar_padronizacao(produto, descr_item)
                 self.session.add(produto)
                 criados += 1
 
         self.session.commit()
         return {"criados": criados, "atualizados": atualizados}
+
+    def _aplicar_padronizacao(self, produto: Produto, descr_item: str) -> None:
+        """
+        Enriquece o produto com dados da pipeline de padronização.
+        Falha silenciosa — o import nunca é bloqueado por erro aqui.
+        """
+        if not _PADRONIZACAO_DISPONIVEL or not descr_item:
+            return
+        try:
+            resultado = processar_descricao(descr_item, session=self.session)
+            produto.descricao_padrao    = resultado.descricao_padrao
+            produto.tipo_produto        = resultado.tipo_produto
+            produto.tipo_embalagem      = resultado.tipo_embalagem
+            produto.peso_volume_valor   = resultado.peso_volume_valor
+            produto.peso_volume_unidade = resultado.peso_volume_unidade
+            produto.score_padronizacao  = resultado.score_confianca
+            produto.origem_padronizacao = resultado.origem
+            produto.revisao_necessaria  = resultado.revisao_necessaria
+            # Classificação
+            produto.categoria_id    = resultado.categoria_id
+            produto.grupo_id        = resultado.grupo_id
+            produto.departamento_id = resultado.departamento_id
+            produto.score_categoria = resultado.score_categoria
+            # Resolve marca_id pelo nome canônico (se identificada)
+            if resultado.marca:
+                marca_obj = self.session.query(Marca).filter(
+                    Marca.nome == resultado.marca
+                ).first()
+                if marca_obj:
+                    produto.marca_id = marca_obj.id
+        except Exception:
+            pass  # falha silenciosa — padronização é enriquecimento, não dado primário
 
     def _processar_h005(self, registros: list) -> int:
         """
