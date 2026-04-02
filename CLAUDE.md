@@ -55,7 +55,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; aba Revisão (classificação manual Dep→Grp→Cat com pré-seleção do pipeline) + aba Marcas & Fabricantes (cadastro individual + importação em lote via seed script) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 3 abas: Revisão Individual (classificação produto a produto), Revisão em Lote (agrupa por sugestão do pipeline, aprova/descarta em batch), Marcas & Fabricantes (cadastro + seed script) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
@@ -99,9 +99,17 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Bronze/Silver seguindo padrão do Databricks original
 - Storage local em storage/arquivos/ — vira S3 na produção
 - Autenticação temporária só por CNPJ — senha ainda não implementada
-- Pipeline de padronização de produtos: limpeza → abreviações → unidades → marca/fabricante → categorização por vocabulário + Jaccard (54% de cobertura automática na base atual)
-- Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo
-- scripts/backfill_padronizacao.py: reprocessa produtos existentes; scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
+- Pipeline de padronização de produtos (app/services/produto_padronizacao/):
+  1. limpeza.py — uppercase, remove acentos, caracteres especiais e stopwords promocionais (PROMO, OFERTA, NOVO…)
+  2. dicionarios.py — expansão de abreviações (~120 termos) + abreviações contextuais (DES→desnatado/desodorante/desinfetante conforme vizinhança; TP→tetra pak só com leite/suco/chá)
+  3. unidades.py — extração de peso/volume via regex
+  4. identificador.py — detecção de marca/fabricante: match exato por token/bigrama (banco > dicionário fixo) + fuzzy matching RapidFuzz (threshold=90, blacklist de tokens genéricos)
+  5. pipeline.py — extração de atributos (ZERO, LIGHT, INTEGRAL, SEM GLUTEN…) separados da descrição; montagem final: base + atributos + unidade
+  6. categorizador.py — _VOCAB_CATEGORIA (~195 entradas, score 0.98) → _VOCAB_TIPO_PRODUTO (score 0.95) → _VOCAB_HORTIFRUTI (score 0.90) → Jaccard fallback
+  - Cobertura automática atual: ~70.6% dos produtos com categoria/grupo
+  - Protegido: produtos com origem_padronizacao='manual'/'manual_sem_cat' nunca são sobrescritos pelo backfill
+- Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo; PRESTOBARBA é alias de GILLETTE (P&G)
+- scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
 
 ## Pendente
 - [x] Página de cadastro de produto com listagem e filtros
@@ -128,10 +136,10 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
 - [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
 - [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
-- [ ] Atualizar cadastro de produto com as orientações abaixo:
-    1. Adicionar amac como redução para amaciante
-    2. acai como redução para açaí
-    3. procurar uma maneira de incluir também algumas palavras chaves depois de padronizado que já categorizarão mais corretamente (ex.: agua sanitaria vai para limpeza -> limpeza de roupas -> agua sanitaria, acai vai para pereciveis do autosserviço -> congelados -> sorvetes/acai)
+- [x] Atualizar cadastro de produto com as orientações abaixo:
+    1. amac → amaciante ✅
+    2. acai → açaí ✅
+    3. keywords → categoria direta via _VOCAB_CATEGORIA (agua sanitaria, acai, etc.) ✅
 ```
 
 ## Decisões mapeadas: Importação NF-e XML

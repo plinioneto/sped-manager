@@ -17,7 +17,7 @@ MARCAS_CONHECIDAS: dict[str, dict] = {
     "LUX":          {"fabricante": "UNILEVER",          "aliases": ["LUX"],                           "categoria": "higiene"},
     "COLGATE":      {"fabricante": "COLGATE-PALMOLIVE", "aliases": ["COLGATE"],                       "categoria": "higiene"},
     "ORAL B":       {"fabricante": "P&G",               "aliases": ["ORAL B", "ORAL-B", "ORALB"],    "categoria": "higiene"},
-    "GILLETTE":     {"fabricante": "P&G",               "aliases": ["GILLETTE"],                      "categoria": "higiene"},
+    "GILLETTE":     {"fabricante": "P&G",               "aliases": ["GILLETTE", "PRESTOBARBA", "PRESTO BARBA"], "categoria": "higiene"},
     "PANTENE":      {"fabricante": "P&G",               "aliases": ["PANTENE"],                       "categoria": "higiene"},
     "HEAD SHOULDERS": {"fabricante": "P&G",             "aliases": ["HEAD SHOULDERS", "HEAD E SHOULDERS"], "categoria": "higiene"},
     "JOHNSON":      {"fabricante": "JOHNSON & JOHNSON", "aliases": ["JOHNSON", "JOHNSONS"],           "categoria": "higiene"},

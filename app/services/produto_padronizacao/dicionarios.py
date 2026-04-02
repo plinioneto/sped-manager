@@ -78,6 +78,8 @@ ABREVIACOES: dict[str, str] = {
     "INSET":        "INSETICIDA",
     "AP BARBEAR":   "APARELHO DE BARBEAR",
     "AP BAR":       "APARELHO DE BARBEAR",
+    "AP PREST":     "APARELHO DE BARBEAR",
+    "ODORIZ":       "ODORIZADOR",
     "ACUM ELETRICO": "ACUMULADOR ELETRICO",
     "ACUM":          "ACUMULADOR ELETRICO",
     # ── Atributos / qualidade ─────────────────────────────────────────
