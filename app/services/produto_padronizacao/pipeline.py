@@ -27,6 +27,51 @@ _TIPOS_PRODUTO: set[str] = {
     "MUSSARELA", "MORTADELA",
 }
 
+# Atributos do produto que devem ser extraídos separadamente.
+# São removidos da descrição antes da categorização (reduz ruído) e
+# recolocados na descrição padronizada final.
+_ATRIBUTOS: set[str] = {
+    "ZERO", "LIGHT", "DIET", "FIT", "SLIM",
+    "INTEGRAL", "DESNATADO", "SEMIDESNATADO",
+    "TRADICIONAL", "PREMIUM", "GOURMET", "ARTESANAL",
+    "EXTRA FORTE", "FORTE", "SUAVE", "MEDIO",
+    "INFANTIL", "FEMININO", "MASCULINO",
+    "SEM GLUTEN", "SEM LACTOSE", "SEM ACUCAR",
+    "VEGANO", "VEGETARIANO", "ORGANICO",
+    "NATURAL", "ORIGINAL",
+}
+
+# Bigramas de atributo — verificados antes dos unigramas
+_ATRIBUTOS_BIGRAMA: set[str] = {a for a in _ATRIBUTOS if " " in a}
+_ATRIBUTOS_UNIGRAMA: set[str] = {a for a in _ATRIBUTOS if " " not in a}
+
+
+def _extrair_atributos(texto: str) -> tuple[list[str], str]:
+    """
+    Extrai atributos do texto e retorna (lista_atributos, texto_sem_atributos).
+    """
+    tokens = texto.split()
+    encontrados: list[str] = []
+    indices_remover: set[int] = set()
+
+    # Bigramas primeiro
+    for i in range(len(tokens) - 1):
+        bigrama = f"{tokens[i]} {tokens[i + 1]}"
+        if bigrama in _ATRIBUTOS_BIGRAMA:
+            encontrados.append(bigrama)
+            indices_remover.add(i)
+            indices_remover.add(i + 1)
+
+    # Unigramas (pula índices já consumidos por bigramas)
+    for i, token in enumerate(tokens):
+        if i not in indices_remover and token in _ATRIBUTOS_UNIGRAMA:
+            encontrados.append(token)
+            indices_remover.add(i)
+
+    texto_limpo = " ".join(t for i, t in enumerate(tokens) if i not in indices_remover)
+    return encontrados, texto_limpo
+
+
 _EMBALAGENS: dict[str, str] = {
     "PET":      "PET",
     "LATA":     "LATA",
@@ -101,19 +146,22 @@ def processar_descricao(
         session           — SQLAlchemy session (necessária para categorização;
                             se None, categorização é pulada)
     """
-    # 1. Limpeza
+    # 1. Limpeza (inclui remoção de stopwords promocionais)
     limpa = limpar_descricao(descricao)
 
-    # 2. Expansão de abreviações
+    # 2. Expansão de abreviações (inclui contextuais: DES, TP)
     expandida = expandir_abreviacoes(limpa, abreviacoes_extra)
 
-    # 3. Extração de atributos
+    # 3. Extração de atributos (ZERO, LIGHT, INTEGRAL, SEM GLUTEN, etc.)
+    atributos, texto_sem_atributos = _extrair_atributos(expandida)
+
+    # 4. Extração de campos estruturados
     um = extrair_unidade(expandida)
     marca, fabricante, score_marca = identificar_marca_e_fabricante(expandida)
     tipo_embalagem = _identificar_embalagem(expandida)
     tipo_produto = _identificar_tipo_produto(expandida)
 
-    # 4. Categorização (requer session)
+    # 5. Categorização (usa texto completo para máximo contexto)
     cat: ResultadoCategorizacao | None = None
     if session is not None:
         try:
@@ -121,10 +169,12 @@ def processar_descricao(
         except Exception:
             pass
 
-    # 5. Descrição padronizada
-    descricao_padrao = _montar_descricao_padrao(expandida, um).lower()
+    # 6. Descrição padronizada (atributos no final, sem duplicação)
+    descricao_padrao = _montar_descricao_padrao(
+        texto_sem_atributos, um, atributos
+    ).lower()
 
-    # 6. Score de confiança geral
+    # 7. Score de confiança geral
     score = _calcular_score(marca, tipo_embalagem, um, expandida)
 
     return ResultadoPadronizacao(
@@ -174,23 +224,31 @@ def _identificar_tipo_produto(texto: str) -> Optional[str]:
     return None
 
 
-def _montar_descricao_padrao(texto: str, um: Optional[UnidadeMedida]) -> str:
+def _montar_descricao_padrao(
+    texto: str,
+    um: Optional[UnidadeMedida],
+    atributos: list[str] | None = None,
+) -> str:
     """
-    Garante que a quantidade+unidade apareça no final, sem duplicação.
-    Ex: "REFRIGERANTE COCA COLA PET 2000ML" → mantém como está
-    Ex: "COCA 2L" (após expansão) → "COCA COLA 2L"
+    Monta descrição padronizada com ordem: descrição + atributos + unidade.
+    Atributos ficam antes da unidade para leitura natural.
+    Ex: "REFRIGERANTE COCA COLA PET ZERO 2L"
     """
-    if not um:
-        return texto.strip()
-    # Remove a parte de quantidade+unidade do meio (se houver) e coloca no fim
     import re
     _PATTERN = re.compile(
         r"\b\d+(?:[.,]\d+)?\s*(?:ML|LTS?|CL|KGS?|GRS?|MG|UND?|UNI|UNID|PCS?|CX|DZ|PCT?|RL|PR|FD)\b",
         re.IGNORECASE,
     )
-    sem_unidade = _PATTERN.sub("", texto).strip()
-    sem_unidade = re.sub(r"\s+", " ", sem_unidade).strip()
-    return f"{sem_unidade} {formatar_unidade(um)}".strip()
+    # Remove unidade do meio para recolocar no final
+    base = _PATTERN.sub("", texto).strip()
+    base = re.sub(r"\s+", " ", base).strip()
+
+    partes = [base]
+    if atributos:
+        partes.append(" ".join(atributos))
+    if um:
+        partes.append(formatar_unidade(um))
+    return " ".join(partes).strip()
 
 
 def _calcular_score(marca, tipo_embalagem, um, texto: str) -> float:

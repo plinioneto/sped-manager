@@ -126,6 +126,54 @@ def invalidar_cache_marcas() -> None:
     _MARCAS_DB = {}
 
 
+# ── Fuzzy matching (Fase 2) ───────────────────────────────────────────────────
+# Threshold: 90 = pega typos comuns (1-2 chars errados) sem false positives.
+# Mínimo 5 caracteres no token para evitar falsos em tokens curtos.
+_FUZZY_THRESHOLD = 90
+_FUZZY_MIN_LEN = 5
+
+# Tokens comuns que NUNCA devem ser testados no fuzzy (causam false positives).
+# São atributos, embalagens, tipos de produto ou adjetivos genéricos.
+_FUZZY_BLACKLIST: set[str] = {
+    "NEUTRO", "NEUTRA", "NATURAL", "NORMAL", "GRANDE", "PEQUENO",
+    "BRANCO", "BRANCA", "PRETO", "PRETA", "VERDE", "AMARELO",
+    "PREMIUM", "ESPECIAL", "ORIGINAL", "TRADICIONAL", "CLASSICO",
+    "LIQUIDO", "LIQUIDA", "SOLIDO", "CREMOSO", "CREMOSA",
+    "LACTEA", "LACTEO", "CONDENSADA", "CONDENSADO",
+    "CHOCOLATE", "MORANGO", "LARANJA", "LIMAO", "MENTA", "BAUNILHA",
+    "SUAVE", "FORTE", "MEDIO", "EXTRA", "SUPER", "ULTRA", "MEGA",
+    "INTEGRAL", "DESNATADO", "SEMIDESNATADO", "LIGHT", "DIET",
+    "PACOTE", "FARDO", "CAIXA", "SACHE", "POTE", "VIDRO", "LATA",
+    "GARRAFA", "BISNAGA", "BANDEJA", "GRANEL", "REFIL",
+    "SABONETE", "SHAMPOO", "CONDICIONADOR", "DETERGENTE", "AMACIANTE",
+    "CERVEJA", "REFRIGERANTE", "BISCOITO", "MACARRAO", "IOGURTE",
+    "PILSEN", "MALTE", "PURO",
+    "PRESIDENTE", "FRESCOR", "PAINCO", "INSPIRE", "MONTANHA", "LIMPPANO",
+}
+
+try:
+    from rapidfuzz import fuzz as _fuzz, process as _process
+    _HAS_RAPIDFUZZ = True
+except ImportError:
+    _HAS_RAPIDFUZZ = False
+
+
+def _todos_aliases() -> dict[str, str]:
+    """Retorna dicionário unificado alias→marca (banco + fixo, banco prioriza)."""
+    merged = dict(_ALIAS_INDEX)
+    merged.update(_ALIAS_INDEX_DB)
+    return merged
+
+
+def _resolver_fabricante(marca: str) -> str | None:
+    """Retorna o fabricante dado o nome canônico da marca."""
+    if marca in _MARCAS_DB:
+        return _MARCAS_DB[marca]["fabricante"]
+    if marca in MARCAS_CONHECIDAS:
+        return MARCAS_CONHECIDAS[marca]["fabricante"]
+    return None
+
+
 def identificar_marca_e_fabricante(
     texto: str,
 ) -> tuple[str | None, str | None, float]:
@@ -136,33 +184,63 @@ def identificar_marca_e_fabricante(
       1. _ALIAS_INDEX_DB  — marcas cadastradas no banco
       2. _ALIAS_INDEX     — dicionário fixo embutido no código
 
+    Fallback: fuzzy matching com RapidFuzz (score >= 85, tokens >= 4 chars).
+
     Retorna: (marca_canônica, fabricante, score)
-      - score 1.0  → match exato por token ou bigrama
-      - score 0.0  → não identificado
+      - score 1.0    → match exato por token ou bigrama
+      - score 0.85+  → match fuzzy (RapidFuzz)
+      - score 0.0    → não identificado
     """
     tokens = texto.upper().split()
 
-    # Bigramas antes de unigramas (ex: "COCA COLA", "ORAL B", "TIO JOAO")
+    # ── Match exato: bigramas → unigramas ────────────────────────────────────
     for i in range(len(tokens) - 1):
         bigrama = f"{tokens[i]} {tokens[i + 1]}"
         # banco primeiro
         if bigrama in _ALIAS_INDEX_DB:
             marca = _ALIAS_INDEX_DB[bigrama]
-            fabricante = _MARCAS_DB[marca]["fabricante"]
-            return marca, fabricante, 1.0
+            return marca, _resolver_fabricante(marca), 1.0
         if bigrama in _ALIAS_INDEX:
             marca = _ALIAS_INDEX[bigrama]
-            fabricante = MARCAS_CONHECIDAS[marca]["fabricante"]
-            return marca, fabricante, 1.0
+            return marca, _resolver_fabricante(marca), 1.0
 
     for token in tokens:
         if token in _ALIAS_INDEX_DB:
             marca = _ALIAS_INDEX_DB[token]
-            fabricante = _MARCAS_DB[marca]["fabricante"]
-            return marca, fabricante, 1.0
+            return marca, _resolver_fabricante(marca), 1.0
         if token in _ALIAS_INDEX:
             marca = _ALIAS_INDEX[token]
-            fabricante = MARCAS_CONHECIDAS[marca]["fabricante"]
-            return marca, fabricante, 1.0
+            return marca, _resolver_fabricante(marca), 1.0
+
+    # ── Fuzzy matching (fallback) ────────────────────────────────────────────
+    if _HAS_RAPIDFUZZ:
+        aliases = _todos_aliases()
+        alias_keys = list(aliases.keys())
+        if not alias_keys:
+            return None, None, 0.0
+
+        # Testa bigramas primeiro, depois unigramas (excluindo blacklist)
+        candidatos = []
+        for i in range(len(tokens) - 1):
+            bigrama = f"{tokens[i]} {tokens[i + 1]}"
+            if len(bigrama.replace(" ", "")) >= _FUZZY_MIN_LEN:
+                candidatos.append(bigrama)
+        for token in tokens:
+            if len(token) >= _FUZZY_MIN_LEN and token not in _FUZZY_BLACKLIST:
+                candidatos.append(token)
+
+        for candidato in candidatos:
+            resultado = _process.extractOne(
+                candidato, alias_keys, scorer=_fuzz.ratio,
+                score_cutoff=_FUZZY_THRESHOLD,
+            )
+            if resultado:
+                alias_match, score_fuzzy, _ = resultado
+                # Anti false-positive: comprimento do candidato e do alias
+                # devem ser similares (diferença máx. 3 chars)
+                if abs(len(candidato) - len(alias_match)) > 3:
+                    continue
+                marca = aliases[alias_match]
+                return marca, _resolver_fabricante(marca), round(score_fuzzy / 100, 2)
 
     return None, None, 0.0

@@ -58,7 +58,9 @@ if not st.session_state.admin_auth:
 
 st.title("Painel Admin")
 
-aba_revisao, aba_marcas = st.tabs(["Revisão de Produtos", "Marcas & Fabricantes"])
+aba_revisao, aba_batch, aba_marcas = st.tabs([
+    "Revisão Individual", "Revisão em Lote", "Marcas & Fabricantes",
+])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABA 1 — Revisão de Produtos
@@ -319,7 +321,234 @@ with aba_revisao:
     db.close()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ABA 2 — Marcas & Fabricantes
+# ABA 2 — Revisão em Lote
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with aba_batch:
+    import pandas as pd
+
+    st.markdown(
+        "Agrupa produtos pela **sugestão do pipeline** (departamento → grupo). "
+        "Selecione os produtos corretos e aprove todos de uma vez."
+    )
+
+    db_batch = next(get_session())
+    try:
+        # ── Filtros ──────────────────────────────────────────────────────────
+        tenants_batch = [t.nome for t in db_batch.query(Tenant).order_by(Tenant.nome).all()]
+
+        col_bf1, col_bf2 = st.columns(2)
+        with col_bf1:
+            filtro_tenant_batch = st.selectbox(
+                "Cliente", ["Todos"] + tenants_batch, key="batch_tenant",
+            )
+        with col_bf2:
+            modo_batch = st.radio(
+                "Mostrar",
+                ["Com sugestão do pipeline", "Todos sem categoria"],
+                horizontal=True, key="batch_modo",
+            )
+
+        # ── Query: produtos pendentes com sugestão do pipeline ───────────────
+        q_batch = (
+            db_batch.query(Produto, Tenant)
+            .join(Tenant, Produto.tenant_id == Tenant.id)
+            .filter(
+                Produto.origem_padronizacao.notin_(_ORIGENS_REVISADAS)
+                | Produto.origem_padronizacao.is_(None)
+            )
+            .filter(Produto.categoria_id.is_(None))
+        )
+        if filtro_tenant_batch != "Todos":
+            q_batch = q_batch.filter(Tenant.nome == filtro_tenant_batch)
+        if modo_batch == "Com sugestão do pipeline":
+            q_batch = q_batch.filter(Produto.grupo_id.isnot(None))
+
+        pendentes_batch = q_batch.order_by(
+            Produto.departamento_id, Produto.grupo_id, Produto.descr_item,
+        ).limit(500).all()
+
+        if not pendentes_batch:
+            st.success("Nenhum produto pendente para revisão em lote.")
+        else:
+            # ── Agrupar por Departamento → Grupo ─────────────────────────────
+            from collections import defaultdict
+
+            # Re-processar cada produto pelo pipeline para ter a sugestão atualizada
+            from app.services.produto_padronizacao.categorizador import carregar_indice
+            from app.services.produto_padronizacao.identificador import carregar_marcas_do_banco
+            carregar_indice(db_batch)
+            carregar_marcas_do_banco(db_batch)
+
+            grupos_agrupados = defaultdict(list)
+            for produto, tenant in pendentes_batch:
+                resultado = processar_descricao(produto.descr_item, session=db_batch)
+                chave = None
+                if resultado.grupo_nome:
+                    chave = f"{resultado.departamento_nome} → {resultado.grupo_nome}"
+                elif modo_batch == "Todos sem categoria":
+                    chave = "Sem sugestão"
+                if chave:
+                    grupos_agrupados[chave].append({
+                        "produto": produto,
+                        "tenant": tenant,
+                        "resultado": resultado,
+                    })
+
+            st.caption(f"{len(pendentes_batch)} produtos em {len(grupos_agrupados)} grupos")
+            st.divider()
+
+            # ── Renderizar cada grupo ────────────────────────────────────────
+            for grupo_label, items in sorted(
+                grupos_agrupados.items(), key=lambda x: -len(x[1])
+            ):
+                with st.expander(f"**{grupo_label}** — {len(items)} produtos"):
+                    # Montar dataframe
+                    rows_batch = []
+                    for item in items:
+                        p = item["produto"]
+                        r = item["resultado"]
+                        rows_batch.append({
+                            "id":           p.id,
+                            "Cliente":      item["tenant"].nome,
+                            "Código":       p.cod_item,
+                            "Descrição":    p.descr_item,
+                            "Padronizada":  r.descricao_padrao,
+                            "Marca":        r.marca or "—",
+                            "Cat. sugerida": r.categoria_nome or "—",
+                            "Score":        r.score_categoria,
+                        })
+
+                    df_batch = pd.DataFrame(rows_batch)
+
+                    # Seleção via checkbox no dataframe
+                    edited = st.data_editor(
+                        df_batch.drop(columns=["id"]),
+                        use_container_width=True,
+                        hide_index=True,
+                        num_rows="fixed",
+                        disabled=["Cliente", "Código", "Descrição", "Padronizada",
+                                  "Marca", "Cat. sugerida", "Score"],
+                        column_config={
+                            "Score": st.column_config.ProgressColumn(
+                                format="%.0%", min_value=0, max_value=1,
+                            ),
+                        },
+                        key=f"batch_df_{grupo_label}",
+                    )
+
+                    # Classificação para o grupo todo
+                    r_primeiro = items[0]["resultado"]
+                    dep_nomes_batch = ["— selecione —"] + sorted(
+                        d.descricao for d in db_batch.query(Departamento).all()
+                    )
+                    dep_pre = r_primeiro.departamento_nome
+                    dep_idx_b = dep_nomes_batch.index(dep_pre) if dep_pre in dep_nomes_batch else 0
+
+                    col_cls1, col_cls2, col_cls3 = st.columns(3)
+                    with col_cls1:
+                        dep_b = st.selectbox(
+                            "Departamento", dep_nomes_batch,
+                            index=dep_idx_b, key=f"batch_dep_{grupo_label}",
+                        )
+                    grp_b_id = None
+                    cat_b_id = None
+                    dep_b_id = None
+                    if dep_b != "— selecione —":
+                        dep_obj_b = db_batch.query(Departamento).filter(
+                            Departamento.descricao == dep_b
+                        ).first()
+                        dep_b_id = dep_obj_b.id if dep_obj_b else None
+                        grupos_b = (
+                            db_batch.query(Grupo)
+                            .filter(Grupo.departamento_id == dep_b_id)
+                            .order_by(Grupo.descricao).all()
+                        )
+                        grp_nomes_b = ["— selecione —"] + [g.descricao for g in grupos_b]
+                        grp_pre = r_primeiro.grupo_nome
+                        grp_idx_b = grp_nomes_b.index(grp_pre) if grp_pre in grp_nomes_b else 0
+                        with col_cls2:
+                            grp_b = st.selectbox(
+                                "Grupo", grp_nomes_b,
+                                index=grp_idx_b, key=f"batch_grp_{grupo_label}",
+                            )
+                        if grp_b != "— selecione —":
+                            grp_obj_b = next((g for g in grupos_b if g.descricao == grp_b), None)
+                            grp_b_id = grp_obj_b.id if grp_obj_b else None
+                            cats_b = (
+                                db_batch.query(Categoria)
+                                .filter(Categoria.grupo_id == grp_b_id)
+                                .order_by(Categoria.descricao).all()
+                            )
+                            cat_nomes_b = ["— selecione —"] + [c.descricao for c in cats_b]
+                            cat_pre = r_primeiro.categoria_nome
+                            cat_idx_b = (
+                                cat_nomes_b.index(cat_pre) if cat_pre in cat_nomes_b else 0
+                            )
+                            with col_cls3:
+                                cat_b = st.selectbox(
+                                    "Categoria", cat_nomes_b,
+                                    index=cat_idx_b, key=f"batch_cat_{grupo_label}",
+                                )
+                            if cat_b != "— selecione —":
+                                cat_obj_b = next(
+                                    (c for c in cats_b if c.descricao == cat_b), None,
+                                )
+                                cat_b_id = cat_obj_b.id if cat_obj_b else None
+
+                    # Botões de ação
+                    col_act1, col_act2, col_act3 = st.columns([1, 1, 3])
+                    with col_act1:
+                        aprovar_todos = st.button(
+                            f"Aprovar todos ({len(items)})",
+                            type="primary",
+                            disabled=(grp_b_id is None),
+                            key=f"batch_aprovar_{grupo_label}",
+                        )
+                    with col_act2:
+                        descartar_todos = st.button(
+                            "Todos sem categoria",
+                            key=f"batch_descartar_{grupo_label}",
+                        )
+
+                    if aprovar_todos:
+                        ids = [item["produto"].id for item in items]
+                        db_batch.query(Produto).filter(Produto.id.in_(ids)).update(
+                            {
+                                Produto.categoria_id: cat_b_id,
+                                Produto.grupo_id: grp_b_id,
+                                Produto.departamento_id: dep_b_id,
+                                Produto.score_categoria: 1.0,
+                                Produto.revisao_necessaria: False,
+                                Produto.origem_padronizacao: "manual",
+                            },
+                            synchronize_session="fetch",
+                        )
+                        db_batch.commit()
+                        _stats.clear()
+                        st.success(f"{len(ids)} produtos aprovados!")
+                        st.rerun()
+
+                    if descartar_todos:
+                        ids = [item["produto"].id for item in items]
+                        db_batch.query(Produto).filter(Produto.id.in_(ids)).update(
+                            {
+                                Produto.revisao_necessaria: False,
+                                Produto.origem_padronizacao: "manual_sem_cat",
+                            },
+                            synchronize_session="fetch",
+                        )
+                        db_batch.commit()
+                        _stats.clear()
+                        st.success(f"{len(ids)} produtos marcados como sem categoria.")
+                        st.rerun()
+
+    finally:
+        db_batch.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ABA 3 — Marcas & Fabricantes
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with aba_marcas:

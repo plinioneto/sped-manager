@@ -27,7 +27,8 @@ from app.services.produto_padronizacao.identificador import carregar_marcas_do_b
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--todos",  action="store_true", help="Reprocessa todos, inclusive classificados")
+    parser.add_argument("--todos",  action="store_true", help="Reprocessa todos, inclusive classificados (preserva manuais)")
+    parser.add_argument("--force",  action="store_true", help="Sobrescreve inclusive classificacoes manuais (cuidado!)")
     parser.add_argument("--tenant", type=int, default=None, help="Limita ao tenant ID informado")
     args = parser.parse_args()
 
@@ -44,6 +45,12 @@ def main():
 
         if not args.todos:
             q = q.filter(Produto.descricao_padrao.is_(None))
+
+        # Sempre protege classificações manuais, exceto com --force
+        if not args.force:
+            q = q.filter(
+                ~Produto.origem_padronizacao.in_(["manual", "manual_sem_cat"])
+            )
 
         produtos = q.order_by(Produto.tenant_id, Produto.descr_item).all()
 

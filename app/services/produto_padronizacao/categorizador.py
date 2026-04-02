@@ -104,31 +104,13 @@ def carregar_indice(session: Session) -> None:
 # Chave: token ou bigrama que identifica o tipo do produto (maiúsculas).
 # Valor: nome exato do grupo no banco.
 _VOCAB_TIPO_PRODUTO: dict[str, str] = {
-    # Limpeza
-    "DETERGENTE":       "LIMPEZA DE COZINHA",
-    "DESINFETANTE":     "LIMPEZA DE CASA",
+    # Limpeza (itens que _VOCAB_CATEGORIA já cobre ficam como fallback de grupo)
     "LAVA ROUPA":       "LIMPEZA PARA ROUPAS",
     "LAVA-ROUPA":       "LIMPEZA PARA ROUPAS",
-    "AMACIANTE":        "LIMPEZA PARA ROUPAS",
-    "AGUA SANITARIA":   "LIMPEZA PARA ROUPAS",
-    "ALVEJANTE":        "LIMPEZA PARA ROUPAS",
-    "SABAO EM PO":      "LIMPEZA PARA ROUPAS",
-    "SABAO LIQUIDO":    "LIMPEZA PARA ROUPAS",
-    "INSETICIDA":       "INSETICIDAS",
     # Higiene
     "SABONETE":     "SABONETES",
-    "ABSORVENTE":   "ABSORVENTES",
-    "PROTETOR SOLAR": "PROTETOR SOLAR, BRONZEADORES E REPELENTES",
-    "REPELENTE":    "PROTETOR SOLAR, BRONZEADORES E REPELENTES",
     "DESODORANTE":  "DESODORANTES E COLONIAS",
-    "SHAMPOO":      "PRODUTOS CAPILARES",
-    "CONDICIONADOR":"PRODUTOS CAPILARES",
-    "CREME PENTEAR":"PRODUTOS CAPILARES",
-    "PASTA DENTAL": "HIGIENE BUCAL",
-    "FITA DENTAL":  "HIGIENE BUCAL",
     "ENXAGUANTE":   "HIGIENE BUCAL",
-    "PAPEL HIGIENICO": "PAPEL HIGIENICO",
-    "FRALDA":       "SECAO INFANTIL",
     # Mercearia salgada
     "VINAGRE":      "VINAGRES",
     "AZEITE":       "AZEITES",
@@ -137,49 +119,22 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "MACARRAO":     "MASSAS E SOPAS",
     "MASSA":        "MASSAS E SOPAS",
     "CONSERVA":     "CONSERVAS E ENLATADOS",
-    "SARDINHA":     "CONSERVAS E ENLATADOS",
-    "ATUM":         "CONSERVAS E ENLATADOS",
     "MILHO ENLATADO": "CONSERVAS E ENLATADOS",
     # Mercearia doce
-    "MISTURA BOLO": "CULINARIA DOCE",
     "CHOCOLATE":    "CHOCOLATES",
-    "BOMBOM":       "CHOCOLATES",
-    "GELEIA":       "GELEIAS",
+    "BISCOITO":     "BISCOITO DOCE",
     "MEL":          "MEL E MELADOS",
-    "IOGURTE":      "LATICINIOS",
-    "REQUEIJAO":    "LATICINIOS",
     "QUEIJO":       "LATICINIOS",
-    "MANTEIGA":     "LATICINIOS",
-    "MARGARINA":    "LATICINIOS",
-    "CREME DE LEITE": "LATICINIOS",
-    # Frios / proteínas
-    "PRESUNTO":     "FRIOS / FATIADOS",
-    "MORTADELA":    "FRIOS / FATIADOS",
-    "MUSSARELA":    "FRIOS / FATIADOS",
-    "SALAME":       "FRIOS / FATIADOS",
-    "LINGUICA":     "LINGUICA E SALSICHA",
-    "SALSICHA":     "LINGUICA E SALSICHA",
+    # Proteínas
     "FRANGO":       "AVES",
+    "BOVINO":       "BOVINO",
+    "SUINO":        "SUINO",
     # Bebidas
     "REFRIGERANTE": "REFRIGERANTE",
     "CERVEJA":      "CERVEJAS",
     "VINHO":        "VINHO",
-    "WHISKY":       "DESTILADOS",
-    "CACHACA":      "DESTILADOS",
-    "VODKA":        "DESTILADOS",
     "SUCO":         "SUCOS",
     "AGUA":         "AGUAS",
-    "ENERGETICO":   "OUTRAS CATEGORIAS NAO ALCOOLICAS",
-    # Perecíveis / Congelados
-    "ACAI":         "CONGELADOS",
-    "SORVETE":      "CONGELADOS",
-    "PICOLE":       "CONGELADOS",
-    "GELADINHO":    "CONGELADOS",
-    "POLPA":        "CONGELADOS",
-    "PAO DE QUEIJO": "CONGELADOS",
-    "LASANHA":      "CONGELADOS",
-    "HAMBURGUER":   "CONGELADOS",
-    "PIZZA":        "CONGELADOS",
     # Commodities
     "ARROZ":        "ARROZ",
     "FEIJAO":       "FEIJAO",
@@ -191,7 +146,6 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "LEITE":        "LEITE",
     "CAFE":         "MATINAIS",
     "CHA":          "MATINAIS",
-    "ACHOCOLATADO": "MATINAIS",
 }
 
 # Vocabulário de hortifruti: produto → grupo canônico (nome exato no banco)
@@ -229,7 +183,7 @@ _VOCAB_HORTIFRUTI: dict[str, str] = {
 # Chave: token, bigrama ou trigrama em maiúsculas.
 # Valor: (nome exato da categoria, nome do grupo para desambiguar duplicatas ou None).
 _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
-    # Limpeza para roupas (nomes exatos da tabela categorias)
+    # ══ LIMPEZA PARA ROUPAS ══════════════════════════════════════════
     "AGUA SANITARIA":   ("AGUA SANITARIA",              None),
     "ALVEJANTE":        ("ALVEJANTES E CLORO",           None),
     "ALVEJANTES":       ("ALVEJANTES E CLORO",           None),
@@ -238,7 +192,24 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "SABAO EM BARRA":   ("SABAO EM BARRA E PASTA",       None),
     "TIRA MANCHAS":     ("CORANTES, TIRA MANCHAS, GOMA", None),
     "AMACIANTE":        ("AMACIANTE DE ROUPA",           None),
-    # Congelados — perecíveis do autoserviço
+    # ══ LIMPEZA DE COZINHA ═══════════════════════════════════════════
+    "DETERGENTE":       ("DETERGENTES LIQUIDOS E GEL",   None),
+    "ESPONJA":          ("ESPONJAS",                     None),
+    "ESPONJA ACO":      ("ESPONJAS",                     None),
+    "DESENGORDURANTE":  ("DESENGORDURANTES",             None),
+    "SAPONACEO":        ("SAPONACEOS PO",                None),
+    # ══ LIMPEZA DE CASA ══════════════════════════════════════════════
+    "DESINFETANTE":     ("DESINFETANTES ATE 500ML",      None),
+    "MULTIUSO":         ("MULTIUSO",                     None),
+    "LIMPA VIDRO":      ("LIMPA VIDROS",                 None),
+    "LIMPA VIDROS":     ("LIMPA VIDROS",                 None),
+    "PALHA DE ACO":     ("PALHA DE ACO",                 None),
+    "ODORIZADOR":       ("ODORIZADOR DE AMBIENTE",       None),
+    # ══ LIMPEZA DE PISOS ═════════════════════════════════════════════
+    "CERA LIQUIDA":     ("CERAS LIQUIDAS",               None),
+    # ══ INSETICIDAS ══════════════════════════════════════════════════
+    "INSETICIDA":       ("INSETICIDA DOMESTICO AEROSOL", None),
+    # ══ CONGELADOS — PERECÍVEIS DO AUTOSERVIÇO ═══════════════════════
     "ACAI":             ("SORVETEs / ACAI",              "CONGELADOS"),
     "SORVETE":          ("SORVETEs / ACAI",              "CONGELADOS"),
     "POLPA DE FRUTAS":  ("POLPA DE FRUTAS",              "CONGELADOS"),
@@ -249,6 +220,214 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "HAMBURGUER":       ("PIZZA / HAMBURGUER",           "CONGELADOS"),
     "EMPANADO":         ("EMPANADOS",                    "CONGELADOS"),
     "EMPANADOS":        ("EMPANADOS",                    "CONGELADOS"),
+    "PICOLE":           ("PICOLÉ / GELADINHO / SACOLE",  "CONGELADOS"),
+    "GELADINHO":        ("PICOLÉ / GELADINHO / SACOLE",  "CONGELADOS"),
+    "BATATA CONGELADA": ("BATATA CONGELADA",             "CONGELADOS"),
+    # ══ LATICÍNIOS ═══════════════════════════════════════════════════
+    "IOGURTE":          ("IOGURTES TRADICIONAL",         "LATICINIOS"),
+    "REQUEIJAO":        ("REQUEIJAO",                    "LATICINIOS"),
+    "MANTEIGA":         ("MANTEIGA",                     "LATICINIOS"),
+    "MARGARINA":        ("MARGARINA E CREME VEGETAL",    "LATICINIOS"),
+    "CREME DE LEITE":   ("CREME DE LEITE",              "CULINARIA DOCE"),
+    "QUEIJO MUSSARELA": ("QUEIJO MUSSARELA",             "LATICINIOS"),
+    "LEITE FERMENTADO": ("LEITE FERMENTADO",             "LATICINIOS"),
+    "BEBIDA LACTEA":    ("BEBIDAS LACTEAS",              "LATICINIOS"),
+    "CHANTILLY":        ("CHANTILLY",                    "LATICINIOS"),
+    # ══ FRIOS / FATIADOS ═════════════════════════════════════════════
+    "PRESUNTO":         ("PRESUNTO",                     "FRIOS / FATIADOS"),
+    "MORTADELA":        ("MORTADELA",                    "FRIOS / FATIADOS"),
+    "MUSSARELA":        ("MUSSARELA",                    "FRIOS / FATIADOS"),
+    "APRESUNTADO":      ("APRESUNTADO",                  "FRIOS / FATIADOS"),
+    "SALAME":           ("MORTADELA/SALAME",             "FRIAMBRERIA"),
+    # ══ BEBIDAS — CERVEJAS ═══════════════════════════════════════════
+    "CERVEJA LATA":     ("CERVEJA LATA",                 None),
+    "CERVEJA LONG":     ("CERVEJA LONG NECK",            None),
+    "CERVEJA GARRAFA":  ("CERVEJA GARRAFA",              None),
+    # ══ BEBIDAS — REFRIGERANTE ═══════════════════════════════════════
+    "REFRIGERANTE COLA":    ("REFRIGERANTE COLA",        None),
+    "REFRIGERANTE GUARANA": ("REFRIGERANTE GUARANA",     None),
+    "AGUA TONICA":      ("AGUA TONICA",                  None),
+    # ══ BEBIDAS — ÁGUAS ══════════════════════════════════════════════
+    "AGUA DE COCO":     ("AGUA DE COCO",                 None),
+    "AGUA MINERAL":     ("AGUA MINERAL ATE 2,5 L",       None),
+    "AGUA SABORIZADA":  ("AGUA SABORIZADA",              None),
+    "AGUA GASEIFICADA": ("AGUA GASEIFICADA",             None),
+    # ══ BEBIDAS — OUTRAS ═════════════════════════════════════════════
+    "ENERGETICO":       ("BEBIDAS ENERGETICAS",          None),
+    "ISOTONICO":        ("ISOTONICOS",                   None),
+    "CHA PRONTO":       ("CHAS PRONTOS",                 None),
+    "BEBIDA VEGETAL":   ("BEBIDA VEGETAL",               None),
+    # ══ BEBIDAS — SUCOS ══════════════════════════════════════════════
+    "SUCO INTEGRAL":    ("SUCO INTEGRAL",                None),
+    "SUCO CONCENTRADO": ("SUCO CONCENTRADO",             None),
+    "REFRESCO EM PO":   ("REFRESCO EM PO",               None),
+    "REFRESCO":         ("REFRESCO EM PO",               None),
+    # ══ BEBIDAS — DESTILADOS ═════════════════════════════════════════
+    "WHISKY":           ("WHISKY",                       None),
+    "VODKA":            ("VODKA",                        None),
+    "GIN":              ("GIN",                          None),
+    "RUM":              ("RUM",                          None),
+    "TEQUILA":          ("TEQUILA",                      None),
+    "CACHACA":          ("AGUARDENTES",                  None),
+    "AGUARDENTE":       ("AGUARDENTES",                  None),
+    # ══ BEBIDAS — VINHO ══════════════════════════════════════════════
+    "ESPUMANTE":        ("ESPUMANTES/FRISANTES/CHAMPAGNE", None),
+    "CHAMPAGNE":        ("ESPUMANTES/FRISANTES/CHAMPAGNE", None),
+    "VINHO TINTO":      ("VINHO TINTO",                  None),
+    "VINHO BRANCO":     ("VINHO BRANCO",                 None),
+    # ══ COMMODITIES — LEITE ══════════════════════════════════════════
+    "LEITE INTEGRAL":      ("LEITE INTEGRAL",            None),
+    "LEITE DESNATADO":     ("LEITE DESNATADO",           None),
+    "LEITE SEMIDESNATADO": ("LEITE SEMIDESNATADO",       None),
+    "LEITE SEM LACTOSE":   ("LEITE SEM LACTOSE",         None),
+    "LEITE EM PO":         ("LEITE EM PO",               None),
+    # ══ COMMODITIES — ARROZ ══════════════════════════════════════════
+    "ARROZ INTEGRAL":    ("ARROZ INTEGRAL",              None),
+    "ARROZ PARBOILIZADO":("ARROZ PARBOILIZADO",          None),
+    # ══ COMMODITIES — FEIJÃO ═════════════════════════════════════════
+    "FEIJAO CARIOCA":   ("FEIJAO CARIOCA",               None),
+    "FEIJAO PRETO":     ("FEIJAO PRETO",                 None),
+    "FEIJAO BRANCO":    ("FEIJAO BRANCO",                None),
+    # ══ COMMODITIES — ÓLEO ═══════════════════════════════════════════
+    "OLEO DE SOJA":     ("OLEO DE SOJA",                 None),
+    "OLEO DE MILHO":    ("OLEO DE MILHO",                None),
+    "OLEO DE CANOLA":   ("OLEO DE CANOLA",               None),
+    "OLEO DE COCO":     ("OLEO DE COCO",                 None),
+    # ══ MERCEARIA DOCE — MATINAIS ════════════════════════════════════
+    "ACHOCOLATADO":     ("ACHOCOLATADO EM PO",            "MATINAIS"),
+    "CAFE EM PO":       ("CAFE EM PO",                   None),
+    "CAFE SOLUVEL":     ("CAFE SOLUVEL",                 None),
+    "CAFE CAPSULA":     ("CAFE E OUTRAS PREPARACOES EM CAPSULA", None),
+    "CAPPUCCINO":       ("CAPPUCCINO EM PO",             None),
+    "CHIMARRAO":        ("CHIMARRAO E TERERE",           None),
+    "TERERE":           ("CHIMARRAO E TERERE",           None),
+    # ══ MERCEARIA DOCE — BISCOITOS ═══════════════════════════════════
+    "BISCOITO RECHEADO":("BISCOITO RECHEADO",            None),
+    "BISCOITO MAIZENA": ("BISCOITO MAIZENA",             None),
+    "BISCOITO MARIA":   ("BISCOITO MARIA",               None),
+    "WAFER":            ("WAFER",                        "BISCOITO DOCE"),
+    "ROSQUINHA":        ("ROSQUINHAS E SEQUILHOS",       None),
+    "SEQUILHO":         ("ROSQUINHAS E SEQUILHOS",       None),
+    "COOKIE":           ("COOKIES",                      None),
+    "COOKIES":          ("COOKIES",                      None),
+    "CREAM CRACKER":    ("CREAM CRACKER",                None),
+    # ══ MERCEARIA DOCE — CHOCOLATES ══════════════════════════════════
+    "CHOCOLATE BARRA":  ("CHOCOLATE EM BARRAS",          None),
+    "BOMBOM":           ("BOMBONS PACOTE",               None),
+    # ══ MERCEARIA DOCE — CULINÁRIA ═══════════════════════════════════
+    "LEITE CONDENSADO": ("LEITE CONDENSADO",             None),
+    "COCO RALADO":      ("COCO RALADO",                  None),
+    "LEITE DE COCO":    ("LEITE DE COCO",                None),
+    "CHOCOLATE EM PO":  ("CHOCOLATES EM PO",             None),
+    "FERMENTO":         ("FERMENTO QUIMICO E COALHO",    "CULINARIA DOCE"),
+    "AMIDO DE MILHO":   ("AMIDO DE MILHO",               None),
+    "MISTURA BOLO":     ("MISTURAS PARA BOLOS E SALGADOS", None),
+    # ══ MERCEARIA DOCE — SOBREMESAS ══════════════════════════════════
+    "GELATINA":         ("GELATINA EM PO",               None),
+    "PUDIM":            ("PO P/ PUDIM, FLAN, MARIA MOLE", None),
+    "DOCE DE LEITE":    ("DOCES DE LEITE",               None),
+    "GELEIA":           ("TRADICIONAL",                  "GELEIAS"),
+    # ══ MERCEARIA DOCE — SALGADINHOS ═════════════════════════════════
+    "SALGADINHO":       ("SALGADINHOS SABORES",          None),
+    "BATATA PALHA":     ("BATATA PALHA",                 None),
+    "BATATA FRITA":     ("BATATA FRITA",                 None),
+    "AMENDOIM":         ("AMENDOIM",                     "SALGADINHO"),
+    "PIPOCA":           ("PIPOCA EM GERAL",              None),
+    # ══ MERCEARIA DOCE — GULOSEIMAS ══════════════════════════════════
+    "BALA":             ("BALAS COMUM",                  None),
+    "CHICLETE":         ("GOMA DE MASCAR",               None),
+    "PIRULITO":         ("PIRULITOS",                    None),
+    "MARSHMALLOW":      ("MARSHMALLOWS",                 None),
+    # ══ MERCEARIA SALGADA — CONSERVAS ════════════════════════════════
+    "AZEITONA":         ("AZEITONAS CONSERVA",           None),
+    "PALMITO":          ("PALMITO CONSERVA",             None),
+    "MILHO VERDE":      ("MILHO VERDE CONSERVA",         None),
+    "SARDINHA":         ("SARDINHA CONSERVA",             None),
+    "ATUM":             ("ATUM CONSERVA",                None),
+    "FEIJOADA ENLATADA":("FEIJOADA ENLATADA",            None),
+    # ══ MERCEARIA SALGADA — TEMPEROS E MOLHOS ════════════════════════
+    "EXTRATO DE TOMATE":("EXTRATO DE TOMATE",            None),
+    "MOLHO DE TOMATE":  ("MOLHOS E POLPAS TOMATE",       None),
+    "CATCHUP":          ("CATCHUP",                      None),
+    "KETCHUP":          ("CATCHUP",                      None),
+    "MOSTARDA":         ("MOSTARDA",                     None),
+    "MAIONESE":         ("MAIONESE",                     None),
+    "MOLHO DE PIMENTA": ("MOLHO DE PIMENTA",             None),
+    "MOLHO DE SOJA":    ("MOLHO DE SOJA",                None),
+    "MOLHO INGLES":     ("MOLHO INGLES E OUTROS",        None),
+    "CALDO TABLETE":    ("CALDO TABLETE E PO",           None),
+    # ══ MERCEARIA SALGADA — MASSAS ═══════════════════════════════════
+    "MACARRAO INSTANTANEO": ("MACARRAO INSTANTANEO",     None),
+    # ══ MERCEARIA SALGADA — AZEITES ══════════════════════════════════
+    "AZEITE EXTRA VIRGEM":  ("AZEITE EXTRA VIRGEM",      None),
+    # ══ MERCEARIA SALGADA — VINAGRES ═════════════════════════════════
+    "VINAGRE DE MACA":  ("VINAGRE DE MACA",              None),
+    # ══ MERCEARIA SALGADA — FARINÁCEOS ═══════════════════════════════
+    "FARINHA DE MANDIOCA":  ("FARINHA DE MANDIOCA",       None),
+    "FAROFA":           ("FAROFAS PRONTAS",              None),
+    "POLVILHO":         ("POLVILHO",                     None),
+    # ══ HIGIENE BUCAL ════════════════════════════════════════════════
+    "CREME DENTAL":     ("CREME DENTAL",                 None),
+    "PASTA DENTAL":     ("CREME DENTAL",                 None),
+    "ESCOVA DENTAL":    ("ESCOVAS DENTAL",               None),
+    "FIO DENTAL":       ("FIO DENTAL",                   None),
+    "FITA DENTAL":      ("FIO DENTAL",                   None),
+    "ENXAGUANTE BUCAL": ("ANTISSÉPTICO BUCAL",           None),
+    "ANTISSEPTICO BUCAL":("ANTISSÉPTICO BUCAL",          None),
+    # ══ PRODUTOS CAPILARES ═══════════════════════════════════════════
+    "SHAMPOO":          ("SHAMPOO",                      "PRODUTOS CAPILARES"),
+    "CONDICIONADOR":    ("CONDICIONADOR",                "PRODUTOS CAPILARES"),
+    "CREME PENTEAR":    ("CREME PARA PENTEAR",           None),
+    "TINTURA":          ("TINTURA / DESCOLORANTES PARA CABELO", None),
+    # ══ DESODORANTES ═════════════════════════════════════════════════
+    "DESODORANTE AEROSOL": ("DESODORANTE AEROSOL",       None),
+    "DESODORANTE ROLL": ("DESODORANTE ROLLON",           None),
+    "DESODORANTE ROLLON":("DESODORANTE ROLLON",          None),
+    # ══ SABONETES ════════════════════════════════════════════════════
+    "SABONETE LIQUIDO": ("SABONETES LÍQUIDOS",           None),
+    "SABONETE BARRA":   ("SABONETES BARRA",              None),
+    "SABONETE INTIMO":  ("SABONETE INTIMO",              None),
+    # ══ PAPEL HIGIÊNICO ═════════════════════════════════════════════
+    "PAPEL HIGIENICO":  ("PAP. HIG. FOLHA DUPLAS",       None),
+    # ══ PROTETOR SOLAR ═══════════════════════════════════════════════
+    "PROTETOR SOLAR":   ("PROTETOR SOLAR",               None),
+    "REPELENTE":        ("REPELENTES",                   None),
+    # ══ ABSORVENTES ══════════════════════════════════════════════════
+    "ABSORVENTE":       ("ABSORVENTE EXTERNO",           "ABSORVENTES"),
+    # ══ SEÇÃO INFANTIL ═══════════════════════════════════════════════
+    "FRALDA":           ("FRALDAS DESCARTÁVEIS PARA BEBĘ", "SECAO INFANTIL"),
+    "LENCO UMEDECIDO":  ("LENCOS UMEDECIDOS",            "SECAO INFANTIL"),
+    # ══ BARBEARIA ════════════════════════════════════════════════════
+    "APARELHO DE BARBEAR": ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),
+    "APARELHO BARBEAR":    ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),
+    "LAMINA BARBEAR":      ("LAMINAS (REFIL)",            "BARBEARIA"),
+    "CREME BARBEAR":       ("CREMES E LOCŐES P/BARBEAR", "BARBEARIA"),
+    # ══ ESTÉTICA ═════════════════════════════════════════════════════
+    "ESMALTE":          ("ESMALTE PARA UNHA",            None),
+    # ══ DESCARTÁVEIS / BAZAR ═════════════════════════════════════════
+    "PAPEL TOALHA":     ("PAPEL TOALHA",                 None),
+    "PAPEL ALUMINIO":   ("PAPEL ALUMINIO",               None),
+    "GUARDANAPO":       ("GURDANAPO DE PAPEL",           None),
+    "FILME PVC":        ("FILME PVC",                    None),
+    "SACO PARA LIXO":   ("SACOS PARA LIXO",              None),
+    "SACO DE LIXO":     ("SACOS PARA LIXO",              None),
+    # ══ UTENSÍLIOS LIMPEZA ═══════════════════════════════════════════
+    "VASSOURA":         ("VASSOURAS",                    None),
+    "RODO":             ("RODOS",                        None),
+    # ══ AÇOUGUE ══════════════════════════════════════════════════════
+    "LINGUICA":         ("LINGUICA GRANEL ATENDIMENTO",  None),
+    "SALSICHA":         ("SALSICHA GRANEL ATENDIMENTO",  None),
+    # ══ NUTRIÇÃO INFANTIL ════════════════════════════════════════════
+    "PAPINHA":          ("PAPINHAS",                     None),
+    # ══ TABACARIA ════════════════════════════════════════════════════
+    "CIGARRO":          ("CIGARRO EM GERAL",             None),
+    # ══ PET SHOP ═════════════════════════════════════════════════════
+    "RACAO":            ("ALIMENTO PARA CAES",           "RACAO E PET SHOP"),
+    # ══ CARVÃO / CHURRASCO ═══════════════════════════════════════════
+    "CARVAO":           ("CARVAO",                       None),
+    # ══ PADARIA ══════════════════════════════════════════════════════
+    "PAO FRANCES":      ("PAO FRANCES",                  None),
+    "PAO DE FORMA":     ("PAO DE FORMA COMUM",           None),
 }
 
 
