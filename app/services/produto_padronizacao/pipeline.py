@@ -35,6 +35,7 @@ _ATRIBUTOS: set[str] = {
     "INTEGRAL", "DESNATADO", "SEMIDESNATADO",
     "TRADICIONAL", "PREMIUM", "GOURMET", "ARTESANAL",
     "EXTRA FORTE", "FORTE", "SUAVE", "MEDIO",
+    "EXTRA VIRGEM", "VIRGEM",
     "INFANTIL", "FEMININO", "MASCULINO",
     "SEM GLUTEN", "SEM LACTOSE", "SEM ACUCAR",
     "VEGANO", "VEGETARIANO", "ORGANICO",
@@ -169,9 +170,9 @@ def processar_descricao(
         except Exception:
             pass
 
-    # 6. Descrição padronizada (atributos no final, sem duplicação)
+    # 6. Descrição padronizada (ordem canônica: produto + atributos + embalagem + volume)
     descricao_padrao = _montar_descricao_padrao(
-        texto_sem_atributos, um, atributos
+        texto_sem_atributos, um, atributos, tipo_embalagem
     ).lower()
 
     # 7. Score de confiança geral
@@ -224,31 +225,54 @@ def _identificar_tipo_produto(texto: str) -> Optional[str]:
     return None
 
 
+def _remover_tokens_embalagem(texto: str) -> str:
+    """Remove tokens de embalagem soltos do texto (ex: VD, CX, PET, LT)."""
+    import re
+    tokens = texto.split()
+    limpo = [t for t in tokens if t.upper() not in _EMBALAGENS]
+    return re.sub(r"\s+", " ", " ".join(limpo)).strip()
+
+
 def _montar_descricao_padrao(
     texto: str,
     um: Optional[UnidadeMedida],
     atributos: list[str] | None = None,
+    tipo_embalagem: Optional[str] = None,
 ) -> str:
     """
-    Monta descrição padronizada com ordem: descrição + atributos + unidade.
-    Atributos ficam antes da unidade para leitura natural.
-    Ex: "REFRIGERANTE COCA COLA PET ZERO 2L"
+    Monta descrição padronizada em ordem canônica:
+        [produto / descrição base] [atributos] [embalagem] [volume]
+
+    Exemplo:
+        "AZEITE OLIVA ANDORINHA EXTRA VIRGEM VD 250ML"
+        → extrair_atributos remove EXTRA VIRGEM → texto_sem_atributos = "AZEITE OLIVA ANDORINHA VD"
+        → _montar_descricao_padrao remove VD do base → base = "AZEITE OLIVA ANDORINHA"
+        → atributos = ["EXTRA VIRGEM"], tipo_embalagem = "VIDRO", volume = "250ML"
+        → resultado = "AZEITE OLIVA ANDORINHA EXTRA VIRGEM VIDRO 250ML"
     """
     import re
     _PATTERN = re.compile(
         r"\b\d+(?:[.,]\d+)?\s*(?:ML|LTS?|CL|KGS?|GRS?|MG|UND?|UNI|UNID|PCS?|CX|DZ|PCT?|RL|PR|FD)\b",
         re.IGNORECASE,
     )
-    # Remove unidade do meio para recolocar no final
+    # 1. Remove padrões de quantidade/volume embutidos no texto
     base = _PATTERN.sub("", texto).strip()
     base = re.sub(r"\s+", " ", base).strip()
 
+    # 2. Remove tokens de embalagem que sobram na base
+    #    (serão recolocados canonicamente ao final)
+    if tipo_embalagem:
+        base = _remover_tokens_embalagem(base)
+
+    # 3. Monta ordem canônica
     partes = [base]
     if atributos:
         partes.append(" ".join(atributos))
+    if tipo_embalagem:
+        partes.append(tipo_embalagem)
     if um:
         partes.append(formatar_unidade(um))
-    return " ".join(partes).strip()
+    return " ".join(p for p in partes if p).strip()
 
 
 def _calcular_score(marca, tipo_embalagem, um, texto: str) -> float:
