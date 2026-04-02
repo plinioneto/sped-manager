@@ -50,7 +50,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 01_gestao_vendas.py | ✅ concluído | gestão de vendas: visão geral com evolução mensal, ritmo de vendas (heatmap dia×mês, histograma de ticket), mix comercial (CFOP/CST via C190), clientes B2B e notas; 2 filtros (período, dia da semana) |
 | 02_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
-| 04_inventario.py | ✅ concluído | inventário H005/H010 e saldos K200, 2 abas |
+| 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | cadastro de produtos com listagem e filtros |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
@@ -109,11 +109,45 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Criar um padrão de cores para a ferramenta, as páginas estão usando cores diferentes (definir quantas cores e quais devem ser usadas)
 - [x] Renomear as páginas e reordená-las por ordem de importância na sidebar
 - [x] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
-- [ ] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero. 
+- [x] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero.
 - [ ] Revisitar cadastro de produto, verificar se tem alguma gestão que pode ser feita ali (opção: "Inteligência de Produtos" com preço médio, concentração de fornecedor, carga tributária)
 - [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
-- [ ] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
+- [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
+- [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
+- [ ] Atualizar cadastro de produto com as orientações abaixo:
+    1. Adicionar amac como redução para amaciante
+    2. acai como redução para açaí
+    3. procurar uma maneira de incluir também algumas palavras chaves depois de padronizado que já categorizarão mais corretamente (ex.: agua sanitaria vai para limpeza -> limpeza de roupas -> agua sanitaria, acai vai para pereciveis do autosserviço -> congelados -> sorvetes/acai)
 ```
+
+## Decisões mapeadas: Importação NF-e XML
+
+### Contexto
+Clientes que não têm o EFD fechado (mês em andamento) ou recebem XMLs diretamente de fornecedores precisam importar dados de compras sem depender do SPED.
+
+### Abordagem decidida
+- **Fonte independente**: XML e EFD coexistem no banco; deduplicação pela chave NF-e de 44 dígitos (`chv_nfe`)
+- **Escopo**: alimenta Compras + Fiscal (C190 derivado dos itens por agregação CST/CFOP/alíquota)
+- **Bronze ignorado**: XML não se encaixa no modelo linha a linha do EfdRaw — ir direto para silver
+- **`cod_part` = CNPJ do emitente**: evita conflito com cod_part do EFD (que são códigos internos)
+- **Sem nova dependência**: usar `xml.etree.ElementTree` da stdlib
+- **Sem mudança de schema**: todos os models já existem com os campos necessários
+
+### Arquivos a criar/editar
+- `app/parser/xml_parser.py` — novo: `XmlParser(session, tenant_id).processar(xml, nome)`
+- `app/pages/06_dados.py` — nova aba "Upload XML" com suporte a múltiplos arquivos
+
+### Mapeamento XML → banco
+| XML | Destino |
+|---|---|
+| `<infNFe Id>` / `<chNFe>` | `DocumentoFiscal.chv_nfe` |
+| `<emit>` CNPJ + xNome | `Participante` (cod_part = CNPJ) |
+| `<ide>` nNF, serie, dhEmi | `DocumentoFiscal` (ind_oper="0" fixo) |
+| `<ICMSTot>` vNF, vICMS, vPIS, vCOFINS | `DocumentoFiscal` totais |
+| `<det>` cProd, xProd, qCom, vProd, CFOP, CST, pICMS | `ItemFiscal` + `Produto` |
+| Agrupamento de itens por CST/CFOP/alíq | `IcmsC190` (derivado) |
+
+---
 
 **How to maintain it — simple rule:**
 
