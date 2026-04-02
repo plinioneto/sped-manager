@@ -25,6 +25,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - ItemFiscal — C170 (chave única: tenant_id + chv_doc + num_item)
 - EfdRaw — bronze linha a linha
 - ArquivoImportado — histórico de importações
+- Fabricante — global (sem tenant_id); grupo empresarial (Unilever, BRF, Ambev...)
+- Marca — global (sem tenant_id); marca comercial (Dove, Sadia, Skol...), FK → Fabricante
+- Departamento / Grupo / Categoria — hierarquia global de 3 níveis para classificação de produtos
 
 ## Regras importantes
 - SEMPRE filtrar por tenant_id em todas as queries
@@ -51,7 +54,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 02_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
-| 05_produtos.py | ✅ concluído | cadastro de produtos com listagem e filtros |
+| 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; aba Revisão (classificação manual Dep→Grp→Cat com pré-seleção do pipeline) + aba Marcas & Fabricantes (cadastro individual + importação em lote via seed script) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
@@ -59,7 +63,12 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | Model | Status | Observações |
 |-------|--------|-------------|
 | Tenant | ✅ | |
-| Produto | ✅ | campos 0200 completos |
+| Produto | ✅ | campos 0200 + padronização (descricao_padrao, tipo_embalagem, peso_volume, scores) + FK para Marca, Categoria, Grupo, Departamento |
+| Fabricante | ✅ | global; nome, cnpj, aliases (JSON), ativo |
+| Marca | ✅ | global; nome, fabricante_id, categoria, aliases (JSON), ativo |
+| Departamento | ✅ | global; 18 departamentos carregados do categorias.db |
+| Grupo | ✅ | global; 118 grupos, FK → Departamento |
+| Categoria | ✅ | global; 720 categorias, FK → Grupo |
 | DocumentoFiscal | ✅ | campos C100 completos |
 | ItemFiscal | ✅ | campos C170 completos |
 | EfdRaw | ✅ | |
@@ -90,6 +99,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Bronze/Silver seguindo padrão do Databricks original
 - Storage local em storage/arquivos/ — vira S3 na produção
 - Autenticação temporária só por CNPJ — senha ainda não implementada
+- Pipeline de padronização de produtos: limpeza → abreviações → unidades → marca/fabricante → categorização por vocabulário + Jaccard (54% de cobertura automática na base atual)
+- Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo
+- scripts/backfill_padronizacao.py: reprocessa produtos existentes; scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
 
 ## Pendente
 - [x] Página de cadastro de produto com listagem e filtros
@@ -110,7 +122,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Renomear as páginas e reordená-las por ordem de importância na sidebar
 - [x] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
 - [x] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero.
-- [ ] Revisitar cadastro de produto, verificar se tem alguma gestão que pode ser feita ali (opção: "Inteligência de Produtos" com preço médio, concentração de fornecedor, carga tributária)
+- [x] Revisitar cadastro de produto — 3 abas: Cadastro EFD, Padronização & Categorias, Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária)
 - [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
 - [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
 - [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
