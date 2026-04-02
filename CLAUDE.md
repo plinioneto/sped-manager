@@ -171,6 +171,69 @@ Clientes que não têm o EFD fechado (mês em andamento) ou recebem XMLs diretam
 
 ---
 
+## Fila de adições ao pipeline de padronização
+
+Use esta seção para acumular novas entradas antes de pedir ao Claude para aplicá-las.
+Quando quiser aplicar, diga: **"aplica a fila de padronização"**.
+Após aplicado, o Claude limpa as entradas e move para o histórico.
+
+### Como preencher
+
+**Abreviações** — `abrev` → `expansão` (vai para `dicionarios.py`)
+- Se for bigrama (duas palavras), colocar entre aspas: `"ap glic"` → `glicerinado`
+- Expansão sempre em português sem abreviação
+
+**Categorias** — `keyword` → `Departamento > Grupo > Categoria` (vai para `categorizador.py`)
+- Keyword pode ser unigrama ou bigrama
+- Se a categoria for ambígua em grupos diferentes, indicar o grupo entre parênteses
+- Consultar nomes exatos na seção "Hierarquia de categorias" abaixo se necessário
+
+**Marcas** — `Nome da marca | Fabricante | aliases separados por vírgula` (vai para `identificador.py`)
+- Aliases: variações de grafia que aparecem nas descrições EFD
+- Fabricante deve bater com um fabricante já cadastrado, ou será criado novo
+
+**Fabricantes** — `Nome | aliases separados por vírgula` (vai para `identificador.py`)
+
+---
+
+### ✏️ Fila — preencha abaixo, peça "aplica a fila" quando quiser aplicar
+
+#### Abreviações
+<!-- formato: abrev → expansão -->
+
+
+#### Categorias
+<!-- formato: keyword → Departamento > Grupo > Categoria -->
+
+
+#### Marcas
+<!-- formato: Nome | Fabricante | alias1, alias2, ... -->
+
+
+#### Fabricantes
+<!-- formato: Nome | alias1, alias2, ... -->
+
+
+---
+
+### ✅ Histórico de adições aplicadas
+
+| Data | Tipo | Entrada |
+|------|------|---------|
+| 2026-04-02 | Abreviação | `amac` → amaciante |
+| 2026-04-02 | Abreviação | `acai` → açaí |
+| 2026-04-02 | Abreviação | `ap barbear` → aparelho de barbear |
+| 2026-04-02 | Abreviação | `ap bar` → aparelho de barbear |
+| 2026-04-02 | Abreviação | `ap prest` → aparelho de barbear |
+| 2026-04-02 | Abreviação | `odoriz` → odorizador |
+| 2026-04-02 | Categoria | `acai` → Perecíveis do Autoserviço > Congelados > Sorvetes/Açaí |
+| 2026-04-02 | Categoria | `agua sanitaria` → Limpeza > Limpeza para Roupas > Água Sanitária |
+| 2026-04-02 | Categoria | `aparelho de barbear` → Perfumaria > Barbearia > Aparelhos Descartáveis |
+| 2026-04-02 | Categoria | `odoriz` → Limpeza > Limpeza de Casa > Odorizador de Ambiente |
+| 2026-04-02 | Marca | GILLETTE \| P&G \| PRESTOBARBA, PRESTO BARBA |
+
+---
+
 **How to maintain it — simple rule:**
 
 After every commit, ask yourself 3 questions:
