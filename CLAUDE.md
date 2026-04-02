@@ -109,6 +109,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Testar página de inventário com arquivo EFD real contendo Bloco H e K200
 - [x] Relatórios fiscais (ICMS, PIS, COFINS) → renomeado para Gestao Fiscal com 5 abas
 - [ ] Autenticação completa com senha criptografada
+- [ ] Login por código curto ou CNPJ: permitir que o tenant faça login digitando um código curto (ex: 4–6 caracteres alfanuméricos) além do CNPJ completo. Adicionar coluna `codigo_acesso` (String, unique, nullable) na tabela `tenants`. Tela de login tenta match por `codigo_acesso` primeiro, depois por `cnpj`. Geração do código pode ser automática no cadastro ou definida pelo admin.
 - [x] Silver C190 com tratamento correto de constraint
 - [ ] Documentação técnica completa
 - [ ] Migração para PostgreSQL (produção)
@@ -123,6 +124,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
 - [x] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero.
 - [x] Revisitar cadastro de produto — 3 abas: Cadastro EFD, Padronização & Categorias, Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária)
+- [ ] Deduplicação de produto por EAN no import EFD: ao processar o registro 0200, se `cod_barra` (EAN) já existir para outro `cod_item` do mesmo tenant, vincular o item ao produto canônico existente em vez de criar duplicata. Campos a considerar: `cod_barra` como chave de deduplicação secundária (após `cod_item`). Atenção: EAN pode estar ausente ou ser "SEM GTIN" — só deduplicar quando EAN for numérico com 8, 12, 13 ou 14 dígitos.
 - [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
 - [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
 - [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
