@@ -136,9 +136,12 @@ with aba_revisao:
     # ── Filtros ───────────────────────────────────────────────────────────────
 
     db = next(get_session())
-
-    tenants      = [t.nome for t in db.query(Tenant).order_by(Tenant.nome).all()]
-    departamentos = db.query(Departamento).order_by(Departamento.descricao).all()
+    try:
+        tenants      = [t.nome for t in db.query(Tenant).order_by(Tenant.nome).all()]
+        departamentos = db.query(Departamento).order_by(Departamento.descricao).all()
+    except Exception:
+        db.close()
+        raise
 
     col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
     with col_f1:
@@ -264,11 +267,13 @@ with aba_revisao:
                 )
                 _stats.clear()
                 st.session_state.rev_idx += 1
+                db.close()
                 st.rerun()
 
         with col_b2:
             if st.button("Pular", use_container_width=True):
                 st.session_state.rev_idx += 1
+                db.close()
                 st.rerun()
 
         with col_b3:
@@ -277,10 +282,12 @@ with aba_revisao:
                 _salvar_classificacao(db, produto.id, None, None, None, descarta=True)
                 _stats.clear()
                 st.session_state.rev_idx += 1
+                db.close()
                 st.rerun()
 
         with col_b4:
             if st.button("Sair", use_container_width=True):
+                db.close()
                 st.session_state.admin_auth = False
                 st.rerun()
 
