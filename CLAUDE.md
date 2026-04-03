@@ -55,7 +55,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 4 abas: Revisão Individual, Revisão em Lote (checkbox por linha), Marcas & Fabricantes (cadastro + seed), Tokens Desconhecidos (lista tokens não reconhecidos pelo pipeline, filtro por contagem, limpeza de ruído) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 4 abas: Revisão Individual (filtros: cliente, modo, departamento, grupo), Revisão em Lote (filtros: cliente, modo, departamento, grupo; checkbox por linha), Marcas & Fabricantes (cadastro + seed), Tokens Desconhecidos (lista tokens não reconhecidos, filtro por contagem, limpeza de ruído) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
