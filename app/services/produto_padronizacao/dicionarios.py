@@ -119,6 +119,9 @@ ABREVIACOES: dict[str, str] = {
     "CREME PENT":   "CREME PENTEAR",
     "MAC INST":     "MACARRAO INSTANTANEO",
     "ATIV CACHOS":  "ATIVADOR DE CACHOS",
+    "SAND HAV":     "SANDALIA HAVAIANA",
+    "BEB LACTEA":   "BEBIDA LACTEA",
+    "GELAT":        "GELATINA",
 }
 
 

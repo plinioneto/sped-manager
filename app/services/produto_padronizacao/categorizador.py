@@ -223,6 +223,8 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "PICOLE":           ("PICOLÉ / GELADINHO / SACOLE",  "CONGELADOS"),
     "GELADINHO":        ("PICOLÉ / GELADINHO / SACOLE",  "CONGELADOS"),
     "BATATA CONGELADA": ("BATATA CONGELADA",             "CONGELADOS"),
+    "BATATA PRE FRITA": ("BATATA CONGELADA",             "CONGELADOS"),
+    "PRE FRITA":        ("BATATA CONGELADA",             "CONGELADOS"),
     # ══ LATICÍNIOS ═══════════════════════════════════════════════════
     "IOGURTE":          ("IOGURTES TRADICIONAL",         "LATICINIOS"),
     "REQUEIJAO":        ("REQUEIJAO",                    "LATICINIOS"),
@@ -328,9 +330,11 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "DOCE DE LEITE":    ("DOCES DE LEITE",               None),
     "GELEIA":           ("TRADICIONAL",                  "GELEIAS"),
     # ══ MERCEARIA DOCE — SALGADINHOS ═════════════════════════════════
-    "SALGADINHO":       ("SALGADINHOS SABORES",          None),
-    "BATATA PALHA":     ("BATATA PALHA",                 None),
-    "BATATA FRITA":     ("BATATA FRITA",                 None),
+    "SALGADINHO":         ("SALGADINHOS SABORES",        None),
+    "BATATA PALHA":       ("BATATA PALHA",               None),
+    "BATATA FRITA":       ("BATATA FRITA",               None),
+    "ELMA CHIPS":         ("BATATA FRITA",               None),
+    "BATATA ELMA CHIPS":  ("BATATA FRITA",               None),
     "AMENDOIM":         ("AMENDOIM",                     "SALGADINHO"),
     "PIPOCA":           ("PIPOCA EM GERAL",              None),
     # ══ MERCEARIA DOCE — GULOSEIMAS ══════════════════════════════════

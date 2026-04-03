@@ -66,6 +66,14 @@ MARCAS_CONHECIDAS: dict[str, dict] = {
     "CAMIL":        {"fabricante": "CAMIL",             "aliases": ["CAMIL"],                         "categoria": "graos"},
     "TIO JOAO":     {"fabricante": "JOSAPAR",           "aliases": ["TIO JOAO", "TIO JOAO"],          "categoria": "graos"},
     "PATRONO":      {"fabricante": "PATRONO",           "aliases": ["PATRONO"],                       "categoria": "graos"},
+    # ── Azeites / óleos ───────────────────────────────────────────────
+    "ANDORINHA":    {"fabricante": "SOVENA",            "aliases": ["ANDORINHA"],                     "categoria": "alimentos"},
+    "GALLO":        {"fabricante": "VICTOR GUEDES",     "aliases": ["GALLO"],                         "categoria": "alimentos"},
+    # ── Guloseimas / balas ────────────────────────────────────────────
+    "FLAMBOYANT":   {"fabricante": "FLAMBOYANT",        "aliases": ["FLAMBOYANT"],                    "categoria": "alimentos"},
+    "ARCOR":        {"fabricante": "ARCOR",             "aliases": ["ARCOR", "BUTTER TOFFEES"],       "categoria": "alimentos"},
+    "DOCILE":       {"fabricante": "DOCILE",            "aliases": ["DOCILE"],                        "categoria": "alimentos"},
+    "FINI":         {"fabricante": "FINI",              "aliases": ["FINI"],                          "categoria": "alimentos"},
 }
 
 # ── Índice base (dicionário fixo) ─────────────────────────────────────────────
