@@ -134,7 +134,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] **Modelo supervisionado para categorização** — quando houver ~300–500 produtos revisados manualmente (`origem_padronizacao = 'manual'`), treinar um classificador simples (TF-IDF + Naive Bayes ou Regressão Logística via `scikit-learn`) usando as descrições padronizadas como entrada e `categoria_id` como rótulo. Plugar em `categorizador.py` como novo passo após `_VOCAB_CATEGORIA` e antes do Jaccard fallback — só ativa quando score dos dicionários for zero. Aumentaria cobertura de ~70% para ~90%+ sem manutenção de dicionários, generalizando para marcas regionais e abreviações nunca vistas. Pré-requisito: volume mínimo de revisões manuais acumuladas.
 - [ ] **Embeddings para produtos similares** — transformar descrições em vetores numéricos (ex: `sentence-transformers`) para detectar que `REFRIG COCA COLA PET 2L` e `COCA COLA REFRIGERANTE GARRAFA 2L` são o mesmo produto. Valor prático: (1) detectar duplicatas no cadastro entre tenants diferentes, (2) sugerir classificação por similaridade ("94% similar a produto já classificado como Refrigerantes"), (3) base para catálogo EAN sem código de barras. Custo alto de infraestrutura (~400MB de modelo); só justifica com múltiplos tenants e volume alto. Pós-MVP.
 - [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
-- [ ] **Documentação técnica completa**
+- [ ] **README prático** (agora): como rodar localmente, configurar `.env`, rodar `init_db` e `backfill`, importar EFD, usar o painel admin. 2–3 páginas, baixo custo, útil para onboarding.
+- [ ] **Documentação técnica completa** (pós-estabilização): fazer após autenticação + deploy estarem prontos, quando o sistema tiver forma definitiva. Diagramas de arquitetura, fluxos, especificação dos models e pipeline.
 
 ### ✅ Concluído (histórico)
 
