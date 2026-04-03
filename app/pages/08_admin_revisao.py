@@ -58,8 +58,8 @@ if not st.session_state.admin_auth:
 
 st.title("Painel Admin")
 
-aba_revisao, aba_batch, aba_marcas = st.tabs([
-    "Revisão Individual", "Revisão em Lote", "Marcas & Fabricantes",
+aba_revisao, aba_batch, aba_marcas, aba_tokens = st.tabs([
+    "Revisão Individual", "Revisão em Lote", "Marcas & Fabricantes", "Tokens Desconhecidos",
 ])
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -748,3 +748,83 @@ with aba_marcas:
             st.info("Nenhuma marca cadastrada.")
 
     db2.close()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ABA 4 — Tokens Desconhecidos
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with aba_tokens:
+    import pandas as pd
+    from app.models.token_desconhecido import TokenDesconhecido
+
+    db_tok = next(get_session())
+    try:
+        st.markdown(
+            "Tokens encontrados nas descrições que **não foram reconhecidos** por "
+            "nenhum dicionário do pipeline. Use esta lista para alimentar novas "
+            "abreviações, marcas ou categorias via fila no CLAUDE.md."
+        )
+
+        total_tokens = db_tok.query(TokenDesconhecido).count()
+        st.metric("Total de tokens únicos acumulados", total_tokens)
+        st.divider()
+
+        col_t1, col_t2 = st.columns([2, 1])
+        with col_t1:
+            busca_token = st.text_input("Filtrar por token", placeholder="ex: SUCOS, NESTL...")
+        with col_t2:
+            min_contagem = st.number_input("Contagem mínima", min_value=1, value=2)
+
+        q_tok = (
+            db_tok.query(TokenDesconhecido)
+            .filter(TokenDesconhecido.contagem >= min_contagem)
+        )
+        if busca_token:
+            q_tok = q_tok.filter(
+                TokenDesconhecido.token.ilike(f"%{busca_token.upper()}%")
+            )
+        tokens_rows = q_tok.order_by(TokenDesconhecido.contagem.desc()).limit(500).all()
+
+        if not tokens_rows:
+            st.info("Nenhum token desconhecido encontrado com os filtros aplicados.")
+        else:
+            df_tok = pd.DataFrame([
+                {
+                    "Token":          r.token,
+                    "Ocorrências":    r.contagem,
+                    "Primeiro visto": r.primeiro_visto.strftime("%d/%m/%Y") if r.primeiro_visto else "—",
+                    "Último visto":   r.ultimo_visto.strftime("%d/%m/%Y") if r.ultimo_visto else "—",
+                    "Exemplo":        r.exemplo or "—",
+                }
+                for r in tokens_rows
+            ])
+            st.dataframe(
+                df_tok,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Ocorrências": st.column_config.ProgressColumn(
+                        format="%d",
+                        min_value=0,
+                        max_value=int(df_tok["Ocorrências"].max()) if len(df_tok) else 1,
+                    ),
+                    "Exemplo": st.column_config.TextColumn(width="large"),
+                },
+            )
+            st.caption(f"{len(tokens_rows)} tokens exibidos (limite 500)")
+
+        st.divider()
+        with st.expander("⚠️ Limpar tokens com contagem = 1 (ruído)"):
+            st.warning("Remove todos os tokens vistos apenas uma vez — geralmente são ruído ou erros de digitação.")
+            if st.button("Limpar tokens únicos", type="primary"):
+                deleted = (
+                    db_tok.query(TokenDesconhecido)
+                    .filter(TokenDesconhecido.contagem == 1)
+                    .delete()
+                )
+                db_tok.commit()
+                st.success(f"{deleted} tokens removidos.")
+                st.rerun()
+
+    finally:
+        db_tok.close()

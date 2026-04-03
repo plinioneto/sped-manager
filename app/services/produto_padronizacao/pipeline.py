@@ -175,7 +175,17 @@ def processar_descricao(
         texto_sem_atributos, um, atributos, tipo_embalagem
     ).lower()
 
-    # 7. Score de confiança geral
+    # 7. Tokens desconhecidos — salva no banco para revisão futura
+    if session is not None:
+        try:
+            tokens_desc = _coletar_tokens_desconhecidos(
+                expandida, marca, tipo_produto, tipo_embalagem, atributos
+            )
+            _salvar_tokens_desconhecidos(session, tokens_desc, descricao)
+        except Exception:
+            pass
+
+    # 8. Score de confiança geral
     score = _calcular_score(marca, tipo_embalagem, um, expandida)
 
     return ResultadoPadronizacao(
@@ -273,6 +283,119 @@ def _montar_descricao_padrao(
     if um:
         partes.append(formatar_unidade(um))
     return " ".join(p for p in partes if p).strip()
+
+
+# Tokens curtos ou de infraestrutura que nunca são "desconhecidos" relevantes
+_TOKENS_IGNORAR: set[str] = {
+    # Preposições / artigos / conectivos
+    "DE", "DA", "DO", "DAS", "DOS", "E", "EM", "COM", "SEM", "PARA",
+    "POR", "AO", "A", "O", "AS", "OS", "NO", "NA", "NOS", "NAS",
+    # Unidades (já cobertas pelo extrator, mas podem sobrar)
+    "ML", "LT", "LTS", "L", "KG", "KGS", "GR", "GRS", "MG",
+    "UND", "UN", "UNI", "UNID", "PC", "PCS", "CX", "DZ", "PCT",
+    "RL", "PR", "FD", "SC",
+    # Números isolados
+}
+
+
+def _coletar_tokens_desconhecidos(
+    expandida: str,
+    marca: str | None,
+    tipo_produto: str | None,
+    tipo_embalagem: str | None,
+    atributos: list[str],
+) -> set[str]:
+    """
+    Retorna tokens da descrição expandida que não foram reconhecidos por
+    nenhuma parte do pipeline. Candidatos a enriquecer dicionários futuros.
+    """
+    import re
+    from app.services.produto_padronizacao.dicionarios import ABREVIACOES, ABREVIACOES_CONTEXTUAIS
+    from app.services.produto_padronizacao.identificador import _todos_aliases
+
+    # Conjunto de todos os tokens "conhecidos"
+    conhecidos: set[str] = set()
+
+    # Valores expandidos de abreviações
+    conhecidos.update(v.upper() for v in ABREVIACOES.values())
+    conhecidos.update(ABREVIACOES_CONTEXTUAIS.keys())
+    # Chaves e valores do vocab de categoria (unigramas)
+    for chave in _VOCAB_CATEGORIA:
+        conhecidos.update(chave.upper().split())
+    for chave in _VOCAB_TIPO_PRODUTO:
+        conhecidos.update(chave.upper().split())
+    for chave in _VOCAB_HORTIFRUTI:
+        conhecidos.update(chave.upper().split())
+    # Embalagens
+    conhecidos.update(_EMBALAGENS.keys())
+    conhecidos.update(v.upper() for v in _EMBALAGENS.values())
+    # Atributos
+    conhecidos.update(t for a in _ATRIBUTOS for t in a.upper().split())
+    # Tipos de produto
+    conhecidos.update(t for p in _TIPOS_PRODUTO for t in p.upper().split())
+    # Marcas conhecidas (aliases)
+    try:
+        conhecidos.update(_todos_aliases().keys())
+    except Exception:
+        pass
+    # Resultado da própria detecção
+    if marca:
+        conhecidos.update(marca.upper().split())
+    if tipo_produto:
+        conhecidos.update(tipo_produto.upper().split())
+    if tipo_embalagem:
+        conhecidos.update(tipo_embalagem.upper().split())
+    for a in atributos:
+        conhecidos.update(a.upper().split())
+    # Tokens a ignorar
+    conhecidos.update(_TOKENS_IGNORAR)
+
+    # Padrão de número/unidade
+    _NUM_PATTERN = re.compile(r"^\d+([.,]\d+)?$")
+
+    desconhecidos: set[str] = set()
+    for token in expandida.upper().split():
+        if len(token) < 4:
+            continue
+        if token in conhecidos:
+            continue
+        if _NUM_PATTERN.match(token):
+            continue
+        desconhecidos.add(token)
+
+    return desconhecidos
+
+
+def _salvar_tokens_desconhecidos(
+    session,
+    tokens: set[str],
+    exemplo: str,
+) -> None:
+    """Faz upsert dos tokens desconhecidos no banco (contagem acumulada)."""
+    if not tokens:
+        return
+    from datetime import datetime
+    from app.models.token_desconhecido import TokenDesconhecido
+
+    for token in tokens:
+        existing = (
+            session.query(TokenDesconhecido)
+            .filter(TokenDesconhecido.token == token)
+            .first()
+        )
+        if existing:
+            existing.contagem += 1
+            existing.ultimo_visto = datetime.utcnow()
+        else:
+            session.add(TokenDesconhecido(
+                token=token,
+                contagem=1,
+                exemplo=exemplo[:200],
+            ))
+    try:
+        session.commit()
+    except Exception:
+        session.rollback()
 
 
 def _calcular_score(marca, tipo_embalagem, um, texto: str) -> float:

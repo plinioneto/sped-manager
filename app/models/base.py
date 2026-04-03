@@ -9,5 +9,6 @@ def init_db():
         tenant, fabricante, marca, categoria, produto,
         documento_fiscal, icms_c190,
         inventario_h005, inventario_h010, estoque_k200,
+        token_desconhecido,
     )
     Base.metadata.create_all(bind=engine)

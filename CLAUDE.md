@@ -55,7 +55,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 3 abas: Revisão Individual (classificação produto a produto), Revisão em Lote (agrupa por sugestão do pipeline, checkbox "✔" por linha para selecionar/deselecionar, aprova/descarta só os marcados), Marcas & Fabricantes (cadastro + seed script) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 4 abas: Revisão Individual, Revisão em Lote (checkbox por linha), Marcas & Fabricantes (cadastro + seed), Tokens Desconhecidos (lista tokens não reconhecidos pelo pipeline, filtro por contagem, limpeza de ruído) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
@@ -78,6 +78,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | InventarioH010 | ✅ | itens H010; dt_inv desnormalizado; constraint (tenant_id, dt_inv, cod_item, ind_prop) |
 | EstoqueK200 | ✅ | saldo K200; constraint (tenant_id, dt_est, cod_item, ind_est) |
 | Participante | ✅ | registro 0150; constraint (tenant_id, cod_part); nome, cnpj, endereço |
+| TokenDesconhecido | ✅ | global; token único + contagem + primeiro/último visto + exemplo de descrição |
 
 ## Status do parser
 | Etapa | Status | Observações |
@@ -109,6 +110,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
   - Cobertura automática atual: ~70.6% dos produtos com categoria/grupo
   - Protegido: produtos com origem_padronizacao='manual'/'manual_sem_cat' nunca são sobrescritos pelo backfill
 - Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo; PRESTOBARBA é alias de GILLETTE (P&G)
+- Tokens desconhecidos: pipeline salva no banco (tabela `tokens_desconhecidos`) tokens ≥4 chars não reconhecidos por nenhum dicionário; acessíveis na aba "Tokens Desconhecidos" do admin, ordenados por frequência; uso esperado: alimentar novas entradas na fila do CLAUDE.md
 - scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
 
 ## Pendente
