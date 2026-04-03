@@ -376,6 +376,7 @@ with aba_batch:
     try:
         # ── Filtros ──────────────────────────────────────────────────────────
         tenants_batch = [t.nome for t in db_batch.query(Tenant).order_by(Tenant.nome).all()]
+        deps_batch = db_batch.query(Departamento).order_by(Departamento.descricao).all()
 
         col_bf1, col_bf2 = st.columns(2)
         with col_bf1:
@@ -388,6 +389,34 @@ with aba_batch:
                 ["Com sugestão do pipeline", "Todos sem categoria"],
                 horizontal=True, key="batch_modo",
             )
+
+        col_bf3, col_bf4 = st.columns(2)
+        dep_nomes_batch = ["Todos os departamentos"] + [d.descricao for d in deps_batch]
+        with col_bf3:
+            filtro_dep_batch = st.selectbox("Departamento", dep_nomes_batch, key="batch_dep")
+
+        filtro_dep_id_batch = None
+        filtro_grp_id_batch = None
+        if filtro_dep_batch != "Todos os departamentos":
+            dep_obj_batch = next((d for d in deps_batch if d.descricao == filtro_dep_batch), None)
+            if dep_obj_batch:
+                filtro_dep_id_batch = dep_obj_batch.id
+                grupos_batch_filtro = (
+                    db_batch.query(Grupo)
+                    .filter(Grupo.departamento_id == filtro_dep_id_batch)
+                    .order_by(Grupo.descricao).all()
+                )
+                grp_nomes_batch = ["Todos os grupos"] + [g.descricao for g in grupos_batch_filtro]
+                with col_bf4:
+                    filtro_grp_batch = st.selectbox("Grupo", grp_nomes_batch, key="batch_grp")
+                if filtro_grp_batch != "Todos os grupos":
+                    grp_obj_batch = next((g for g in grupos_batch_filtro if g.descricao == filtro_grp_batch), None)
+                    if grp_obj_batch:
+                        filtro_grp_id_batch = grp_obj_batch.id
+        else:
+            with col_bf4:
+                st.selectbox("Grupo", ["— selecione um departamento primeiro —"],
+                             disabled=True, key="batch_grp")
 
         # ── Query: produtos pendentes com sugestão do pipeline ───────────────
         q_batch = (
@@ -403,6 +432,10 @@ with aba_batch:
             q_batch = q_batch.filter(Tenant.nome == filtro_tenant_batch)
         if modo_batch == "Com sugestão do pipeline":
             q_batch = q_batch.filter(Produto.grupo_id.isnot(None))
+        if filtro_dep_id_batch:
+            q_batch = q_batch.filter(Produto.departamento_id == filtro_dep_id_batch)
+        if filtro_grp_id_batch:
+            q_batch = q_batch.filter(Produto.grupo_id == filtro_grp_id_batch)
 
         pendentes_batch = q_batch.order_by(
             Produto.departamento_id, Produto.grupo_id, Produto.descr_item,
