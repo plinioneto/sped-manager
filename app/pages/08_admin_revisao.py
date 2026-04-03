@@ -86,7 +86,8 @@ with aba_revisao:
     # Origens que indicam revisão humana concluída — nunca reaparecem na fila
     _ORIGENS_REVISADAS = ("manual", "manual_sem_cat")
 
-    def _pendentes(db, filtro_tenant, apenas_sem_categoria, apenas_revisao, limit=200):
+    def _pendentes(db, filtro_tenant, apenas_sem_categoria, apenas_revisao,
+                   filtro_dep_id=None, filtro_grp_id=None, limit=200):
         q = (
             db.query(Produto, Tenant)
             .join(Tenant, Produto.tenant_id == Tenant.id)
@@ -104,6 +105,10 @@ with aba_revisao:
             )
         if filtro_tenant:
             q = q.filter(Tenant.nome == filtro_tenant)
+        if filtro_dep_id:
+            q = q.filter(Produto.departamento_id == filtro_dep_id)
+        if filtro_grp_id:
+            q = q.filter(Produto.grupo_id == filtro_grp_id)
         return q.order_by(Produto.tenant_id, Produto.descr_item).limit(limit).all()
 
 
@@ -145,7 +150,7 @@ with aba_revisao:
         db.close()
         raise
 
-    col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
+    col_f1, col_f2 = st.columns([2, 3])
     with col_f1:
         filtro_tenant = st.selectbox("Cliente", ["Todos"] + tenants, key="filtro_tenant")
     with col_f2:
@@ -154,14 +159,49 @@ with aba_revisao:
             ["Sem categoria + revisão", "Sem categoria", "Revisão necessária"],
             horizontal=True,
         )
+
+    # Filtro por departamento / grupo (sugestão do pipeline)
+    col_f3, col_f4 = st.columns(2)
+    dep_nomes_filtro = ["Todos os departamentos"] + [d.descricao for d in departamentos]
     with col_f3:
-        st.write("")
+        filtro_dep_nome = st.selectbox("Departamento (sugestão pipeline)", dep_nomes_filtro, key="filtro_dep")
+
+    filtro_dep_id = None
+    filtro_grp_id = None
+    if filtro_dep_nome != "Todos os departamentos":
+        dep_obj_filtro = next((d for d in departamentos if d.descricao == filtro_dep_nome), None)
+        if dep_obj_filtro:
+            filtro_dep_id = dep_obj_filtro.id
+            grupos_filtro = (
+                db.query(Grupo)
+                .filter(Grupo.departamento_id == filtro_dep_id)
+                .order_by(Grupo.descricao)
+                .all()
+            )
+            grp_nomes_filtro = ["Todos os grupos"] + [g.descricao for g in grupos_filtro]
+            with col_f4:
+                filtro_grp_nome = st.selectbox("Grupo", grp_nomes_filtro, key="filtro_grp")
+            if filtro_grp_nome != "Todos os grupos":
+                grp_obj_filtro = next((g for g in grupos_filtro if g.descricao == filtro_grp_nome), None)
+                if grp_obj_filtro:
+                    filtro_grp_id = grp_obj_filtro.id
+    else:
+        with col_f4:
+            st.selectbox("Grupo", ["— selecione um departamento primeiro —"],
+                         disabled=True, key="filtro_grp")
 
     apenas_sem_cat = (modo == "Sem categoria")
     apenas_revisao = (modo == "Revisão necessária")
     filtro_t       = None if filtro_tenant == "Todos" else filtro_tenant
 
-    pendentes = _pendentes(db, filtro_t, apenas_sem_cat, apenas_revisao)
+    # Resetar índice ao trocar filtros
+    filtro_key = (filtro_t, modo, filtro_dep_id, filtro_grp_id)
+    if st.session_state.get("_ultimo_filtro") != filtro_key:
+        st.session_state.rev_idx = 0
+        st.session_state["_ultimo_filtro"] = filtro_key
+
+    pendentes = _pendentes(db, filtro_t, apenas_sem_cat, apenas_revisao,
+                           filtro_dep_id, filtro_grp_id)
 
     if not pendentes:
         st.success("Nenhum produto pendente de revisão com os filtros selecionados.")
