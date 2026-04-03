@@ -55,7 +55,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 3 abas: Revisão Individual (classificação produto a produto), Revisão em Lote (agrupa por sugestão do pipeline, aprova/descarta em batch com checkbox por linha para excluir produtos discrepantes do lote), Marcas & Fabricantes (cadastro + seed script) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 3 abas: Revisão Individual (classificação produto a produto), Revisão em Lote (agrupa por sugestão do pipeline, checkbox "✔" por linha para selecionar/deselecionar, aprova/descarta só os marcados), Marcas & Fabricantes (cadastro + seed script) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
@@ -135,7 +135,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] Catálogo global de produtos via EAN: criar tabela `catalogo_produtos` (global, sem tenant_id), chave = `cod_barra` (EAN). A tabela `produtos` **não muda** — continua com chave `tenant_id + cod_item`, mantendo o vínculo correto com C170 (ItemFiscal). No import do 0200, após o upsert normal do produto do tenant, buscar o EAN no catálogo global e setar `produto.catalogo_id` (FK nullable). Assim o mesmo produto físico (ex: Coca-Cola 2L) vendido por vários tenants com `cod_item` diferentes converge para uma única entrada no catálogo. Só vincular quando EAN for numérico válido (8, 12, 13 ou 14 dígitos) — ignorar "SEM GTIN" e campos vazios.
 - [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
 - [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
-- [ ] Revisão em Lote (08_admin_revisao.py): adicionar checkbox por linha no data_editor para que o usuário possa desmarcar produtos discrepantes antes de aprovar o lote — o botão "Aprovar" só processa as linhas com checkbox marcado, permitindo aprovar em batch mesmo quando 1–2 produtos do grupo não se encaixam na classificação sugerida
+- [x] Revisão em Lote (08_admin_revisao.py): checkbox por linha no data_editor — coluna "✔" (default True); botões "Aprovar selecionados (N)" e "Sem categoria (N)" operam só nas linhas marcadas; caption mostra "N de M selecionados" quando algum está desmarcado
 - [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
 - [x] Atualizar cadastro de produto com as orientações abaixo:
     1. amac → amaciante ✅

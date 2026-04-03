@@ -409,6 +409,7 @@ with aba_batch:
                         p = item["produto"]
                         r = item["resultado"]
                         rows_batch.append({
+                            "✔":            True,
                             "id":           p.id,
                             "Cliente":      item["tenant"].nome,
                             "Código":       p.cod_item,
@@ -421,21 +422,34 @@ with aba_batch:
 
                     df_batch = pd.DataFrame(rows_batch)
 
-                    # Seleção via checkbox no dataframe
+                    # Checkbox por linha + id oculto
                     edited = st.data_editor(
-                        df_batch.drop(columns=["id"]),
+                        df_batch,
                         use_container_width=True,
                         hide_index=True,
                         num_rows="fixed",
                         disabled=["Cliente", "Código", "Descrição", "Padronizada",
                                   "Marca", "Cat. sugerida", "Score"],
                         column_config={
+                            "✔": st.column_config.CheckboxColumn(
+                                "✔",
+                                help="Desmarque para excluir este produto do lote",
+                                default=True,
+                                width="small",
+                            ),
+                            "id": None,   # oculta coluna id
                             "Score": st.column_config.ProgressColumn(
                                 format="%.0%", min_value=0, max_value=1,
                             ),
                         },
                         key=f"batch_df_{grupo_label}",
                     )
+
+                    # IDs selecionados (checkbox marcado)
+                    selected_ids = edited[edited["✔"] == True]["id"].tolist()
+                    n_sel = len(selected_ids)
+                    if n_sel < len(items):
+                        st.caption(f"ℹ️ {n_sel} de {len(items)} produtos selecionados")
 
                     # Classificação para o grupo todo
                     r_primeiro = items[0]["resultado"]
@@ -499,21 +513,21 @@ with aba_batch:
                     # Botões de ação
                     col_act1, col_act2, col_act3 = st.columns([1, 1, 3])
                     with col_act1:
-                        aprovar_todos = st.button(
-                            f"Aprovar todos ({len(items)})",
+                        aprovar_sel = st.button(
+                            f"Aprovar selecionados ({n_sel})",
                             type="primary",
-                            disabled=(grp_b_id is None),
+                            disabled=(grp_b_id is None or n_sel == 0),
                             key=f"batch_aprovar_{grupo_label}",
                         )
                     with col_act2:
-                        descartar_todos = st.button(
-                            "Todos sem categoria",
+                        descartar_sel = st.button(
+                            f"Sem categoria ({n_sel})",
+                            disabled=(n_sel == 0),
                             key=f"batch_descartar_{grupo_label}",
                         )
 
-                    if aprovar_todos:
-                        ids = [item["produto"].id for item in items]
-                        db_batch.query(Produto).filter(Produto.id.in_(ids)).update(
+                    if aprovar_sel:
+                        db_batch.query(Produto).filter(Produto.id.in_(selected_ids)).update(
                             {
                                 Produto.categoria_id: cat_b_id,
                                 Produto.grupo_id: grp_b_id,
@@ -526,12 +540,11 @@ with aba_batch:
                         )
                         db_batch.commit()
                         _stats.clear()
-                        st.success(f"{len(ids)} produtos aprovados!")
+                        st.success(f"{n_sel} produtos aprovados!")
                         st.rerun()
 
-                    if descartar_todos:
-                        ids = [item["produto"].id for item in items]
-                        db_batch.query(Produto).filter(Produto.id.in_(ids)).update(
+                    if descartar_sel:
+                        db_batch.query(Produto).filter(Produto.id.in_(selected_ids)).update(
                             {
                                 Produto.revisao_necessaria: False,
                                 Produto.origem_padronizacao: "manual_sem_cat",
@@ -540,7 +553,7 @@ with aba_batch:
                         )
                         db_batch.commit()
                         _stats.clear()
-                        st.success(f"{len(ids)} produtos marcados como sem categoria.")
+                        st.success(f"{n_sel} produtos marcados como sem categoria.")
                         st.rerun()
 
     finally:
