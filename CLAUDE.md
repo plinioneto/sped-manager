@@ -114,36 +114,45 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
 
 ## Pendente
-- [x] Página de cadastro de produto com listagem e filtros
-- [x] Página de gestão de compras com filtros independentes por período, fornecedor, nº nota e produto
-- [ ] Testar página de inventário com arquivo EFD real contendo Bloco H e K200
-- [x] Relatórios fiscais (ICMS, PIS, COFINS) → renomeado para Gestao Fiscal com 5 abas
-- [ ] Autenticação completa com senha criptografada
-- [ ] Login por código curto ou CNPJ: permitir que o tenant faça login digitando um código curto (ex: 4–6 caracteres alfanuméricos) além do CNPJ completo. Adicionar coluna `codigo_acesso` (String, unique, nullable) na tabela `tenants`. Tela de login tenta match por `codigo_acesso` primeiro, depois por `cnpj`. Geração do código pode ser automática no cadastro ou definida pelo admin.
-- [x] Silver C190 com tratamento correto de constraint
-- [ ] Documentação técnica completa
-- [ ] Migração para PostgreSQL (produção)
-- [ ] Deploy no Streamlit Cloud
-- [x] Compras: revisar gráfico de pizza do CFOP (ficou confuso, melhorar legibilidade)
-- [x] Compras: exibir nome/razão social dos fornecedores ao invés de CNPJ nos gráficos e tabelas
-- [x] Mudar legenda dos gráficos de barra pra cima pra que os rótulos de dados não atrapalhem a leitura da legenda
-- [x] Adicionar na página de dashboard do sistema qual a última data contemplada nos arquivos
-- [x] Criar página de gestão de vendas (saídas)
-- [ ] Criar um padrão de cores para a ferramenta, as páginas estão usando cores diferentes (definir quantas cores e quais devem ser usadas)
-- [x] Renomear as páginas e reordená-las por ordem de importância na sidebar
-- [x] Renomear a página dashboard de dados para "Dados" e adicionar a parte de upload de arquivo dentro dela, ajustando o layout para ficar coeso
-- [x] Ajustar a página de estoque. Muitos supermercadistas não preenchem o bloco H e não fazem inventário de maneira correta. Portanto, será necessário um ajuste. Faremos um "estoque virtual", em que teremos um controle das entradas e saídas, mas assumindo um estoque inicial igual a zero. Caso o cliente tenha preenchido o bloco H e K, usamos ele como base, se não saímos do ponto zero.
-- [x] Revisitar cadastro de produto — 3 abas: Cadastro EFD, Padronização & Categorias, Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária)
-- [ ] Catálogo global de produtos via EAN: criar tabela `catalogo_produtos` (global, sem tenant_id), chave = `cod_barra` (EAN). A tabela `produtos` **não muda** — continua com chave `tenant_id + cod_item`, mantendo o vínculo correto com C170 (ItemFiscal). No import do 0200, após o upsert normal do produto do tenant, buscar o EAN no catálogo global e setar `produto.catalogo_id` (FK nullable). Assim o mesmo produto físico (ex: Coca-Cola 2L) vendido por vários tenants com `cod_item` diferentes converge para uma única entrada no catálogo. Só vincular quando EAN for numérico válido (8, 12, 13 ou 14 dígitos) — ignorar "SEM GTIN" e campos vazios.
-- [x] Transformar o Dashboard atual em resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor) — dados técnicos de importação vão pra página "Dados"
-- [x] Verificar se é possível selecionar mais meses e anos ao mesmo tempo, por exemplo: "quero ver os primeiros 3 meses do ano"
-- [x] Revisão em Lote (08_admin_revisao.py): checkbox por linha no data_editor — coluna "✔" (default True); botões "Aprovar selecionados (N)" e "Sem categoria (N)" operam só nas linhas marcadas; caption mostra "N de M selecionados" quando algum está desmarcado
-- [ ] Importação de NF-e XML como fonte independente de dados (ver decisões abaixo)
-- [x] Atualizar cadastro de produto com as orientações abaixo:
-    1. amac → amaciante ✅
-    2. acai → açaí ✅
-    3. keywords → categoria direta via _VOCAB_CATEGORIA (agua sanitaria, acai, etc.) ✅
-```
+
+### 🔴 Alta prioridade — bloqueiam uso com clientes reais
+
+- [ ] **Autenticação com senha criptografada** — hoje qualquer pessoa com o CNPJ entra; pré-requisito para qualquer deploy
+- [ ] **Login por código curto**: coluna `codigo_acesso` (String, unique, nullable) na tabela `tenants`; tela de login tenta código curto primeiro, depois CNPJ; geração automática no cadastro ou definida pelo admin
+- [ ] **Migração para PostgreSQL** — troca só o `.env`; necessário antes do deploy
+- [ ] **Deploy no Streamlit Cloud**
+
+### 🟡 Média prioridade — funcionalidades novas de valor
+
+- [ ] **Importação de NF-e XML** como fonte independente de dados (arquitetura decidida — ver seção abaixo)
+- [ ] **Página `07_configuracoes.py`** — dados do tenant, gestão de usuários, código de acesso; escopo ainda a definir
+- [ ] **Padrão de cores** — todas as páginas usam cores diferentes; definir paleta de 5–6 cores e aplicar globalmente via constantes em `utils/` ou tema Streamlit
+
+### 🟢 Baixa prioridade — qualidade e escala
+
+- [ ] **Catálogo global de produtos via EAN**: tabela `catalogo_produtos` (global, sem tenant_id), chave = `cod_barra`. No import do 0200, após upsert normal do produto, buscar o EAN no catálogo e setar `produto.catalogo_id` (FK nullable). Só vincular quando EAN for numérico válido (8, 12, 13 ou 14 dígitos) — ignorar "SEM GTIN" e campos vazios.
+- [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
+- [ ] **Documentação técnica completa**
+
+### ✅ Concluído (histórico)
+
+- [x] Página de cadastro de produto — 3 abas: Cadastro EFD, Padronização & Categorias, Inteligência de Produtos
+- [x] Página de gestão de compras — 4 filtros independentes (período, fornecedor, nº nota, produto)
+- [x] Página de gestão de vendas (saídas)
+- [x] Relatórios fiscais → Gestão Fiscal com 5 abas (ICMS, ST, PIS/COFINS, diagnóstico)
+- [x] Dashboard → resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor)
+- [x] Página de Dados — upload + histórico de importações unificados
+- [x] Estoque virtual com fallback K200/H010/zero
+- [x] Silver C190 com constraint correta
+- [x] Compras: CNPJ → razão social nos gráficos; gráfico CFOP revisado
+- [x] Filtros de período com seleção múltipla de meses/anos
+- [x] Renomear e reordenar páginas na sidebar
+- [x] Legendas dos gráficos movidas para cima
+- [x] Última data contemplada exibida no dashboard
+- [x] Revisão em Lote com checkbox por linha no data_editor
+- [x] Pipeline de padronização: stopwords, abreviações contextuais, extração de atributos, ordem canônica
+- [x] Fuzzy matching de marcas (RapidFuzz threshold=90)
+- [x] Tokens desconhecidos salvos no banco para revisão futura
 
 ## Decisões mapeadas: Importação NF-e XML
 
