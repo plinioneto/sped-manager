@@ -451,6 +451,11 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ PADARIA ══════════════════════════════════════════════════════
     "PAO FRANCES":      ("PAO FRANCES",                  None),
     "PAO DE FORMA":     ("PAO DE FORMA COMUM",           None),
+    # ══ TÊXTIL — CALÇADOS ════════════════════════════════════════════
+    "SANDALIA HAVAIANA":("SANDALIA E CHINELO",           "CALCADOS"),
+    "SANDALIA":         ("SANDALIA E CHINELO",           "CALCADOS"),
+    "CHINELO":          ("SANDALIA E CHINELO",           "CALCADOS"),
+    "HAVAIANA":         ("SANDALIA E CHINELO",           "CALCADOS"),
 }
 
 

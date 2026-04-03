@@ -249,7 +249,7 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 | 2026-04-03 | Categoria | `bananada` / `goiabada` / `doce de fruta` → Mercearia Doce > Sobremesas > Doces de Frutas |
 | 2026-04-03 | Categoria | `suco pronto` / `nectar` → Bebidas > Sucos > Suco Pronto/Néctar |
 | 2026-04-03 | Categoria | `petit suisse` → Laticínios > Iogurtes > Iogurtes Infantis |
-| 2026-04-03 | Categoria | `sand hav` (categoria) → incompleto, pendente (Têxtil > Calçados > ?) |
+| 2026-04-03 | Categoria | `sandalia havaiana` / `sandalia` / `chinelo` / `havaiana` → Têxtil > Calçados > Sandália e Chinelo |
 | 2026-04-03 | Fabricante | SOVENA |
 | 2026-04-03 | Fabricante | VICTOR GUEDES |
 | 2026-04-03 | Fabricante | FLAMBOYANT |
