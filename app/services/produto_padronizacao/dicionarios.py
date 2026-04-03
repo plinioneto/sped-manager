@@ -122,6 +122,8 @@ ABREVIACOES: dict[str, str] = {
     "SAND HAV":     "SANDALIA HAVAIANA",
     "BEB LACTEA":   "BEBIDA LACTEA",
     "GELAT":        "GELATINA",
+    "SORV":         "SORVETE",
+    "REF PO":       "REFRESCO EM PO",
 }
 
 

@@ -73,7 +73,20 @@ MARCAS_CONHECIDAS: dict[str, dict] = {
     "FLAMBOYANT":   {"fabricante": "FLAMBOYANT",        "aliases": ["FLAMBOYANT"],                    "categoria": "alimentos"},
     "ARCOR":        {"fabricante": "ARCOR",             "aliases": ["ARCOR", "BUTTER TOFFEES"],       "categoria": "alimentos"},
     "DOCILE":       {"fabricante": "DOCILE",            "aliases": ["DOCILE"],                        "categoria": "alimentos"},
-    "FINI":         {"fabricante": "FINI",              "aliases": ["FINI"],                          "categoria": "alimentos"},
+    "FINI":         {"fabricante": "FINI",              "aliases": ["FINI", "DENTADURAS FINI", "MINHOCAS FINI", "TUBES FINI"], "categoria": "alimentos"},
+    "FREEGELLS":    {"fabricante": "RICLAN",            "aliases": ["FREEGELLS"],                     "categoria": "alimentos"},
+    "AZEDINHA":     {"fabricante": "RICLAN",            "aliases": ["AZEDINHA"],                      "categoria": "alimentos"},
+    "MENTOS":       {"fabricante": "PERFETTI VAN MELLE","aliases": ["MENTOS"],                        "categoria": "alimentos"},
+    # ── Massas / grãos (marcas adicionais) ───────────────────────────
+    "BARILLA":      {"fabricante": "BARILLA",           "aliases": ["BARILLA"],                       "categoria": "alimentos"},
+    "SANTA AMALIA": {"fabricante": "CAMIL",             "aliases": ["SANTA AMALIA"],                  "categoria": "graos"},
+    # ── Sucos / néctares ─────────────────────────────────────────────
+    "DEL VALLE":    {"fabricante": "THE COCA-COLA CO",  "aliases": ["DEL VALLE"],                     "categoria": "bebidas"},
+    "TIAL":         {"fabricante": "TIAL",              "aliases": ["TIAL"],                          "categoria": "bebidas"},
+    # ── Aves / proteínas ─────────────────────────────────────────────
+    "PIF PAF":      {"fabricante": "PIF PAF ALIMENTOS", "aliases": ["PIF PAF", "PIFPAF"],             "categoria": "frios"},
+    # ── Biscoitos / panificação (adicionais) ─────────────────────────
+    "AYMORE":       {"fabricante": "ARCOR",             "aliases": ["AYMORE", "AYMORÉ"],              "categoria": "panificacao"},
 }
 
 # ── Índice base (dicionário fixo) ─────────────────────────────────────────────

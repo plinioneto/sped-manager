@@ -201,39 +201,19 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 #### Abreviações
 <!-- formato: abrev → expansão -->
-sorv -> sorvete
 
 
 #### Categorias
 <!-- formato: keyword → Departamento > Grupo > Categoria -->
-chicle -> mercearia doce > guloseimas > goma de mascar
-bolinho -> mercearia doce > biscoito doce > bolinhos
-bananada -> mercearia doce > sobremesas e outros doces > doces de frutas
+
 
 #### Marcas
 <!-- formato: Nome | Fabricante | alias1, alias2, ... -->
-Dentaduras | Fini
-Beijos de Morango | Fini | Beijinho
-Bananas | Fini | Bananinha
-Tubes | Fini | Tubetes
-Minhocas | Fini
-Amoras | Fini
-Aros de Morango Azedinhos | Fini
-Minhocas Azedinhas | Fini
-Ursinhos | Fini
-Barilla | Barilla
-Santa Amalia | Camil
-Freegells | Riclan
-Mentos | Perfetti Van Melle
-Azedinha | Riclan
+
 
 #### Fabricantes
 <!-- formato: Nome | alias1, alias2, ... -->
-Barilla
-Vilma Alimentos
-Camil
-Riclan
-Perfetti Van Melle
+
 ---
 
 ### ✅ Histórico de adições aplicadas
@@ -260,20 +240,42 @@ Perfetti Van Melle
 | 2026-04-03 | Abreviação | `sand hav` → sandalia havaiana |
 | 2026-04-03 | Abreviação | `beb lactea` → bebida lactea |
 | 2026-04-03 | Abreviação | `gelat` → gelatina |
+| 2026-04-03 | Abreviação | `sorv` → sorvete |
+| 2026-04-03 | Abreviação | `ref po` → refresco em po |
 | 2026-04-03 | Categoria | `elma chips` / `batata elma chips` → Mercearia Doce > Salgadinhos > Batata Frita |
 | 2026-04-03 | Categoria | `batata pre frita` / `pre frita` → Perecíveis do Autoserviço > Congelados > Batata Congelada |
+| 2026-04-03 | Categoria | `chicle` → Mercearia Doce > Guloseimas > Goma de Mascar |
+| 2026-04-03 | Categoria | `bolinho` → Mercearia Doce > Biscoito Doce > Bolinhos |
+| 2026-04-03 | Categoria | `bananada` / `goiabada` / `doce de fruta` → Mercearia Doce > Sobremesas > Doces de Frutas |
+| 2026-04-03 | Categoria | `suco pronto` / `nectar` → Bebidas > Sucos > Suco Pronto/Néctar |
+| 2026-04-03 | Categoria | `petit suisse` → Laticínios > Iogurtes > Iogurtes Infantis |
+| 2026-04-03 | Categoria | `sand hav` (categoria) → incompleto, pendente (Têxtil > Calçados > ?) |
 | 2026-04-03 | Fabricante | SOVENA |
 | 2026-04-03 | Fabricante | VICTOR GUEDES |
 | 2026-04-03 | Fabricante | FLAMBOYANT |
 | 2026-04-03 | Fabricante | ARCOR |
 | 2026-04-03 | Fabricante | DOCILE |
 | 2026-04-03 | Fabricante | FINI |
+| 2026-04-03 | Fabricante | BARILLA |
+| 2026-04-03 | Fabricante | RICLAN |
+| 2026-04-03 | Fabricante | PERFETTI VAN MELLE |
+| 2026-04-03 | Fabricante | PIF PAF ALIMENTOS |
+| 2026-04-03 | Fabricante | TIAL |
 | 2026-04-03 | Marca | ANDORINHA \| SOVENA |
 | 2026-04-03 | Marca | GALLO \| VICTOR GUEDES |
 | 2026-04-03 | Marca | FLAMBOYANT \| FLAMBOYANT |
 | 2026-04-03 | Marca | ARCOR \| ARCOR \| alias: BUTTER TOFFEES |
 | 2026-04-03 | Marca | DOCILE \| DOCILE |
-| 2026-04-03 | Marca | FINI \| FINI |
+| 2026-04-03 | Marca | FINI \| FINI \| aliases: DENTADURAS FINI, MINHOCAS FINI, TUBES FINI |
+| 2026-04-03 | Marca | FREEGELLS \| RICLAN |
+| 2026-04-03 | Marca | AZEDINHA \| RICLAN |
+| 2026-04-03 | Marca | MENTOS \| PERFETTI VAN MELLE |
+| 2026-04-03 | Marca | BARILLA \| BARILLA |
+| 2026-04-03 | Marca | SANTA AMALIA \| CAMIL |
+| 2026-04-03 | Marca | DEL VALLE \| THE COCA-COLA CO |
+| 2026-04-03 | Marca | TIAL \| TIAL |
+| 2026-04-03 | Marca | PIF PAF \| PIF PAF ALIMENTOS \| alias: PIFPAF |
+| 2026-04-03 | Marca | AYMORE \| ARCOR \| alias: AYMORÉ |
 
 ---
 

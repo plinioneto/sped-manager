@@ -227,6 +227,7 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "PRE FRITA":        ("BATATA CONGELADA",             "CONGELADOS"),
     # ══ LATICÍNIOS ═══════════════════════════════════════════════════
     "IOGURTE":          ("IOGURTES TRADICIONAL",         "LATICINIOS"),
+    "PETIT SUISSE":     ("IOGURTES INFANTIS",            "LATICINIOS"),
     "REQUEIJAO":        ("REQUEIJAO",                    "LATICINIOS"),
     "MANTEIGA":         ("MANTEIGA",                     "LATICINIOS"),
     "MARGARINA":        ("MARGARINA E CREME VEGETAL",    "LATICINIOS"),
@@ -262,6 +263,9 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ BEBIDAS — SUCOS ══════════════════════════════════════════════
     "SUCO INTEGRAL":    ("SUCO INTEGRAL",                None),
     "SUCO CONCENTRADO": ("SUCO CONCENTRADO",             None),
+    "SUCO PRONTO":      ("SUCO PRONTO / NECTAR",         None),
+    "NECTAR":           ("SUCO PRONTO / NECTAR",         None),
+    "NÉCTAR":           ("SUCO PRONTO / NECTAR",         None),
     "REFRESCO EM PO":   ("REFRESCO EM PO",               None),
     "REFRESCO":         ("REFRESCO EM PO",               None),
     # ══ BEBIDAS — DESTILADOS ═════════════════════════════════════════
@@ -329,6 +333,10 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "PUDIM":            ("PO P/ PUDIM, FLAN, MARIA MOLE", None),
     "DOCE DE LEITE":    ("DOCES DE LEITE",               None),
     "GELEIA":           ("TRADICIONAL",                  "GELEIAS"),
+    "BANANADA":         ("DOCES DE FRUTAS",              "SOBREMESAS E OUTROS DOCES"),
+    "GOIABADA":         ("DOCES DE FRUTAS",              "SOBREMESAS E OUTROS DOCES"),
+    "DOCE DE FRUTA":    ("DOCES DE FRUTAS",              "SOBREMESAS E OUTROS DOCES"),
+    "DOCES DE FRUTAS":  ("DOCES DE FRUTAS",              "SOBREMESAS E OUTROS DOCES"),
     # ══ MERCEARIA DOCE — SALGADINHOS ═════════════════════════════════
     "SALGADINHO":         ("SALGADINHOS SABORES",        None),
     "BATATA PALHA":       ("BATATA PALHA",               None),
@@ -337,9 +345,12 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "BATATA ELMA CHIPS":  ("BATATA FRITA",               None),
     "AMENDOIM":         ("AMENDOIM",                     "SALGADINHO"),
     "PIPOCA":           ("PIPOCA EM GERAL",              None),
+    # ══ MERCEARIA DOCE — BISCOITOS (adicional) ═══════════════════════
+    "BOLINHO":          ("BOLINHOS",                     "BISCOITO DOCE"),
     # ══ MERCEARIA DOCE — GULOSEIMAS ══════════════════════════════════
     "BALA":             ("BALAS COMUM",                  None),
     "CHICLETE":         ("GOMA DE MASCAR",               None),
+    "CHICLE":           ("GOMA DE MASCAR",               None),
     "PIRULITO":         ("PIRULITOS",                    None),
     "MARSHMALLOW":      ("MARSHMALLOWS",                 None),
     # ══ MERCEARIA SALGADA — CONSERVAS ════════════════════════════════
