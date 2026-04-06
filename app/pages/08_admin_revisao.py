@@ -11,18 +11,28 @@ Abas:
 
 import json
 import os
+from datetime import datetime, timezone, timedelta
 
 import streamlit as st
 
-from app.utils.db import get_session
+from app.utils.db import get_session, run_migrations
+
+run_migrations()
 from app.models.produto import Produto
 from app.models.tenant import Tenant
 from app.models.categoria import Departamento, Grupo, Categoria
 from app.models.fabricante import Fabricante
 from app.models.marca import Marca
+from app.models.arquivo_importado import ArquivoImportado
+from app.models.efd_raw import EfdRaw
 from app.services.produto_padronizacao import processar_descricao
 from app.services.produto_padronizacao.categorizador import invalidar_cache
 from app.services.produto_padronizacao.identificador import invalidar_cache_marcas
+from app.services.tenant_service import TenantService
+from app.utils.formatters import formatar_cnpj, limpar_cnpj
+from app.parser.renomeador import processar_renomeacao
+from app.parser.bronze import BronzeProcessor
+from app.parser.silver import SilverProcessor
 
 # Oculta sidebar do cliente — esta página é de uso interno
 st.markdown("""
@@ -58,8 +68,8 @@ if not st.session_state.admin_auth:
 
 st.title("Painel Admin")
 
-aba_revisao, aba_batch, aba_marcas, aba_tokens = st.tabs([
-    "Revisão Individual", "Revisão em Lote", "Marcas & Fabricantes", "Tokens Desconhecidos",
+aba_revisao, aba_batch, aba_marcas, aba_tokens, aba_clientes = st.tabs([
+    "Revisão Individual", "Revisão em Lote", "Marcas & Fabricantes", "Tokens Desconhecidos", "Clientes & Upload",
 ])
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -901,3 +911,482 @@ with aba_tokens:
 
     finally:
         db_tok.close()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ABA 5 — Clientes & Upload
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with aba_clientes:
+
+    brt = timezone(timedelta(hours=-3))
+
+    # ── Seção A: lista de tenants ─────────────────────────────────────────────
+
+    st.subheader("Clientes cadastrados")
+
+    from sqlalchemy.orm import joinedload
+    from app.models.grupo_empresarial import GrupoEmpresarial
+
+    db_cli = next(get_session())
+    try:
+        tenants = (
+            db_cli.query(Tenant)
+            .options(joinedload(Tenant.grupo))
+            .order_by(Tenant.nome)
+            .all()
+        )
+    finally:
+        db_cli.close()
+
+    if tenants:
+        st.dataframe(
+            [
+                {
+                    "ID":             t.id,
+                    "Nome":           t.nome,
+                    "CNPJ":           formatar_cnpj(t.cnpj),
+                    "Código acesso":  t.codigo_acesso or "—",
+                    "Senha":          "✓" if t.senha_hash else "✗ sem senha",
+                    "Grupo":          t.grupo.nome if t.grupo else "—",
+                    "Ativo":          "✓" if t.ativo else "✗",
+                    "Criado em":      t.criado_em.strftime("%d/%m/%Y") if t.criado_em else "—",
+                }
+                for t in tenants
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("Nenhum cliente cadastrado.")
+
+    st.divider()
+
+    # ── Seção A2: editar cliente existente ────────────────────────────────────
+
+    st.subheader("Editar cliente")
+
+    if tenants:
+        tenant_edit_opts = {f"{t.nome} ({formatar_cnpj(t.cnpj)})": t for t in tenants}
+        tenant_edit_sel  = st.selectbox("Selecione o cliente", list(tenant_edit_opts.keys()), key="edit_sel")
+        t_edit = tenant_edit_opts[tenant_edit_sel]
+
+        with st.form("form_editar_tenant"):
+            db_grp_edit = next(get_session())
+            try:
+                grupos_edit = TenantService(db_grp_edit).listar_grupos()
+            finally:
+                db_grp_edit.close()
+
+            grupo_opts_edit  = {"— nenhum —": None} | {g.nome: g.id for g in grupos_edit}
+            grupo_atual_nome = t_edit.grupo.nome if t_edit.grupo else "— nenhum —"
+
+            nome_edit    = st.text_input("Nome *", value=t_edit.nome)
+            cnpj_edit    = st.text_input("CNPJ *", value=formatar_cnpj(t_edit.cnpj))
+            codigo_edit  = st.text_input("Código de acesso", value=t_edit.codigo_acesso or "")
+            grupo_e_sel  = st.selectbox(
+                "Grupo Empresarial",
+                list(grupo_opts_edit.keys()),
+                index=list(grupo_opts_edit.keys()).index(grupo_atual_nome) if grupo_atual_nome in grupo_opts_edit else 0,
+            )
+            ativo_edit   = st.checkbox("Ativo", value=t_edit.ativo)
+            salvar_edit  = st.form_submit_button("Salvar alterações", type="primary")
+
+        if salvar_edit:
+            cnpj_limpo_e = limpar_cnpj(cnpj_edit)
+            if not nome_edit.strip():
+                st.error("Nome obrigatório.")
+            elif len(cnpj_limpo_e) != 14:
+                st.error("CNPJ deve ter 14 dígitos numéricos.")
+            else:
+                db_e = next(get_session())
+                try:
+                    t = db_e.query(Tenant).filter(Tenant.id == t_edit.id).first()
+                    t.nome          = nome_edit.strip()
+                    t.cnpj          = cnpj_limpo_e
+                    t.codigo_acesso = codigo_edit.strip() or None
+                    t.ativo         = ativo_edit
+                    t.grupo_id      = grupo_opts_edit.get(grupo_e_sel)
+                    db_e.commit()
+                    st.success("Cliente atualizado com sucesso.")
+                    st.rerun()
+                except Exception as e:
+                    msg = str(e)
+                    if "UNIQUE" in msg.upper():
+                        st.error("CNPJ ou código de acesso já está em uso por outro cliente.")
+                    else:
+                        st.error(f"Erro: {msg}")
+                finally:
+                    db_e.close()
+
+    st.divider()
+
+    # ── Seção B: cadastrar novo tenant ────────────────────────────────────────
+
+    st.subheader("Cadastrar novo cliente")
+
+    db_grp_b = next(get_session())
+    try:
+        grupos_b = TenantService(db_grp_b).listar_grupos()
+    finally:
+        db_grp_b.close()
+
+    grupo_opts_b = {"— nenhum —": None} | {g.nome: g.id for g in grupos_b}
+
+    with st.form("form_novo_tenant", clear_on_submit=True):
+        nome_novo       = st.text_input("Nome *")
+        cnpj_novo       = st.text_input("CNPJ *", placeholder="14 dígitos (com ou sem máscara)")
+        col_s1, col_s2 = st.columns(2)
+        senha_nova      = col_s1.text_input("Senha *", type="password")
+        senha_nova2     = col_s2.text_input("Confirmar senha *", type="password")
+        codigo_novo     = st.text_input("Código de acesso (opcional)", placeholder="ex: GS01 — letras e números, único")
+        grupo_sel_nome  = st.selectbox("Grupo Empresarial (opcional)", list(grupo_opts_b.keys()))
+        cadastrar       = st.form_submit_button("Cadastrar", type="primary")
+
+    if cadastrar:
+        cnpj_limpo = limpar_cnpj(cnpj_novo)
+        if not nome_novo.strip():
+            st.error("Nome obrigatório.")
+        elif len(cnpj_limpo) != 14:
+            st.error("CNPJ deve ter 14 dígitos numéricos.")
+        elif not senha_nova:
+            st.error("Senha obrigatória.")
+        elif senha_nova != senha_nova2:
+            st.error("As senhas não coincidem.")
+        else:
+            db_cad = next(get_session())
+            try:
+                svc_cad = TenantService(db_cad)
+                novo = svc_cad.criar(
+                    nome_novo.strip(),
+                    cnpj_limpo,
+                    senha=senha_nova,
+                    codigo_acesso=codigo_novo.strip() or None,
+                )
+                grupo_id_sel = grupo_opts_b.get(grupo_sel_nome)
+                if grupo_id_sel:
+                    svc_cad.associar_tenant_a_grupo(novo.id, grupo_id_sel)
+                st.success(f"Cliente **{nome_novo.strip()}** cadastrado com sucesso.")
+                st.rerun()
+            except Exception as e:
+                msg = str(e)
+                if "UNIQUE" in msg.upper():
+                    st.error("CNPJ ou código de acesso já cadastrado.")
+                else:
+                    st.error(f"Erro: {msg}")
+            finally:
+                db_cad.close()
+
+    st.divider()
+
+    # ── Seção B2: definir/redefinir senha de tenant existente ─────────────────
+
+    st.subheader("Definir / redefinir senha")
+
+    db_sen = next(get_session())
+    try:
+        tenants_sen = db_sen.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
+    finally:
+        db_sen.close()
+
+    tenant_sen_opts = {f"{t.nome} ({formatar_cnpj(t.cnpj)})": t.id for t in tenants_sen}
+
+    with st.form("form_def_senha", clear_on_submit=True):
+        tenant_sen_sel  = st.selectbox("Cliente", list(tenant_sen_opts.keys()))
+        codigo_sen      = st.text_input("Código de acesso (opcional — deixe em branco para não alterar)")
+        col_p1, col_p2 = st.columns(2)
+        nova_senha      = col_p1.text_input("Nova senha *", type="password")
+        nova_senha2     = col_p2.text_input("Confirmar nova senha *", type="password")
+        salvar_senha    = st.form_submit_button("Salvar", type="primary")
+
+    if salvar_senha:
+        if not nova_senha:
+            st.error("Senha obrigatória.")
+        elif nova_senha != nova_senha2:
+            st.error("As senhas não coincidem.")
+        else:
+            tid = tenant_sen_opts[tenant_sen_sel]
+            db_s = next(get_session())
+            try:
+                svc_s = TenantService(db_s)
+                svc_s.definir_senha(tid, nova_senha)
+                if codigo_sen.strip():
+                    t = svc_s.buscar_por_id(tid)
+                    t.codigo_acesso = codigo_sen.strip()
+                    db_s.commit()
+                st.success("Senha atualizada com sucesso.")
+            except Exception as e:
+                msg = str(e)
+                if "UNIQUE" in msg.upper():
+                    st.error("Código de acesso já está em uso por outro cliente.")
+                else:
+                    st.error(f"Erro: {msg}")
+            finally:
+                db_s.close()
+
+    st.divider()
+
+    # ── Seção C: upload admin ─────────────────────────────────────────────────
+
+    st.subheader("Upload de arquivos EFD")
+
+    db_up = next(get_session())
+    try:
+        svc_up = TenantService(db_up)
+        tenants_ativos = db_up.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
+        grupos_up = svc_up.listar_grupos()
+    finally:
+        db_up.close()
+
+    if not tenants_ativos:
+        st.warning("Nenhum cliente ativo. Cadastre um cliente primeiro.")
+        st.stop()
+
+    # Filtro por grupo
+    if grupos_up:
+        grupo_up_opts = {"Todos os clientes": None} | {g.nome: g.id for g in grupos_up}
+        grupo_up_sel = st.selectbox("Filtrar por grupo", list(grupo_up_opts.keys()), key="admin_upload_grupo")
+        grupo_up_id = grupo_up_opts[grupo_up_sel]
+        if grupo_up_id:
+            tenants_ativos = [t for t in tenants_ativos if t.grupo_id == grupo_up_id]
+
+    opcoes_tenant = {t.nome: {"id": t.id, "cnpj": t.cnpj} for t in tenants_ativos}
+
+    tenant_selecionado_nome = st.selectbox(
+        "Tenant de destino",
+        list(opcoes_tenant.keys()),
+        key="admin_upload_tenant_nome",
+    )
+    tenant_selecionado_id   = opcoes_tenant[tenant_selecionado_nome]["id"]
+    tenant_selecionado_cnpj = opcoes_tenant[tenant_selecionado_nome]["cnpj"]
+
+    arquivos_admin = st.file_uploader(
+        "Selecione os arquivos EFD (.txt)",
+        type=["txt"],
+        accept_multiple_files=True,
+        key="admin_upload_files",
+        help="Arquivos SPED Fiscal no formato .txt gerado pelo SPED",
+    )
+
+    if arquivos_admin:
+        st.subheader(f"{len(arquivos_admin)} arquivo(s) selecionado(s)")
+        st.divider()
+
+        metadados_lista = []
+        erro_upload = False
+
+        for arquivo in arquivos_admin:
+            conteudo = arquivo.read().decode("latin-1")
+            try:
+                metadados = processar_renomeacao(conteudo, arquivo.name)
+                metadados['conteudo'] = conteudo
+
+                cnpj_arquivo = limpar_cnpj(metadados['cnpj'])
+                cnpj_tenant  = limpar_cnpj(tenant_selecionado_cnpj)
+                cnpj_ok = cnpj_arquivo == cnpj_tenant
+
+                if not cnpj_ok:
+                    st.error(
+                        f"**{arquivo.name}** — CNPJ do arquivo "
+                        f"(`{formatar_cnpj(cnpj_arquivo)}`) não bate com o tenant selecionado "
+                        f"(`{formatar_cnpj(cnpj_tenant)}`). Arquivo ignorado."
+                    )
+                    erro_upload = True
+                    continue
+
+                metadados_lista.append(metadados)
+
+                with st.expander(f"{metadados['razao_social']} — {metadados['periodo_ini']} a {metadados['periodo_fin']}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.info(f"**Empresa:** {metadados['razao_social']}")
+                        st.info(f"**CNPJ do arquivo:** {formatar_cnpj(metadados['cnpj'])}")
+                        st.info(f"**UF:** {metadados['uf']}")
+                    with col2:
+                        st.info(f"**Período:** {metadados['periodo_ini']} a {metadados['periodo_fin']}")
+                        st.info(f"**Nome original:** {metadados['nome_original']}")
+                        st.info(f"**Nome padronizado:** {metadados['novo_nome']}")
+            except ValueError as e:
+                st.error(f"Erro em {arquivo.name}: {str(e)}")
+                erro_upload = True
+
+        st.divider()
+
+        if not erro_upload:
+            if st.button("Confirmar e processar todos", type="primary", use_container_width=True, key="admin_upload_btn"):
+
+                db_proc = next(get_session())
+                resultados = []
+
+                for metadados in metadados_lista:
+                    bronze = BronzeProcessor(db_proc, tenant_selecionado_id)
+
+                    if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
+                        resultados.append({
+                            "arquivo": metadados['novo_nome'],
+                            "status": "ignorado",
+                        })
+                        continue
+
+                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                    with open(caminho, "w", encoding="latin-1") as f:
+                        f.write(metadados['conteudo'])
+
+                    registro = ArquivoImportado(
+                        tenant_id       = tenant_selecionado_id,
+                        nome_original   = metadados['nome_original'],
+                        nome_padronizado= metadados['novo_nome'],
+                        cnpj            = metadados['cnpj'],
+                        periodo_ini     = metadados['periodo_ini'],
+                        periodo_fin     = metadados['periodo_fin'],
+                        status          = "processando",
+                    )
+                    db_proc.add(registro)
+                    db_proc.commit()
+
+                    with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
+                        try:
+                            resultado_bronze = bronze.ingerir(metadados['conteudo'], metadados['novo_nome'])
+                            registro.status = "bronze_concluido"
+                            db_proc.commit()
+                        except Exception as e:
+                            registro.status = "erro"
+                            registro.erro_msg = str(e)
+                            db_proc.commit()
+                            resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
+                            continue
+
+                    with st.spinner(f"Silver: {metadados['novo_nome']}..."):
+                        try:
+                            silver = SilverProcessor(db_proc, tenant_selecionado_id)
+                            resultado_silver = silver.processar(metadados['novo_nome'])
+                            registro.status = "concluido"
+                            registro.processado_em = datetime.utcnow()
+                            db_proc.commit()
+                            resultados.append({
+                                "arquivo":             metadados['novo_nome'],
+                                "status":              "concluido",
+                                "linhas_bronze":       resultado_bronze['linhas'],
+                                "documentos":          resultado_silver['documentos'],
+                                "itens":               resultado_silver['itens'],
+                                "produtos_criados":    resultado_silver['produtos_criados'],
+                                "produtos_atualizados":resultado_silver['produtos_atualizados'],
+                            })
+                        except Exception as e:
+                            registro.status = "erro"
+                            registro.erro_msg = str(e)
+                            db_proc.commit()
+                            resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
+
+                db_proc.close()
+
+                st.divider()
+                st.subheader("Resultado")
+                for r in resultados:
+                    if r['status'] == 'concluido':
+                        st.success(
+                            f"✓ **{r['arquivo']}** — "
+                            f"{r['documentos']} docs · {r['itens']} itens · "
+                            f"{r['produtos_criados']} produtos novos · {r['produtos_atualizados']} atualizados"
+                        )
+                    elif r['status'] == 'ignorado':
+                        st.warning(f"⚠ **{r['arquivo']}** — já importado anteriormente, ignorado.")
+                    else:
+                        st.error(f"✗ **{r['arquivo']}** — {r.get('erro', 'erro desconhecido')}")
+
+    st.divider()
+
+    # ── Seção D: gestão de grupos empresariais ────────────────────────────────
+
+    st.subheader("Grupos Empresariais")
+
+    col_grp_lista, col_grp_form = st.columns([3, 2])
+
+    with col_grp_lista:
+        db_gd = next(get_session())
+        try:
+            grupos_d = TenantService(db_gd).listar_grupos()
+            tenants_d = db_gd.query(Tenant).options(joinedload(Tenant.grupo)).order_by(Tenant.nome).all()
+        finally:
+            db_gd.close()
+
+        if grupos_d:
+            lojas_por_grupo = {}
+            for t in tenants_d:
+                gid = t.grupo_id
+                if gid:
+                    lojas_por_grupo.setdefault(gid, []).append(t.nome)
+
+            st.dataframe(
+                [
+                    {
+                        "ID":        g.id,
+                        "Nome":      g.nome,
+                        "Lojas":     ", ".join(lojas_por_grupo.get(g.id, [])) or "—",
+                        "Criado em": g.criado_em.strftime("%d/%m/%Y") if g.criado_em else "—",
+                    }
+                    for g in grupos_d
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("Nenhum grupo cadastrado.")
+
+    with col_grp_form:
+        st.caption("Criar novo grupo")
+        with st.form("form_novo_grupo", clear_on_submit=True):
+            nome_grupo = st.text_input("Nome do grupo *")
+            criar_grp  = st.form_submit_button("Criar", type="primary")
+
+        if criar_grp:
+            if not nome_grupo.strip():
+                st.error("Nome obrigatório.")
+            else:
+                db_cg = next(get_session())
+                try:
+                    TenantService(db_cg).criar_grupo(nome_grupo.strip())
+                    st.success(f"Grupo **{nome_grupo.strip()}** criado.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+                finally:
+                    db_cg.close()
+
+    with st.expander("Associar loja a grupo"):
+        db_assoc = next(get_session())
+        try:
+            svc_assoc    = TenantService(db_assoc)
+            tenants_assoc = db_assoc.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
+            grupos_assoc  = svc_assoc.listar_grupos()
+        finally:
+            db_assoc.close()
+
+        if not tenants_assoc or not grupos_assoc:
+            st.info("Cadastre pelo menos um cliente e um grupo antes de associar.")
+        else:
+            col_a, col_b, col_c = st.columns([2, 2, 1])
+            with col_a:
+                tenant_assoc_nome = st.selectbox(
+                    "Loja", [t.nome for t in tenants_assoc], key="assoc_tenant"
+                )
+            with col_b:
+                grupo_assoc_nome = st.selectbox(
+                    "Grupo", [g.nome for g in grupos_assoc], key="assoc_grupo"
+                )
+            with col_c:
+                st.write("")
+                st.write("")
+                associar_btn = st.button("Associar", use_container_width=True)
+
+            if associar_btn:
+                tenant_sel = next(t for t in tenants_assoc if t.nome == tenant_assoc_nome)
+                grupo_sel  = next(g for g in grupos_assoc  if g.nome == grupo_assoc_nome)
+                db_a = next(get_session())
+                try:
+                    TenantService(db_a).associar_tenant_a_grupo(tenant_sel.id, grupo_sel.id)
+                    st.success(f"**{tenant_assoc_nome}** associada ao grupo **{grupo_assoc_nome}**.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+                finally:
+                    db_a.close()

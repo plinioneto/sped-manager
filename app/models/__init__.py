@@ -1,3 +1,4 @@
+from app.models.grupo_empresarial import GrupoEmpresarial
 from app.models.tenant import Tenant
 from app.models.fabricante import Fabricante
 from app.models.marca import Marca
@@ -13,3 +14,4 @@ from app.models.inventario_h010 import InventarioH010
 from app.models.estoque_k200 import EstoqueK200
 from app.models.participante import Participante
 from app.models.token_desconhecido import TokenDesconhecido
+from app.models.catalogo_produto import CatalogoProduto

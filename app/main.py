@@ -1,10 +1,11 @@
 import streamlit as st
-from app.utils.db import get_session, engine
+from app.utils.db import get_session, engine, run_migrations
 from app.models.base import Base
 import app.models
 
 # Criar tabelas no banco caso não existam
 Base.metadata.create_all(bind=engine)
+run_migrations()
 
 # Config da página
 st.set_page_config(
@@ -44,16 +45,17 @@ if not st.session_state.tenant_id:
     st.subheader('Acesse sua conta')
 
     with st.form('login_form'):
-        cnpj = st.text_input("CNPJ")
-        senha = st.text_input("Senha", type = "password")
+        identificador = st.text_input("CNPJ ou código de acesso")
+        senha = st.text_input("Senha", type="password")
         entrar = st.form_submit_button("Entrar")
 
     if entrar:
-        # autenticação temporária que será substituída quando criar o model de usuário (tabela)
         db = next(get_session())
         from app.services.tenant_service import TenantService
-        service = TenantService(db)
-        tenant = service.buscar_por_cnpj(cnpj)
+        try:
+            tenant = TenantService(db).autenticar(identificador, senha)
+        finally:
+            db.close()
 
         if tenant:
             st.session_state.tenant_id = tenant.id
@@ -61,7 +63,7 @@ if not st.session_state.tenant_id:
             st.session_state.tenant_cnpj = tenant.cnpj
             st.rerun()
         else:
-            st.error("CNPJ não encontrado")
+            st.error("CNPJ/código ou senha inválidos")
 else:
     # sucesso no login
 

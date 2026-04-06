@@ -29,6 +29,27 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+
+def run_migrations():
+    """Migrações idempotentes — executadas em todo ponto de entrada da app."""
+    from sqlalchemy import text
+    # SQLite não suporta constraints em ALTER TABLE ADD COLUMN — UNIQUE é ignorado aqui
+    # e garantido pelo ORM/índice criado a seguir
+    _migrations = [
+        "ALTER TABLE tenants ADD COLUMN grupo_id INTEGER REFERENCES grupos_empresariais(id)",
+        "ALTER TABLE tenants ADD COLUMN senha_hash TEXT",
+        "ALTER TABLE tenants ADD COLUMN codigo_acesso TEXT",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_tenants_codigo_acesso ON tenants(codigo_acesso)",
+    ]
+    with engine.connect() as conn:
+        for sql in _migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # coluna já existe
+
+
 def get_session():
     db = SessionLocal()
     try:

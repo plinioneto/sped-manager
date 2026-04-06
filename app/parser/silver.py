@@ -18,6 +18,35 @@ try:
 except Exception:
     _PADRONIZACAO_DISPONIVEL = False
 
+try:
+    from app.repositories.catalogo_repo import CatalogoProdutoRepository, ean_valido
+    _CATALOGO_DISPONIVEL = True
+except Exception:
+    _CATALOGO_DISPONIVEL = False
+
+
+def _esta_classificado_catalogo(entrada) -> bool:
+    return entrada.categoria_id is not None or entrada.grupo_id is not None
+
+
+def _esta_classificado_produto(produto: Produto) -> bool:
+    return produto.categoria_id is not None or produto.grupo_id is not None
+
+
+def _copiar_do_catalogo(produto: Produto, catalogo) -> None:
+    produto.descricao_padrao    = catalogo.descricao_padrao
+    produto.tipo_produto        = catalogo.tipo_produto
+    produto.tipo_embalagem      = catalogo.tipo_embalagem
+    produto.peso_volume_valor   = catalogo.peso_volume_valor
+    produto.peso_volume_unidade = catalogo.peso_volume_unidade
+    produto.categoria_id        = catalogo.categoria_id
+    produto.grupo_id            = catalogo.grupo_id
+    produto.departamento_id     = catalogo.departamento_id
+    produto.marca_id            = catalogo.marca_id
+    produto.score_categoria     = catalogo.score_categoria
+    produto.origem_padronizacao = "catalogo"
+    produto.revisao_necessaria  = False
+
 
 class SilverProcessor:
     def __init__(self, session: Session, tenant_id: int):
@@ -289,31 +318,50 @@ class SilverProcessor:
 
             descr_item = c[3] if len(c) > 3 else ''
 
+            cod_barra_raw = (c[4] if len(c) > 4 else '').strip()
+
             if existente:
                 existente.descr_item = descr_item
-                existente.cod_barra = c[4] if len(c) > 4 else ''
-                existente.unid_inv = c[6] if len(c) > 6 else ''
-                existente.tipo_item = c[7] if len(c) > 7 else ''
-                existente.cod_ncm = c[8] if len(c) > 8 else ''
-                existente.aliq_icms = self._cast_decimal(c[12]) if len(c) > 12 else 0.0
-                existente.cest = c[13] if len(c) > 13 else ''
-                self._aplicar_padronizacao(existente, descr_item)
+                existente.cod_barra  = cod_barra_raw
+                existente.unid_inv   = c[6] if len(c) > 6 else ''
+                existente.tipo_item  = c[7] if len(c) > 7 else ''
+                existente.cod_ncm    = c[8] if len(c) > 8 else ''
+                existente.aliq_icms  = self._cast_decimal(c[12]) if len(c) > 12 else 0.0
+                existente.cest       = c[13] if len(c) > 13 else ''
+                produto_obj = existente
                 atualizados += 1
             else:
-                produto = Produto(
-                    tenant_id=self.tenant_id,
-                    cod_item=cod,
-                    descr_item=descr_item,
-                    cod_barra=c[4] if len(c) > 4 else '',
-                    unid_inv=c[6] if len(c) > 6 else '',
-                    tipo_item=c[7] if len(c) > 7 else '',
-                    cod_ncm=c[8] if len(c) > 8 else '',
-                    aliq_icms=self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
-                    cest=c[13] if len(c) > 13 else '',
+                produto_obj = Produto(
+                    tenant_id = self.tenant_id,
+                    cod_item  = cod,
+                    descr_item= descr_item,
+                    cod_barra = cod_barra_raw,
+                    unid_inv  = c[6] if len(c) > 6 else '',
+                    tipo_item = c[7] if len(c) > 7 else '',
+                    cod_ncm   = c[8] if len(c) > 8 else '',
+                    aliq_icms = self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
+                    cest      = c[13] if len(c) > 13 else '',
                 )
-                self._aplicar_padronizacao(produto, descr_item)
-                self.session.add(produto)
+                self.session.add(produto_obj)
                 criados += 1
+
+            # EAN catalog lookup — herda classificação entre tenants quando possível
+            if _CATALOGO_DISPONIVEL and ean_valido(cod_barra_raw):
+                catalogo_repo = CatalogoProdutoRepository(self.session)
+                entrada_catalogo = catalogo_repo.buscar_por_ean(cod_barra_raw)
+
+                if entrada_catalogo and _esta_classificado_catalogo(entrada_catalogo):
+                    # Catálogo já tem classificação — copiar ao produto (exceto manuais)
+                    if produto_obj.origem_padronizacao not in ('manual', 'manual_sem_cat'):
+                        _copiar_do_catalogo(produto_obj, entrada_catalogo)
+                else:
+                    # Catálogo vazio/não classificado — rodar pipeline e gravar resultado
+                    self._aplicar_padronizacao(produto_obj, descr_item)
+                    if _esta_classificado_produto(produto_obj):
+                        catalogo_repo.upsert_from_produto(produto_obj, cod_barra_raw)
+            else:
+                # Sem EAN válido — comportamento original
+                self._aplicar_padronizacao(produto_obj, descr_item)
 
         self.session.commit()
         return {"criados": criados, "atualizados": atualizados}

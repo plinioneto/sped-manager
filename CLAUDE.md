@@ -19,7 +19,8 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - app/utils — db.py, formatters.py
 
 ## Models existentes
-- Tenant — empresa/supermercado (CNPJ sem máscara, 14 dígitos)
+- GrupoEmpresarial — global (sem tenant_id); agrupa tenants de um mesmo dono (nome, ativo)
+- Tenant — empresa/supermercado (CNPJ sem máscara, 14 dígitos); FK nullable → GrupoEmpresarial
 - Produto — cadastro 0200 (chave única: tenant_id + cod_item)
 - DocumentoFiscal — C100 (chave única: tenant_id + chv_nfe)
 - ItemFiscal — C170 (chave única: tenant_id + chv_doc + num_item)
@@ -55,14 +56,15 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
 | 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
 | 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 4 abas: Revisão Individual (filtros: cliente, modo, departamento, grupo), Revisão em Lote (filtros: cliente, modo, departamento, grupo; checkbox por linha), Marcas & Fabricantes (cadastro + seed), Tokens Desconhecidos (lista tokens não reconhecidos, filtro por contagem, limpeza de ruído) |
+| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 5 abas: Revisão Individual, Revisão em Lote, Marcas & Fabricantes, Tokens Desconhecidos, Clientes & Upload (lista clientes com grupo, cadastro com grupo opcional, upload admin com filtro por grupo, gestão de grupos empresariais) |
 | 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
 | 07_configuracoes.py | ⏳ pendente | |
 
 ## Status dos models
 | Model | Status | Observações |
 |-------|--------|-------------|
-| Tenant | ✅ | |
+| GrupoEmpresarial | ✅ | global (sem tenant_id); nome, ativo; FK ← Tenant.grupo_id |
+| Tenant | ✅ | grupo_id (FK nullable → GrupoEmpresarial) |
 | Produto | ✅ | campos 0200 + padronização (descricao_padrao, tipo_embalagem, peso_volume, scores) + FK para Marca, Categoria, Grupo, Departamento |
 | Fabricante | ✅ | global; nome, cnpj, aliases (JSON), ativo |
 | Marca | ✅ | global; nome, fabricante_id, categoria, aliases (JSON), ativo |
@@ -122,6 +124,19 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [ ] **Migração para PostgreSQL** — troca só o `.env`; necessário antes do deploy
 - [ ] **Deploy no Streamlit Cloud**
 
+### 🟠 Etapa 2 — Multi-loja nas páginas de gestão (pré-requisito: Etapa 1 concluída ✅)
+
+Permitir que donos de grupos vejam dados consolidados de todas as lojas e filtrem por loja nas páginas de gestão. Requer:
+
+- **`app/repositories/base_repo.py`** — aceitar `tenant_ids: list[int]`; manter `self.tenant_id` para backwards compat em métodos de escrita
+- **8 repositories** — trocar `== self.tenant_id` por `.in_(self.tenant_ids)` em todos os filtros de leitura; `compras_repo.py` tem helper `_aplicar_filtros_doc` com assinatura a mudar; `estoque_repo.py` e `inventario_repo.py` têm JOINs com tupla Python → converter para `and_()` explícito
+- **`app/main.py`** — após login, se tenant tiver `grupo_id`: carregar todas as lojas do grupo em `st.session_state.tenant_ids` e `lojas_disponiveis`; sempre inicializar `active_tenant_ids = tenant_ids[:]`
+- **`app/components/sidebar.py`** — exibir `grupo_nome` no topo; quando 2+ lojas: `st.sidebar.multiselect` que atualiza `active_tenant_ids` e chama `st.rerun()`; logout limpa todas as novas chaves
+- **Páginas 00–05** — usar `active_tenant_ids` em vez de `tenant_id` único; tabelas de listagem ganham coluna "Loja" quando multi-store; `06_dados.py` não muda (upload sempre single-tenant)
+- Extras nas páginas: `00_inicio.py` label "Consolidado — N lojas"; query direta em `ArquivoImportado.tenant_id` → `.in_()`; `05_produtos.py` query direta em `Produto.tenant_id` → `.in_()`
+
+Compatibilidade garantida: tenant sem grupo funciona idêntico ao atual (`active_tenant_ids = [tenant.id]`).
+
 ### 🟡 Média prioridade — funcionalidades novas de valor
 
 - [ ] **Importação de NF-e XML** como fonte independente de dados (arquitetura decidida — ver seção abaixo)
@@ -130,7 +145,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 
 ### 🟢 Baixa prioridade — qualidade e escala
 
-- [ ] **Catálogo global de produtos via EAN**: tabela `catalogo_produtos` (global, sem tenant_id), chave = `cod_barra`. No import do 0200, após upsert normal do produto, buscar o EAN no catálogo e setar `produto.catalogo_id` (FK nullable). Só vincular quando EAN for numérico válido (8, 12, 13 ou 14 dígitos) — ignorar "SEM GTIN" e campos vazios.
+- [x] **Catálogo global de produtos via EAN** — implementado: `catalogo_produtos` (global, sem tenant_id); silver.py faz lookup por EAN antes de rodar a pipeline; backfill popula o catálogo com produtos já classificados; `scripts/backfill_catalogo_ean.py` com flags `--dry-run` e `--tenant`
 - [ ] **Modelo supervisionado para categorização** — quando houver ~300–500 produtos revisados manualmente (`origem_padronizacao = 'manual'`), treinar um classificador simples (TF-IDF + Naive Bayes ou Regressão Logística via `scikit-learn`) usando as descrições padronizadas como entrada e `categoria_id` como rótulo. Plugar em `categorizador.py` como novo passo após `_VOCAB_CATEGORIA` e antes do Jaccard fallback — só ativa quando score dos dicionários for zero. Aumentaria cobertura de ~70% para ~90%+ sem manutenção de dicionários, generalizando para marcas regionais e abreviações nunca vistas. Pré-requisito: volume mínimo de revisões manuais acumuladas.
 - [ ] **Embeddings para produtos similares** — transformar descrições em vetores numéricos (ex: `sentence-transformers`) para detectar que `REFRIG COCA COLA PET 2L` e `COCA COLA REFRIGERANTE GARRAFA 2L` são o mesmo produto. Valor prático: (1) detectar duplicatas no cadastro entre tenants diferentes, (2) sugerir classificação por similaridade ("94% similar a produto já classificado como Refrigerantes"), (3) base para catálogo EAN sem código de barras. Custo alto de infraestrutura (~400MB de modelo); só justifica com múltiplos tenants e volume alto. Pós-MVP.
 - [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
@@ -156,6 +171,85 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - [x] Pipeline de padronização: stopwords, abreviações contextuais, extração de atributos, ordem canônica
 - [x] Fuzzy matching de marcas (RapidFuzz threshold=90)
 - [x] Tokens desconhecidos salvos no banco para revisão futura
+- [x] Catálogo global de EAN (`catalogo_produtos`) — herança de classificação entre tenants; backfill rodado com 2.657 entradas
+- [x] GrupoEmpresarial — model + FK em Tenant + TenantService com 5 métodos; aba Clientes & Upload no admin com gestão de grupos
+
+## Checklist de testes — funcionalidades recentes (2026-04-06)
+
+### 1. Banco de dados (verificação inicial)
+- [ ] `grupos_empresariais` existe no SQLite ✅
+- [ ] `tenants.grupo_id` existe ✅
+- [ ] `catalogo_produtos` tem 2.657 entradas ✅
+
+### 2. Admin — Grupos Empresariais (Seção D da aba Clientes & Upload)
+- [ ] Abrir `localhost:8501/08_admin_revisao`, logar com a senha admin
+- [ ] Ir para aba **Clientes & Upload** → rolar até **Grupos Empresariais**
+- [ ] Criar grupo: ex. "Rede GS"
+- [ ] Verificar que o grupo aparece na tabela com coluna "Lojas" vazia
+
+### 3. Admin — Cadastrar GS Mercearia
+- [ ] Seção **Cadastrar novo cliente**: preencher nome "GS Mercearia", CNPJ correto
+- [ ] Selecionar grupo "Rede GS" no dropdown opcional
+- [ ] Clicar Cadastrar → verificar mensagem de sucesso
+- [ ] Verificar na tabela da Seção A que a GS aparece com coluna "Grupo: Rede GS"
+- [ ] Verificar na Seção D que o grupo "Rede GS" agora lista "GS Mercearia" em "Lojas"
+
+### 4. Admin — Associar loja existente a grupo (se houver outra loja no banco)
+- [ ] Expandir **Associar loja a grupo**, selecionar a loja e o grupo, clicar Associar
+- [ ] Verificar que a coluna "Grupo" da loja foi atualizada na tabela
+
+### 5. Admin — Filtro por grupo no upload
+- [ ] Na Seção C, selecionar "Rede GS" no dropdown "Filtrar por grupo"
+- [ ] Verificar que o selectbox "Tenant de destino" mostra apenas lojas do grupo GS
+
+### 6. Admin — Upload dos arquivos da GS Mercearia
+- [ ] Selecionar "GS Mercearia" no selectbox de destino
+- [ ] Subir 1 arquivo EFD como teste
+- [ ] **Teste de validação de CNPJ**: tentar subir um arquivo de outro supermercado → deve aparecer erro em vermelho e arquivo ser ignorado
+- [ ] Subir o arquivo correto da GS → deve processar sem erro
+- [ ] Verificar resultado: documentos, itens, produtos criados/atualizados
+- [ ] Verificar que o `ArquivoImportado` foi criado com o `tenant_id` correto (não o tenant logado)
+
+### 7. Herança de classificação via EAN
+- [ ] Após o upload, consultar no SQLite:
+  ```sql
+  SELECT origem_padronizacao, COUNT(*) FROM produtos
+  WHERE tenant_id = <id_gs> GROUP BY origem_padronizacao;
+  ```
+- [ ] Verificar que há registros com `origem_padronizacao = 'catalogo'` — indica que produtos já classificados no primeiro tenant foram herdados
+- [ ] Produtos com EAN inválido ou novo devem ter `origem_padronizacao = 'regra'`
+
+### 8. Upload dos 5 arquivos restantes
+- [ ] Subir os demais arquivos da GS um a um (ou todos de uma vez) pelo admin
+- [ ] Verificar que nenhum tem erro de CNPJ divergente
+- [ ] Verificar resumo final de cada arquivo
+
+### 9. Login como GS Mercearia
+- [ ] Logar na tela principal com o CNPJ da GS
+- [ ] Verificar que as páginas de gestão carregam os dados corretos
+
+### Queries úteis para verificar no SQLite
+```sql
+-- Tenants e grupos
+SELECT t.nome, t.cnpj, g.nome as grupo
+FROM tenants t LEFT JOIN grupos_empresariais g ON t.grupo_id = g.id;
+
+-- Arquivos importados por tenant
+SELECT t.nome, a.nome_padronizado, a.status, a.processado_em
+FROM arquivos_importados a JOIN tenants t ON a.tenant_id = t.id
+ORDER BY a.processado_em DESC;
+
+-- Origem da classificação após upload
+SELECT origem_padronizacao, COUNT(*) as qtd
+FROM produtos WHERE tenant_id = <id>
+GROUP BY origem_padronizacao ORDER BY qtd DESC;
+
+-- Catálogo EAN
+SELECT COUNT(*) FROM catalogo_produtos;
+SELECT COUNT(*) FROM catalogo_produtos WHERE categoria_id IS NOT NULL;
+```
+
+---
 
 ## Decisões mapeadas: Importação NF-e XML
 
