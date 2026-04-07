@@ -28,7 +28,11 @@ from app.models.marca import Marca
 DADOS: list[tuple[str, list[str]]] = [
     ("Nestlé",               ["Nescafé", "Nescau", "Leite Moça", "KitKat", "Passatempo", "Bono", "Negresco", "Galak", "Charge", "Prestígio", "Maggi", "Purina"]),
     ("Unilever",             ["Hellmann's", "Knorr", "Kibon", "Dove", "Rexona", "OMO", "Comfort", "Seda", "Tresemmé", "Lux"]),
-    ("Ambev",                ["Brahma", "Skol", "Antarctica", "Guaraná Antarctica", "Pepsi", "H2OH!", "Gatorade", "Budweiser", "Stella Artois", "Corona", "Beats"]),
+    ("Ambev",                ["Brahma", "Skol", "Antarctica", "Guaraná Antarctica", "Pepsi", "H2OH!", "Gatorade", "Budweiser", "Stella Artois", "Corona", "Beats",
+                              # Cervejas adicionais Ambev
+                              "Bohemia", "Patagonia", "Serramalte", "Polar", "Caracu",
+                              "Colorado", "Wals", "Goose Island",
+                              "Spaten", "Franziskaner", "Leffe", "Hoegaarden", "Becks", "Löwenbräu"]),
     ("Coca-Cola FEMSA",      ["Coca-Cola", "Fanta", "Sprite", "Schweppes", "Del Valle", "Crystal", "Powerade", "Monster", "Ades"]),
     ("PepsiCo",              ["Pepsi", "Elma Chips", "Ruffles", "Doritos", "Cheetos", "Toddynho", "Quaker", "Gatorade", "H2OH!"]),
     ("Mondelez",             ["Lacta", "Oreo", "Bis", "Trident", "Club Social", "Tang", "Halls", "Sonho de Valsa", "Bubbaloo"]),
@@ -57,8 +61,12 @@ DADOS: list[tuple[str, list[str]]] = [
     ("Melitta",              ["Melitta", "Café Barão", "Café União"]),
     ("3 Corações",           ["3 Corações", "Santa Clara", "Kimimo", "Letícia"]),
     ("JDE Peet's",           ["Pilão", "L'OR", "Café do Ponto", "Caboclo"]),
-    ("Heineken Brasil",      ["Heineken", "Amstel", "Eisenbahn", "Schin", "Devassa", "Baden Baden"]),
-    ("Diageo",               ["Johnnie Walker", "Smirnoff", "Tanqueray", "Ypióca"]),
+    ("Heineken Brasil",      ["Heineken", "Amstel", "Eisenbahn", "Schin", "Devassa", "Baden Baden",
+                              # Cervejas adicionais Heineken Brasil (via Femsa + Brasil Kirin)
+                              "Kaiser", "Bavaria", "Tiger", "Lagunitas", "Kirin Ichiban",
+                              "Birra Moretti", "Desperados", "Murphys", "Grimbergen", "Affligem",
+                              "Glacial", "Blue Moon"]),
+    ("Diageo",               ["Johnnie Walker", "Smirnoff", "Tanqueray", "Ypióca", "Guinness"]),
     ("Pernod Ricard",        ["Absolut", "Ballantine's", "Chivas Regal", "Beefeater"]),
     ("Kellogg's",            ["Kellogg's", "Sucrilhos", "Pringles"]),
     ("General Mills",        ["Yoki", "Kitano", "Häagen-Dazs"]),
@@ -71,6 +79,32 @@ DADOS: list[tuple[str, list[str]]] = [
     ("Ferrero",              ["Ferrero Rocher", "Nutella", "Kinder", "Tic Tac"]),
     ("Mars",                 ["M&M's", "Snickers", "Twix", "Pedigree", "Whiskas"]),
     ("Garoto",               ["Serenata de Amor", "Talento", "Baton", "Garoto"]),
+
+    # ── Cervejas — fabricantes nacionais ─────────────────────────────────────
+    ("Grupo Petrópolis",     ["Itaipava", "Crystal", "Petra", "Black Princess", "Lokal", "Cabaré"]),
+    ("Cerpa",                ["Cerpa", "Crolant"]),
+
+    # ── Cervejas — importadas (Alemanha) ─────────────────────────────────────
+    ("Erdinger Weissbrau",   ["Erdinger"]),
+    ("Paulaner Brauerei",    ["Paulaner", "Hacker-Pschorr"]),
+    ("Weihenstephaner",      ["Weihenstephaner"]),
+    ("Warsteiner Brauerei",  ["Warsteiner"]),
+    ("Bitburger Braugruppe", ["Bitburger", "König Pilsener"]),
+
+    # ── Cervejas — importadas (Bélgica) ──────────────────────────────────────
+    ("Duvel Moortgat",       ["Duvel", "Vedett", "La Chouffe", "Liefmans"]),
+    ("Abbaye de Scourmont",  ["Chimay"]),
+
+    # ── Cervejas — artesanais brasileiras ────────────────────────────────────
+    ("Cervejaria Backer",    ["Backer", "Leopoldina"]),
+    ("Cervejaria Krug Bier", ["Krug Bier"]),
+    ("Cervejaria Dado Bier", ["Dado Bier"]),
+    ("Cervejaria Saint Bier",["Saint Bier"]),
+    ("Seasons Cervejaria",   ["Seasons"]),
+    ("Cervejaria Coruja",    ["Coruja"]),
+    ("Cervejaria 2 Cabeças", ["2 Cabeças"]),
+    ("Dama Bier",            ["Dama Bier"]),
+    ("Way Beer",             ["Way Beer"]),
 ]
 
 
