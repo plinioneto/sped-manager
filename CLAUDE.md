@@ -329,7 +329,7 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 #### Abreviações
 <!-- formato: abrev → expansão -->
-
+conf -> confeito
 #### Categorias
 <!-- formato: keyword → Departamento > Grupo > Categoria -->
 
@@ -338,9 +338,10 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 #### Marcas
 <!-- formato: Nome | Fabricante | alias1, alias2, ... -->
+Fini | Fini | fini
 #### Fabricantes
 <!-- formato: Nome | alias1, alias2, ... -->
-
+Fini| fini
 ---
 
 ### ✅ Histórico de adições aplicadas

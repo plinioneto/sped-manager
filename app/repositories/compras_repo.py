@@ -5,6 +5,8 @@ from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
 from app.models.participante import Participante
 from app.models.categoria import Departamento, Grupo, Categoria
+from app.models.marca import Marca
+from app.models.fabricante import Fabricante
 from app.repositories.base_repo import BaseRepository
 
 
@@ -480,6 +482,80 @@ class ComprasRepository(BaseRepository):
         q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item, Produto.descricao_padrao, Produto.unid_inv)
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+
+    def agrupar_por_fabricante(self, departamento_id=None, grupo_id=None, categoria_id=None,
+                               ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
+        """Valor de compras agrupado por fabricante, com filtro hierárquico opcional."""
+        q = (
+            self.session.query(
+                func.coalesce(Fabricante.nome, "Sem fabricante").label("nome"),
+                Marca.fabricante_id,
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .join(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Marca, Marca.id == Produto.marca_id)
+            .outerjoin(Fabricante, Fabricante.id == Marca.fabricante_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        q = self._filtro_hierarquia_por_produto(q, departamento_id, grupo_id, categoria_id)
+        return (
+            q.group_by(
+                func.coalesce(Fabricante.nome, "Sem fabricante"),
+                Marca.fabricante_id,
+            )
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+
+    def agrupar_por_marca(self, fabricante_id=None, departamento_id=None, grupo_id=None, categoria_id=None,
+                          ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
+        """Valor de compras agrupado por marca, com filtro por fabricante e hierarquia opcionais."""
+        q = (
+            self.session.query(
+                func.coalesce(Marca.nome, "Sem marca").label("nome"),
+                Produto.marca_id,
+                func.coalesce(Fabricante.nome, "Sem fabricante").label("fabricante_nome"),
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .join(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Marca, Marca.id == Produto.marca_id)
+            .outerjoin(Fabricante, Fabricante.id == Marca.fabricante_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        q = self._filtro_hierarquia_por_produto(q, departamento_id, grupo_id, categoria_id)
+        if fabricante_id is not None:
+            q = q.filter(Marca.fabricante_id == fabricante_id)
+        return (
+            q.group_by(
+                func.coalesce(Marca.nome, "Sem marca"),
+                Produto.marca_id,
+                func.coalesce(Fabricante.nome, "Sem fabricante"),
+            )
             .order_by(func.sum(ItemFiscal.vl_item).desc())
             .all()
         )

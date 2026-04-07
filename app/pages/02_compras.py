@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import app.models
 from app.components.sidebar import render_sidebar
@@ -25,6 +24,12 @@ MESES_LABEL = {
     "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
     "05": "Maio", "06": "Junho", "07": "Julho", "08": "Agosto",
     "09": "Setembro", "10": "Outubro", "11": "Novembro", "12": "Dezembro",
+}
+
+MESES_ABREV = {
+    "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
+    "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
+    "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
 }
 
 COD_SIT = {
@@ -59,25 +64,16 @@ CFOP_DESCR = {
 }
 
 CFOP_GRUPO = {
-    "1102": "Mercadoria p/ Revenda",
-    "1403": "Mercadoria p/ Revenda",
-    "2102": "Mercadoria p/ Revenda",
-    "2403": "Mercadoria p/ Revenda",
-    "1152": "Transferências",
-    "1409": "Transferências",
+    "1102": "Mercadoria p/ Revenda", "1403": "Mercadoria p/ Revenda",
+    "2102": "Mercadoria p/ Revenda", "2403": "Mercadoria p/ Revenda",
+    "1152": "Transferências", "1409": "Transferências",
     "1101": "Industrialização",
-    "1407": "Uso e Consumo",
-    "1556": "Uso e Consumo",
-    "2407": "Uso e Consumo",
-    "2556": "Uso e Consumo",
-    "1406": "Ativo Imobilizado",
-    "1551": "Ativo Imobilizado",
-    "2406": "Ativo Imobilizado",
-    "2551": "Ativo Imobilizado",
-    "1652": "Energia Elétrica",
-    "1653": "Energia Elétrica",
-    "1910": "Bonificação/Doação",
-    "2910": "Bonificação/Doação",
+    "1407": "Uso e Consumo", "1556": "Uso e Consumo",
+    "2407": "Uso e Consumo", "2556": "Uso e Consumo",
+    "1406": "Ativo Imobilizado", "1551": "Ativo Imobilizado",
+    "2406": "Ativo Imobilizado", "2551": "Ativo Imobilizado",
+    "1652": "Energia Elétrica", "1653": "Energia Elétrica",
+    "1910": "Bonificação/Doação", "2910": "Bonificação/Doação",
 }
 
 PLOTLY_LAYOUT = dict(
@@ -97,12 +93,6 @@ def formatar_qtd(valor: float) -> str:
     return f"{valor:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def formatar_mes(yyyymm: str) -> str:
-    ano = yyyymm[:4]
-    mes = yyyymm[4:6]
-    return f"{MESES_LABEL.get(mes, mes)}/{ano}"
-
-
 def formatar_mes_curto(yyyymm: str) -> str:
     ano = yyyymm[:4]
     mes = yyyymm[4:6]
@@ -110,14 +100,12 @@ def formatar_mes_curto(yyyymm: str) -> str:
 
 
 def cnpj_curto(cnpj: str) -> str:
-    """Retorna CNPJ formatado ou truncado para caber em gráficos."""
     if cnpj and len(cnpj) == 14:
         return formatar_cnpj(cnpj)
     return cnpj or "N/I"
 
 
 def nome_fornecedor(row) -> str:
-    """Retorna nome do participante ou CNPJ formatado como fallback."""
     nome = getattr(row, "nome_part", None)
     if nome:
         return nome
@@ -129,121 +117,225 @@ def nome_fornecedor(row) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Dados iniciais e filtros
+# Título
 # ---------------------------------------------------------------------------
-
-db = next(get_session())
-try:
-    repo = ComprasRepository(db, tenant_id)
-    meses_raw = repo.meses_disponiveis()
-finally:
-    db.close()
 
 st.title("Gestão de Compras")
 st.divider()
 
-# Filtros
-MESES_ABREV = {
-    "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
-    "05": "Mai", "06": "Jun", "07": "Jul", "08": "Ago",
-    "09": "Set", "10": "Out", "11": "Nov", "12": "Dez",
-}
+# ---------------------------------------------------------------------------
+# Filtro Row 1 — Período + Loja (placeholder multi-store)
+# ---------------------------------------------------------------------------
+
+db = next(get_session())
+try:
+    repo_init = ComprasRepository(db, tenant_id)
+    meses_raw = repo_init.meses_disponiveis()
+finally:
+    db.close()
 
 anos_raw = sorted({m[:4] for m in meses_raw}, reverse=True)
 meses_num_raw = sorted({m[4:] for m in meses_raw})
 
-col_ano, col_mes, col_forn, col_nota, col_prod = st.columns(5)
+lojas = st.session_state.get("lojas_disponiveis", [])
+mostrar_loja = len(lojas) > 1
 
-sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw)
+if mostrar_loja:
+    col_ano, col_mes, col_loja = st.columns([1, 2, 2])
+else:
+    col_ano, col_mes = st.columns([1, 2])
+
+sel_ano = col_ano.selectbox("Ano", ["Todos"] + anos_raw, key="compras_ano")
 sel_meses = col_mes.multiselect(
     "Mês",
     options=meses_num_raw,
     format_func=lambda m: MESES_ABREV.get(m, m),
     placeholder="Todos",
+    key="compras_meses",
 )
+
+if mostrar_loja:
+    col_loja.multiselect(
+        "Loja",
+        options=[l["id"] for l in lojas],
+        format_func=lambda lid: next((l["nome"] for l in lojas if l["id"] == lid), str(lid)),
+        placeholder="Todas as lojas",
+        key="compras_lojas",
+    )
 
 ano_filtro = None if sel_ano == "Todos" else sel_ano
 meses_filtro = sel_meses if sel_meses else None
 
-busca_forn = col_forn.text_input("Fornecedor", placeholder="CNPJ ou parte do nome")
-busca_nota = col_nota.text_input("Nº da Nota", placeholder="Ex: 000123456")
-busca_prod = col_prod.text_input("Produto", placeholder="Código ou descrição")
+# ---------------------------------------------------------------------------
+# Filtro Row 2 — Hierarquia cascateada (Departamento > Grupo > Categoria)
+# ---------------------------------------------------------------------------
 
-busca_forn = busca_forn.strip() or None
-busca_nota = busca_nota.strip() or None
-busca_prod = busca_prod.strip() or None
+db = next(get_session())
+try:
+    deptos = db.query(Departamento).order_by(Departamento.descricao).all()
+    opcoes_depto = {d.descricao: d.id for d in deptos}
 
-filtros = dict(ano=ano_filtro, meses=meses_filtro, fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
+    col_d, col_g, col_c = st.columns(3)
+
+    stored_depto = st.session_state.get("compras_depto", "Todos")
+    depto_opts = ["Todos"] + list(opcoes_depto.keys())
+    depto_index = depto_opts.index(stored_depto) if stored_depto in depto_opts else 0
+    sel_depto_nome = col_d.selectbox("Departamento", depto_opts, index=depto_index, key="compras_depto")
+    departamento_id = opcoes_depto.get(sel_depto_nome)
+
+    grupo_id = None
+    sel_grupo_nome = "Todos"
+    categoria_id = None
+    sel_cat_nome = "Todos"
+
+    if departamento_id:
+        grupos = (
+            db.query(Grupo)
+            .filter(Grupo.departamento_id == departamento_id)
+            .order_by(Grupo.descricao)
+            .all()
+        )
+        opcoes_grupo = {g.descricao: g.id for g in grupos}
+        grupo_opts = ["Todos"] + list(opcoes_grupo.keys())
+        stored_grupo = st.session_state.get("compras_grupo", "Todos")
+        grupo_index = grupo_opts.index(stored_grupo) if stored_grupo in grupo_opts else 0
+        sel_grupo_nome = col_g.selectbox("Grupo", grupo_opts, index=grupo_index, key="compras_grupo")
+        grupo_id = opcoes_grupo.get(sel_grupo_nome)
+
+        if grupo_id:
+            cats = (
+                db.query(Categoria)
+                .filter(Categoria.grupo_id == grupo_id)
+                .order_by(Categoria.descricao)
+                .all()
+            )
+            opcoes_cat = {c.descricao: c.id for c in cats}
+            cat_opts = ["Todos"] + list(opcoes_cat.keys())
+            stored_cat = st.session_state.get("compras_cat", "Todos")
+            cat_index = cat_opts.index(stored_cat) if stored_cat in cat_opts else 0
+            sel_cat_nome = col_c.selectbox("Categoria", cat_opts, index=cat_index, key="compras_cat")
+            categoria_id = opcoes_cat.get(sel_cat_nome)
+finally:
+    db.close()
+
+filtros = dict(ano=ano_filtro, meses=meses_filtro, fornecedor=None, num_nota=None, produto=None)
+hier = dict(departamento_id=departamento_id, grupo_id=grupo_id, categoria_id=categoria_id)
+
+# Breadcrumb do filtro ativo
+partes_hier = []
+if departamento_id:
+    partes_hier.append(sel_depto_nome)
+if grupo_id:
+    partes_hier.append(sel_grupo_nome)
+if categoria_id:
+    partes_hier.append(sel_cat_nome)
+if partes_hier:
+    st.caption(f"🔍 Filtro ativo: **{' › '.join(partes_hier)}**")
+
+st.divider()
 
 # ---------------------------------------------------------------------------
-# Métricas globais com delta
+# Carregamento principal de dados
 # ---------------------------------------------------------------------------
 
 db = next(get_session())
 try:
     repo = ComprasRepository(db, tenant_id)
+
     metricas = repo.metricas_globais(**filtros)
+    evolucao = repo.evolucao_mensal(**filtros)
+    cfop_data = repo.distribuicao_cfop(**filtros)
+    por_fornecedor = repo.agrupar_por_fornecedor(**filtros, **hier)
+    forn_evolucao = repo.top_fornecedores_evolucao(limit=5, **filtros)
+    dados_fabricante = repo.agrupar_por_fabricante(**hier, **filtros)
+    dados_marca = repo.agrupar_por_marca(**hier, **filtros)
 
-    # Calcula delta: métricas do mês anterior vs selecionado (só se filtrou por mês)
-    delta_notas = None
-    delta_forn = None
-    delta_valor = None
-    delta_itens = None
+    # Dados do nível hierárquico ativo
+    if categoria_id:
+        nivel_dados = repo.agrupar_por_produto_categoria(categoria_id, **filtros)
+        nivel_tipo = "produto"
+        nivel_titulo = f"Produtos em {sel_cat_nome}"
+    elif grupo_id:
+        nivel_dados = repo.agrupar_por_categoria(grupo_id, **filtros)
+        nivel_tipo = "categoria"
+        nivel_titulo = f"Por Categoria — {sel_grupo_nome}"
+    elif departamento_id:
+        nivel_dados = repo.agrupar_por_grupo(departamento_id, **filtros)
+        nivel_tipo = "grupo"
+        nivel_titulo = f"Por Grupo — {sel_depto_nome}"
+    else:
+        nivel_dados = repo.agrupar_por_departamento(**filtros)
+        nivel_tipo = "departamento"
+        nivel_titulo = "Por Departamento"
 
+    # Delta para cards (mês único selecionado)
+    delta_notas = delta_forn = delta_valor = delta_itens = None
     if ano_filtro and meses_filtro and len(meses_filtro) == 1 and len(meses_raw) > 1:
         yyyymm = ano_filtro + meses_filtro[0]
         idx = meses_raw.index(yyyymm) if yyyymm in meses_raw else -1
         if idx >= 0 and idx + 1 < len(meses_raw):
             mes_ant = meses_raw[idx + 1]
-            ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
-            filtros_ant = dict(ano=ano_ant, meses=[mes_num_ant], fornecedor=busca_forn, num_nota=busca_nota, produto=busca_prod)
-            metricas_ant = repo.metricas_globais(**filtros_ant)
-            delta_notas = metricas["total_notas"] - metricas_ant["total_notas"]
-            delta_forn = metricas["total_fornecedores"] - metricas_ant["total_fornecedores"]
-            delta_valor = metricas["valor_total_compras"] - metricas_ant["valor_total_compras"]
-            delta_itens = metricas["total_itens_comprados"] - metricas_ant["total_itens_comprados"]
+            filtros_ant = dict(ano=mes_ant[:4], meses=[mes_ant[4:]], fornecedor=None, num_nota=None, produto=None)
+            m_ant = repo.metricas_globais(**filtros_ant)
+            delta_notas = metricas["total_notas"] - m_ant["total_notas"]
+            delta_forn = metricas["total_fornecedores"] - m_ant["total_fornecedores"]
+            delta_valor = metricas["valor_total_compras"] - m_ant["valor_total_compras"]
+            delta_itens = metricas["total_itens_comprados"] - m_ant["total_itens_comprados"]
+
 finally:
     db.close()
 
-st.divider()
+# Totais do nível hierárquico
+if nivel_tipo == "produto":
+    grand_total_nivel = sum(r.vl_total or 0.0 for r in nivel_dados)
+else:
+    grand_total_nivel = sum(r.valor or 0.0 for r in nivel_dados)
+
+valor_card = grand_total_nivel if any(hier.values()) else metricas["valor_total_compras"]
+
+if nivel_tipo == "produto":
+    skus_card = len(nivel_dados)
+    skus_label = "Produtos no nível"
+else:
+    skus_card = sum(getattr(r, "qtd_skus", 0) or 0 for r in nivel_dados)
+    skus_label = "SKUs distintos" if any(hier.values()) else "Itens comprados"
+
+# ---------------------------------------------------------------------------
+# Cards de resumo
+# ---------------------------------------------------------------------------
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric(
-    "Notas de entrada",
-    f"{metricas['total_notas']:,}".replace(",", "."),
-    delta=f"{delta_notas:+d} vs mês anterior" if delta_notas is not None else None,
-    help="Total de NF-e de entrada (C100, ind_oper=0)",
+    "Valor Total Compras",
+    formatar_br(valor_card),
+    delta=f"{formatar_br(delta_valor)} vs mês anterior" if delta_valor is not None else None,
 )
 col2.metric(
+    "Notas de Entrada",
+    f"{metricas['total_notas']:,}".replace(",", "."),
+    delta=f"{delta_notas:+d} vs mês anterior" if delta_notas is not None else None,
+)
+col3.metric(
     "Fornecedores",
     f"{metricas['total_fornecedores']:,}".replace(",", "."),
     delta=f"{delta_forn:+d} vs mês anterior" if delta_forn is not None else None,
-    help="Fornecedores distintos pelo cod_part",
-)
-col3.metric(
-    "Valor total comprado",
-    formatar_br(metricas["valor_total_compras"]),
-    delta=f"{formatar_br(delta_valor)} vs mês anterior" if delta_valor is not None else None,
-    help="Soma do vl_doc de todas as notas de entrada",
 )
 col4.metric(
-    "Itens comprados",
-    f"{metricas['total_itens_comprados']:,}".replace(",", "."),
-    delta=f"{delta_itens:+d} vs mês anterior" if delta_itens is not None else None,
-    help="Total de linhas C170 de notas de entrada",
+    skus_label,
+    f"{skus_card:,}".replace(",", "."),
+    delta=f"{delta_itens:+d} vs mês anterior" if delta_itens is not None and nivel_tipo not in ("produto",) else None,
 )
+
+st.divider()
 
 # ---------------------------------------------------------------------------
 # Abas
 # ---------------------------------------------------------------------------
 
-st.divider()
-
-aba_geral, aba_forn, aba_cat, aba_prod, aba_notas = st.tabs([
+aba_geral, aba_cat, aba_forn, aba_notas = st.tabs([
     "Visão Geral",
+    "Por Categoria",
     "Fornecedores",
-    "Categorias",
-    "Produtos",
     "Notas e Itens",
 ])
 
@@ -252,15 +344,6 @@ aba_geral, aba_forn, aba_cat, aba_prod, aba_notas = st.tabs([
 # ===========================================================================
 
 with aba_geral:
-
-    db = next(get_session())
-    try:
-        repo = ComprasRepository(db, tenant_id)
-        evolucao = repo.evolucao_mensal(**filtros)
-        cfop_data = repo.distribuicao_cfop(**filtros)
-        top_forn = repo.agrupar_por_fornecedor(**filtros)
-    finally:
-        db.close()
 
     # --- Evolução mensal ---
     if evolucao:
@@ -302,119 +385,240 @@ with aba_geral:
     else:
         st.info("Sem dados de evolução mensal para os filtros selecionados.")
 
-    # --- Top 10 fornecedores + CFOP lado a lado ---
-    col_chart1, col_chart2 = st.columns(2)
+    st.divider()
 
-    with col_chart1:
-        st.subheader("Top 10 Fornecedores")
-        if top_forn:
-            top10 = top_forn[:10]
-            df_top = pd.DataFrame([{
-                "Fornecedor": nome_fornecedor(r),
-                "Valor (R$)": r.total_compras or 0.0,
-            } for r in top10])
-            df_top = df_top.sort_values("Valor (R$)", ascending=True)
+    # --- Share por Fabricante e Marca ---
+    st.subheader("Share por Fabricante e Marca")
 
-            fig_top = px.bar(
-                df_top, x="Valor (R$)", y="Fornecedor",
+    col_fab, col_marc = st.columns(2)
+
+    with col_fab:
+        st.markdown("**Top 10 Fabricantes**")
+        if dados_fabricante:
+            grand_fab = sum(r.valor or 0.0 for r in dados_fabricante)
+            top10_fab = dados_fabricante[:10]
+            df_fab = pd.DataFrame([{
+                "Fabricante": (r.nome or "Sem fabricante")[:35],
+                "Valor (R$)": r.valor or 0.0,
+                "Share (%)": (r.valor or 0.0) / grand_fab * 100 if grand_fab else 0.0,
+            } for r in top10_fab])
+            df_fab = df_fab.sort_values("Valor (R$)", ascending=True)
+
+            fig_fab = go.Figure(go.Bar(
+                x=df_fab["Valor (R$)"],
+                y=df_fab["Fabricante"],
                 orientation="h",
-                color="Valor (R$)",
-                color_continuous_scale="Blues",
-            )
-            fig_top.update_layout(**PLOTLY_LAYOUT, height=380, showlegend=False, coloraxis_showscale=False)
-            fig_top.update_traces(
-                text=[formatar_br(v) for v in df_top["Valor (R$)"]],
-                textposition="auto",
+                marker_color=AZUL,
+                text=[f"{p:.1f}%" for p in df_fab["Share (%)"]],
+                textposition="outside",
                 textfont=dict(size=10),
+            ))
+            fig_fab.update_layout(
+                **PLOTLY_LAYOUT,
+                xaxis_title="Valor (R$)",
+                height=max(300, len(df_fab) * 30 + 60),
+                showlegend=False,
             )
-            st.plotly_chart(fig_top, use_container_width=True)
-        else:
-            st.info("Nenhum fornecedor encontrado.")
+            st.plotly_chart(fig_fab, use_container_width=True)
 
-    with col_chart2:
+            # Aviso se maioria sem fabricante
+            sem_fab = next((r for r in dados_fabricante if r.nome == "Sem fabricante"), None)
+            if sem_fab and grand_fab:
+                pct_sem = (sem_fab.valor or 0.0) / grand_fab * 100
+                if pct_sem > 20:
+                    st.caption(f"⚠️ {pct_sem:.0f}% dos itens sem fabricante classificado")
+        else:
+            st.info("Nenhum fabricante identificado. Vincule marcas aos produtos no cadastro.")
+
+    with col_marc:
+        st.markdown("**Top 10 Marcas**")
+        if dados_marca:
+            grand_marc = sum(r.valor or 0.0 for r in dados_marca)
+            top10_marc = dados_marca[:10]
+            df_marc = pd.DataFrame([{
+                "Marca": (r.nome or "Sem marca")[:35],
+                "Fabricante": r.fabricante_nome or "—",
+                "Valor (R$)": r.valor or 0.0,
+                "Share (%)": (r.valor or 0.0) / grand_marc * 100 if grand_marc else 0.0,
+            } for r in top10_marc])
+            df_marc = df_marc.sort_values("Valor (R$)", ascending=True)
+
+            fig_marc = go.Figure(go.Bar(
+                x=df_marc["Valor (R$)"],
+                y=df_marc["Marca"],
+                orientation="h",
+                marker_color=VERDE,
+                text=[f"{p:.1f}%" for p in df_marc["Share (%)"]],
+                textposition="outside",
+                textfont=dict(size=10),
+            ))
+            fig_marc.update_layout(
+                **PLOTLY_LAYOUT,
+                xaxis_title="Valor (R$)",
+                height=max(300, len(df_marc) * 30 + 60),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_marc, use_container_width=True)
+
+            sem_marc = next((r for r in dados_marca if r.nome == "Sem marca"), None)
+            if sem_marc and grand_marc:
+                pct_sem = (sem_marc.valor or 0.0) / grand_marc * 100
+                if pct_sem > 20:
+                    st.caption(f"⚠️ {pct_sem:.0f}% dos itens sem marca classificada")
+        else:
+            st.info("Nenhuma marca identificada. Vincule marcas aos produtos no cadastro.")
+
+    st.divider()
+
+    # --- Distribuição por CFOP ---
+    if cfop_data:
         st.subheader("Distribuição por Finalidade (CFOP)")
-        if cfop_data:
-            # Agrupa CFOPs por finalidade
-            grupos = {}
-            for r in cfop_data:
-                grupo = CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros"
-                if grupo not in grupos:
-                    grupos[grupo] = {"Valor (R$)": 0.0, "Itens": 0}
-                grupos[grupo]["Valor (R$)"] += r.valor_total or 0.0
-                grupos[grupo]["Itens"] += r.qtd_itens or 0
+        grupos_cfop = {}
+        for r in cfop_data:
+            grupo = CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros"
+            if grupo not in grupos_cfop:
+                grupos_cfop[grupo] = {"Valor (R$)": 0.0, "Itens": 0}
+            grupos_cfop[grupo]["Valor (R$)"] += r.valor_total or 0.0
+            grupos_cfop[grupo]["Itens"] += r.qtd_itens or 0
 
-            df_cfop = pd.DataFrame([
-                {"Finalidade": g, "Valor (R$)": v["Valor (R$)"], "Itens": v["Itens"]}
-                for g, v in grupos.items()
-            ]).sort_values("Valor (R$)", ascending=False)
+        df_cfop = pd.DataFrame([
+            {"Finalidade": g, "Valor (R$)": v["Valor (R$)"], "Itens": v["Itens"]}
+            for g, v in grupos_cfop.items()
+        ]).sort_values("Valor (R$)", ascending=False)
 
-            cores_grupo = {
-                "Mercadoria p/ Revenda": AZUL,
-                "Transferências": COLOR_SEQ[5],
-                "Industrialização": AMBAR,
-                "Uso e Consumo": COLOR_SEQ[4],
-                "Ativo Imobilizado": COLOR_SEQ[1],
-                "Energia Elétrica": COLOR_SEQ[2],
-                "Bonificação/Doação": VERMELHO,
-                "Outros": "#97A0AF",
-            }
+        cores_grupo = {
+            "Mercadoria p/ Revenda": AZUL,
+            "Transferências": COLOR_SEQ[5] if len(COLOR_SEQ) > 5 else "#7986CB",
+            "Industrialização": AMBAR,
+            "Uso e Consumo": COLOR_SEQ[4] if len(COLOR_SEQ) > 4 else "#4DB6AC",
+            "Ativo Imobilizado": COLOR_SEQ[1] if len(COLOR_SEQ) > 1 else "#F48FB1",
+            "Energia Elétrica": COLOR_SEQ[2] if len(COLOR_SEQ) > 2 else "#80CBC4",
+            "Bonificação/Doação": VERMELHO,
+            "Outros": "#97A0AF",
+        }
 
-            fig_cfop = px.pie(
-                df_cfop, values="Valor (R$)", names="Finalidade",
-                hole=0.45,
-                color="Finalidade",
-                color_discrete_map=cores_grupo,
-            )
-            fig_cfop.update_layout(**PLOTLY_LAYOUT, height=380)
-            fig_cfop.update_traces(
-                textposition="inside",
-                textinfo="percent+label",
-                textfont=dict(size=11),
-            )
-            st.plotly_chart(fig_cfop, use_container_width=True)
+        import plotly.express as px
+        fig_cfop = px.pie(
+            df_cfop, values="Valor (R$)", names="Finalidade",
+            hole=0.45,
+            color="Finalidade",
+            color_discrete_map=cores_grupo,
+        )
+        fig_cfop.update_layout(**PLOTLY_LAYOUT, height=380)
+        fig_cfop.update_traces(
+            textposition="inside",
+            textinfo="percent+label",
+            textfont=dict(size=11),
+        )
+        st.plotly_chart(fig_cfop, use_container_width=True)
 
-            # Detalhamento por CFOP individual em expander
-            with st.expander("Ver detalhamento por CFOP"):
-                df_detalhe = pd.DataFrame([{
-                    "CFOP": r.cfop or "N/I",
-                    "Descrição": CFOP_DESCR.get(r.cfop, "Outros") if r.cfop else "N/I",
-                    "Finalidade": CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros",
-                    "Valor (R$)": r.valor_total or 0.0,
-                    "Itens": r.qtd_itens or 0,
-                } for r in cfop_data])
-                st.dataframe(
-                    df_detalhe,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
-                    },
-                )
-        else:
-            st.info("Nenhum dado de CFOP encontrado.")
+        with st.expander("Ver detalhamento por CFOP"):
+            df_detalhe = pd.DataFrame([{
+                "CFOP": r.cfop or "N/I",
+                "Descrição": CFOP_DESCR.get(r.cfop, "Outros") if r.cfop else "N/I",
+                "Finalidade": CFOP_GRUPO.get(r.cfop, "Outros") if r.cfop else "Outros",
+                "Valor (R$)": r.valor_total or 0.0,
+                "Itens": r.qtd_itens or 0,
+            } for r in cfop_data])
+            st.dataframe(df_detalhe, use_container_width=True, hide_index=True,
+                         column_config={"Valor (R$)": st.column_config.NumberColumn(format="R$ %.2f")})
 
 
 # ===========================================================================
-# ABA 2 — FORNECEDORES
+# ABA 2 — POR CATEGORIA (macro → micro)
+# ===========================================================================
+
+with aba_cat:
+
+    st.subheader(nivel_titulo)
+    st.caption(f"Nível: **{'›'.join(partes_hier) if partes_hier else 'Todos os Departamentos'}**")
+
+    if not nivel_dados:
+        st.info("Nenhum dado encontrado. Verifique se os produtos estão classificados.")
+    else:
+        # Cards do nível
+        total_itens_nivel = sum(getattr(r, "qtd_itens", 0) or 0 for r in nivel_dados) if nivel_tipo != "produto" else len(nivel_dados)
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Valor Total", formatar_br(grand_total_nivel))
+        col_m2.metric("SKUs distintos" if nivel_tipo != "produto" else "Produtos", f"{skus_card:,}".replace(",", "."))
+        col_m3.metric("Linhas de compra" if nivel_tipo != "produto" else "SKUs", f"{total_itens_nivel:,}".replace(",", "."))
+
+        # Gráfico de barras horizontais
+        if nivel_tipo == "produto":
+            nomes_chart = [(r.descricao_padrao or r.descr_item or r.cod_item or "—")[:40] for r in nivel_dados[:25]]
+            valores_chart = [r.vl_total or 0.0 for r in nivel_dados[:25]]
+        else:
+            nomes_chart = [(r.nome or "Não classificado")[:40] for r in nivel_dados[:25]]
+            valores_chart = [r.valor or 0.0 for r in nivel_dados[:25]]
+
+        pares = sorted(zip(valores_chart, nomes_chart), key=lambda x: x[0])
+        valores_ord = [p[0] for p in pares]
+        nomes_ord = [p[1] for p in pares]
+        pcts_ord = [v / grand_total_nivel * 100 if grand_total_nivel else 0.0 for v in valores_ord]
+
+        fig_cat = go.Figure(go.Bar(
+            x=valores_ord,
+            y=nomes_ord,
+            orientation="h",
+            marker_color=AZUL,
+            text=[f"{formatar_br(v)} ({p:.1f}%)" for v, p in zip(valores_ord, pcts_ord)],
+            textposition="outside",
+            textfont=dict(size=10),
+        ))
+        fig_cat.update_layout(
+            **PLOTLY_LAYOUT,
+            xaxis_title="Valor (R$)",
+            height=max(360, len(nomes_ord) * 28 + 80),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+        # Tabela detalhada
+        if nivel_tipo == "produto":
+            df_cat = pd.DataFrame([{
+                "Código": r.cod_item or "—",
+                "Descrição": r.descricao_padrao or r.descr_item or "—",
+                "Unidade": r.unid_inv or "—",
+                "Qtd. Total": r.qtd_total or 0.0,
+                "Valor Total (R$)": r.vl_total or 0.0,
+                "% do Nível": (r.vl_total or 0.0) / grand_total_nivel * 100 if grand_total_nivel else 0.0,
+                "Nº Notas": r.qtd_notas or 0,
+            } for r in nivel_dados])
+            st.dataframe(df_cat, use_container_width=True, hide_index=True, column_config={
+                "Qtd. Total": st.column_config.NumberColumn(format="%.3f"),
+                "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                "% do Nível": st.column_config.NumberColumn(format="%.1f %%"),
+            })
+        else:
+            df_cat = pd.DataFrame([{
+                "Nome": r.nome or "Não classificado",
+                "Valor Total (R$)": r.valor or 0.0,
+                "% do Total": (r.valor or 0.0) / grand_total_nivel * 100 if grand_total_nivel else 0.0,
+                "Linhas": r.qtd_itens or 0,
+                "SKUs": r.qtd_skus or 0,
+            } for r in nivel_dados])
+            st.dataframe(df_cat, use_container_width=True, hide_index=True, column_config={
+                "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                "% do Total": st.column_config.NumberColumn(format="%.1f %%"),
+            })
+
+        st.caption(f"{len(nivel_dados)} registro(s) | Total: {formatar_br(grand_total_nivel)}")
+
+
+# ===========================================================================
+# ABA 3 — FORNECEDORES
 # ===========================================================================
 
 with aba_forn:
 
-    db = next(get_session())
-    try:
-        repo = ComprasRepository(db, tenant_id)
-        por_fornecedor = repo.agrupar_por_fornecedor(**filtros)
-        forn_evolucao = repo.top_fornecedores_evolucao(limit=5, **filtros)
-    finally:
-        db.close()
-
     if not por_fornecedor:
         st.info("Nenhum fornecedor encontrado para os filtros selecionados.")
     else:
+        grand_total_forn = sum(r.total_compras or 0.0 for r in por_fornecedor)
+
         # --- Pareto de fornecedores ---
         st.subheader("Concentração de Fornecedores (Pareto)")
 
-        grand_total = sum(r.total_compras or 0.0 for r in por_fornecedor)
         acumulado = 0.0
         pareto_data = []
         for r in por_fornecedor:
@@ -423,7 +627,7 @@ with aba_forn:
             pareto_data.append({
                 "Fornecedor": nome_fornecedor(r),
                 "Valor (R$)": val,
-                "% Acumulado": (acumulado / grand_total * 100) if grand_total else 0.0,
+                "% Acumulado": (acumulado / grand_total_forn * 100) if grand_total_forn else 0.0,
             })
 
         df_pareto = pd.DataFrame(pareto_data[:20])
@@ -467,6 +671,7 @@ with aba_forn:
                 "Valor (R$)": r.valor_total or 0.0,
             } for r in forn_evolucao])
 
+            import plotly.express as px
             fig_forn_evo = px.line(
                 df_forn_evo, x="Mês", y="Valor (R$)", color="Fornecedor",
                 markers=True,
@@ -474,7 +679,7 @@ with aba_forn:
             fig_forn_evo.update_layout(**PLOTLY_LAYOUT, height=380)
             st.plotly_chart(fig_forn_evo, use_container_width=True)
 
-        # --- Tabela de fornecedores ---
+        # --- Tabela ranking ---
         st.subheader("Ranking de Fornecedores")
 
         df_forn = pd.DataFrame([{
@@ -485,7 +690,7 @@ with aba_forn:
             "Total ICMS (R$)": r.total_icms or 0.0,
             "Total PIS (R$)": r.total_pis or 0.0,
             "Total COFINS (R$)": r.total_cofins or 0.0,
-            "% do Total": (r.total_compras or 0.0) / grand_total * 100 if grand_total else 0.0,
+            "% do Total": (r.total_compras or 0.0) / grand_total_forn * 100 if grand_total_forn else 0.0,
         } for r in por_fornecedor])
 
         st.dataframe(
@@ -500,309 +705,9 @@ with aba_forn:
                 "% do Total": st.column_config.NumberColumn(format="%.1f %%"),
             },
         )
-        st.caption(f"{len(por_fornecedor)} fornecedor(es)")
-
-
-# ===========================================================================
-# ABA 3 — CATEGORIAS (classificação mercadológica)
-# ===========================================================================
-
-with aba_cat:
-
-    db = next(get_session())
-    try:
-        repo = ComprasRepository(db, tenant_id)
-
-        # ---- Filtros internos de hierarquia ----
-        deptos = db.query(Departamento).order_by(Departamento.descricao).all()
-        opcoes_depto = {d.descricao: d.id for d in deptos}
-
-        col_f1, col_f2, col_f3 = st.columns(3)
-        sel_depto = col_f1.selectbox("Departamento", ["Todos"] + list(opcoes_depto.keys()), key="cat_depto")
-        departamento_id_cat = opcoes_depto.get(sel_depto)
-
-        sel_grupo = "Todos"
-        sel_cat = "Todos"
-        grupo_id_cat = None
-        categoria_id_cat = None
-
-        if departamento_id_cat:
-            grupos = (
-                db.query(Grupo)
-                .filter(Grupo.departamento_id == departamento_id_cat)
-                .order_by(Grupo.descricao)
-                .all()
-            )
-            opcoes_grupo = {g.descricao: g.id for g in grupos}
-            sel_grupo = col_f2.selectbox("Grupo", ["Todos"] + list(opcoes_grupo.keys()), key="cat_grupo")
-            grupo_id_cat = opcoes_grupo.get(sel_grupo)
-
-            if grupo_id_cat:
-                cats = (
-                    db.query(Categoria)
-                    .filter(Categoria.grupo_id == grupo_id_cat)
-                    .order_by(Categoria.descricao)
-                    .all()
-                )
-                opcoes_cat = {c.descricao: c.id for c in cats}
-                sel_cat = col_f3.selectbox("Categoria", ["Todos"] + list(opcoes_cat.keys()), key="cat_cat")
-                categoria_id_cat = opcoes_cat.get(sel_cat)
-
-        # ---- Carregar dados do nível ativo ----
-        if categoria_id_cat:
-            nivel_label = f"{sel_depto} › {sel_grupo} › {sel_cat}"
-            nivel_dados = repo.agrupar_por_produto_categoria(categoria_id_cat, **filtros)
-            nivel_tipo = "produto"
-        elif grupo_id_cat:
-            nivel_label = f"{sel_depto} › {sel_grupo}"
-            nivel_dados = repo.agrupar_por_categoria(grupo_id_cat, **filtros)
-            nivel_tipo = "categoria"
-        elif departamento_id_cat:
-            nivel_label = sel_depto
-            nivel_dados = repo.agrupar_por_grupo(departamento_id_cat, **filtros)
-            nivel_tipo = "grupo"
-        else:
-            nivel_label = "Todos os Departamentos"
-            nivel_dados = repo.agrupar_por_departamento(**filtros)
-            nivel_tipo = "departamento"
-
-    finally:
-        db.close()
-
-    # ---- Breadcrumb ----
-    st.caption(f"Nível: **{nivel_label}**")
-
-    if not nivel_dados:
-        st.info("Nenhum dado encontrado. Verifique se os produtos estão classificados.")
-    else:
-        grand_total_cat = sum(r.valor or 0.0 for r in nivel_dados)
-
-        # ---- Cards de resumo ----
-        total_skus = sum(getattr(r, "qtd_skus", 0) or 0 for r in nivel_dados) if nivel_tipo != "produto" else len(nivel_dados)
-        total_itens_cat = sum(getattr(r, "qtd_itens", 0) or 0 for r in nivel_dados)
-
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("Valor Total", formatar_br(grand_total_cat))
-        col_m2.metric("SKUs distintos", f"{total_skus:,}".replace(",", "."))
-        col_m3.metric("Linhas de compra", f"{total_itens_cat:,}".replace(",", "."))
-
-        # ---- Gráfico de barras horizontais ----
-        if nivel_tipo == "produto":
-            nomes_chart = [(r.descricao_padrao or r.descr_item or r.cod_item or "—")[:40] for r in nivel_dados[:25]]
-            valores_chart = [r.vl_total or 0.0 for r in nivel_dados[:25]]
-        else:
-            nomes_chart = [(r.nome or "Não classificado")[:40] for r in nivel_dados[:25]]
-            valores_chart = [r.valor or 0.0 for r in nivel_dados[:25]]
-
-        # ordena crescente para barras horizontais (maior fica no topo)
-        pares = sorted(zip(valores_chart, nomes_chart), key=lambda x: x[0])
-        valores_ord = [p[0] for p in pares]
-        nomes_ord = [p[1] for p in pares]
-        pcts_ord = [v / grand_total_cat * 100 if grand_total_cat else 0.0 for v in valores_ord]
-
-        titulo_chart = {
-            "departamento": "Compras por Departamento",
-            "grupo": f"Grupos em {sel_depto}",
-            "categoria": f"Categorias em {sel_grupo}",
-            "produto": f"Produtos em {sel_cat}",
-        }[nivel_tipo]
-
-        fig_cat = go.Figure(go.Bar(
-            x=valores_ord,
-            y=nomes_ord,
-            orientation="h",
-            marker_color=AZUL,
-            text=[f"{formatar_br(v)} ({p:.1f}%)" for v, p in zip(valores_ord, pcts_ord)],
-            textposition="outside",
-            textfont=dict(size=10),
-        ))
-        fig_cat.update_layout(
-            **PLOTLY_LAYOUT,
-            title=titulo_chart,
-            xaxis_title="Valor (R$)",
-            height=max(360, len(nomes_ord) * 28 + 80),
-            showlegend=False,
-        )
-        st.plotly_chart(fig_cat, use_container_width=True)
-
-        # ---- Tabela detalhada ----
-        with st.expander("Ver tabela detalhada", expanded=False):
-            if nivel_tipo == "produto":
-                df_cat = pd.DataFrame([{
-                    "Código": r.cod_item or "—",
-                    "Descrição": r.descricao_padrao or r.descr_item or "—",
-                    "Unidade": r.unid_inv or "—",
-                    "Qtd. Total": r.qtd_total or 0.0,
-                    "Valor Total (R$)": r.vl_total or 0.0,
-                    "Nº Notas": r.qtd_notas or 0,
-                    "% do Nível": (r.vl_total or 0.0) / grand_total_cat * 100 if grand_total_cat else 0.0,
-                } for r in nivel_dados])
-                st.dataframe(
-                    df_cat,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Qtd. Total": st.column_config.NumberColumn(format="%.3f"),
-                        "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
-                        "% do Nível": st.column_config.NumberColumn(format="%.1f %%"),
-                    },
-                )
-            else:
-                df_cat = pd.DataFrame([{
-                    "Nome": r.nome or "Não classificado",
-                    "Valor Total (R$)": r.valor or 0.0,
-                    "Linhas": r.qtd_itens or 0,
-                    "SKUs": r.qtd_skus or 0,
-                    "% do Total": (r.valor or 0.0) / grand_total_cat * 100 if grand_total_cat else 0.0,
-                } for r in nivel_dados])
-                st.dataframe(
-                    df_cat,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
-                        "% do Total": st.column_config.NumberColumn(format="%.1f %%"),
-                    },
-                )
-            st.caption(f"{len(nivel_dados)} registro(s) | Total: {formatar_br(grand_total_cat)}")
-
-
-# ===========================================================================
-# ABA 4 — PRODUTOS
-# ===========================================================================
-
-with aba_prod:
-
-    db = next(get_session())
-    try:
-        repo = ComprasRepository(db, tenant_id)
-        por_produto = repo.agrupar_por_produto(**filtros)
-    finally:
-        db.close()
-
-    if not por_produto:
-        st.info("Nenhum produto encontrado para os filtros selecionados.")
-    else:
-        grand_total_prod = sum(r.vl_total or 0.0 for r in por_produto)
-
-        # --- Curva ABC ---
-        st.subheader("Curva ABC de Produtos")
-
-        acumulado = 0.0
-        abc_data = []
-        for r in por_produto:
-            val = r.vl_total or 0.0
-            acumulado += val
-            pct_acum = (acumulado / grand_total_prod * 100) if grand_total_prod else 0.0
-            if pct_acum <= 80:
-                classe = "A"
-            elif pct_acum <= 95:
-                classe = "B"
-            else:
-                classe = "C"
-            abc_data.append({
-                "Produto": (r.descr_item or r.cod_item or "—")[:30],
-                "Código": r.cod_item or "—",
-                "Valor (R$)": val,
-                "% Acumulado": pct_acum,
-                "Classe": classe,
-            })
-
-        df_abc = pd.DataFrame(abc_data)
-        total_a = len([x for x in abc_data if x["Classe"] == "A"])
-        total_b = len([x for x in abc_data if x["Classe"] == "B"])
-        total_c = len([x for x in abc_data if x["Classe"] == "C"])
-
-        # Cards resumo ABC
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Classe A (80% do valor)", f"{total_a} produtos")
-        col_b.metric("Classe B (80-95%)", f"{total_b} produtos")
-        col_c.metric("Classe C (95-100%)", f"{total_c} produtos")
-
-        # Gráfico top 20 com curva acumulada
-        df_abc_top = df_abc.head(20)
-        cores_abc = {"A": AZUL, "B": AMBAR, "C": "#BDBDBD"}
-
-        fig_abc = go.Figure()
-        for classe in ["A", "B", "C"]:
-            mask = df_abc_top["Classe"] == classe
-            if mask.any():
-                fig_abc.add_trace(go.Bar(
-                    x=df_abc_top.loc[mask, "Produto"],
-                    y=df_abc_top.loc[mask, "Valor (R$)"],
-                    name=f"Classe {classe}",
-                    marker_color=cores_abc[classe],
-                ))
-        fig_abc.add_trace(go.Scatter(
-            x=df_abc_top["Produto"],
-            y=df_abc_top["% Acumulado"],
-            name="% Acumulado",
-            yaxis="y2",
-            mode="lines+markers",
-            line=dict(color=VERMELHO, width=2),
-            marker=dict(size=5),
-        ))
-        fig_abc.add_hline(y=80, line_dash="dash", line_color="rgba(79,139,249,0.4)", annotation_text="80%", yref="y2")
-        fig_abc.add_hline(y=95, line_dash="dash", line_color="rgba(255,167,38,0.4)", annotation_text="95%", yref="y2")
-        fig_abc.update_layout(
-            **PLOTLY_LAYOUT,
-            barmode="stack",
-            yaxis=dict(title="Valor (R$)", showgrid=True, gridcolor="rgba(128,128,128,0.2)"),
-            yaxis2=dict(title="% Acumulado", overlaying="y", side="right", range=[0, 105]),
-            height=420,
-            xaxis=dict(tickangle=-45),
-        )
-        st.plotly_chart(fig_abc, use_container_width=True)
-
-        # --- Top 20 produtos (barras horizontais) ---
-        st.subheader("Top 20 Produtos por Valor de Compra")
-
-        df_top_prod = pd.DataFrame([{
-            "Produto": (r.descr_item or r.cod_item or "—")[:35],
-            "Valor (R$)": r.vl_total or 0.0,
-        } for r in por_produto[:20]])
-        df_top_prod = df_top_prod.sort_values("Valor (R$)", ascending=True)
-
-        fig_top_prod = px.bar(
-            df_top_prod, x="Valor (R$)", y="Produto",
-            orientation="h",
-            color="Valor (R$)",
-            color_continuous_scale="Blues",
-        )
-        fig_top_prod.update_layout(**PLOTLY_LAYOUT, height=max(350, len(df_top_prod) * 28), showlegend=False, coloraxis_showscale=False)
-        fig_top_prod.update_traces(
-            text=[formatar_br(v) for v in df_top_prod["Valor (R$)"]],
-            textposition="auto",
-            textfont=dict(size=10),
-        )
-        st.plotly_chart(fig_top_prod, use_container_width=True)
-
-        # --- Tabela completa ---
-        st.subheader("Detalhamento por Produto")
-
-        df_prod = pd.DataFrame([{
-            "Código": r.cod_item or "—",
-            "Descrição": r.descr_item or "—",
-            "Unidade": r.unid_inv or "—",
-            "Qtd. Total": r.qtd_total or 0.0,
-            "Vlr. Total (R$)": r.vl_total or 0.0,
-            "Preço Médio (R$)": r.preco_medio or 0.0,
-            "Nº Notas": r.qtd_notas,
-            "% do Total": (r.vl_total or 0.0) / grand_total_prod * 100 if grand_total_prod else 0.0,
-        } for r in por_produto])
-
-        st.dataframe(
-            df_prod,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Qtd. Total": st.column_config.NumberColumn(format="%.3f"),
-                "Vlr. Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
-                "Preço Médio (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
-                "% do Total": st.column_config.NumberColumn(format="%.1f %%"),
-            },
-        )
-        st.caption(f"{len(por_produto)} produto(s) distintos")
+        st.caption(f"{len(por_fornecedor)} fornecedor(es) | Total: {formatar_br(grand_total_forn)}")
+        if partes_hier:
+            st.caption(f"ℹ️ Filtrado por: {' › '.join(partes_hier)}")
 
 
 # ===========================================================================
@@ -811,13 +716,27 @@ with aba_prod:
 
 with aba_notas:
 
+    # Filtros locais da aba
+    col_forn_det, col_nota_det, col_prod_det = st.columns(3)
+    busca_forn = col_forn_det.text_input("Fornecedor", placeholder="CNPJ ou parte do nome", key="compras_forn_det")
+    busca_nota = col_nota_det.text_input("Nº da Nota", placeholder="Ex: 000123456", key="compras_nota_det")
+    busca_prod = col_prod_det.text_input("Produto", placeholder="Código ou descrição", key="compras_prod_det")
+
+    filtros_det = dict(
+        ano=ano_filtro,
+        meses=meses_filtro,
+        fornecedor=busca_forn.strip() or None,
+        num_nota=busca_nota.strip() or None,
+        produto=busca_prod.strip() or None,
+    )
+
     # --- Notas de Entrada ---
     st.subheader("Notas de Entrada")
 
     db = next(get_session())
     try:
         repo = ComprasRepository(db, tenant_id)
-        notas = repo.listar_notas(**filtros)
+        notas = repo.listar_notas(**filtros_det)
     finally:
         db.close()
 
@@ -863,7 +782,7 @@ with aba_notas:
     db = next(get_session())
     try:
         repo = ComprasRepository(db, tenant_id)
-        itens_rows = repo.listar_itens(**filtros)
+        itens_rows = repo.listar_itens(**filtros_det)
     finally:
         db.close()
 
