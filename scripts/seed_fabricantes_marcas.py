@@ -28,7 +28,7 @@ from app.models.marca import Marca
 DADOS: list[tuple[str, list[str]]] = [
     ("Nestlé",               ["Nescafé", "Nescau", "Leite Moça", "KitKat", "Passatempo", "Bono", "Negresco", "Galak", "Charge", "Prestígio", "Maggi", "Purina"]),
     ("Unilever",             ["Hellmann's", "Knorr", "Kibon", "Dove", "Rexona", "OMO", "Comfort", "Seda", "Tresemmé", "Lux"]),
-    ("Ambev",                ["Brahma", "Skol", "Antarctica", "Guaraná Antarctica", "Pepsi", "H2OH!", "Gatorade", "Budweiser", "Stella Artois", "Corona"]),
+    ("Ambev",                ["Brahma", "Skol", "Antarctica", "Guaraná Antarctica", "Pepsi", "H2OH!", "Gatorade", "Budweiser", "Stella Artois", "Corona", "Beats"]),
     ("Coca-Cola FEMSA",      ["Coca-Cola", "Fanta", "Sprite", "Schweppes", "Del Valle", "Crystal", "Powerade", "Monster", "Ades"]),
     ("PepsiCo",              ["Pepsi", "Elma Chips", "Ruffles", "Doritos", "Cheetos", "Toddynho", "Quaker", "Gatorade", "H2OH!"]),
     ("Mondelez",             ["Lacta", "Oreo", "Bis", "Trident", "Club Social", "Tang", "Halls", "Sonho de Valsa", "Bubbaloo"]),

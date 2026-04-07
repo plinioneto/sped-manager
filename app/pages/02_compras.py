@@ -7,6 +7,7 @@ from app.components.sidebar import render_sidebar
 from app.utils.db import get_session
 from app.utils.formatters import formatar_cnpj
 from app.repositories.compras_repo import ComprasRepository
+from app.models.categoria import Departamento, Grupo, Categoria
 from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
 if not st.session_state.get("tenant_id"):
@@ -238,9 +239,10 @@ col4.metric(
 
 st.divider()
 
-aba_geral, aba_forn, aba_prod, aba_notas = st.tabs([
+aba_geral, aba_forn, aba_cat, aba_prod, aba_notas = st.tabs([
     "Visão Geral",
     "Fornecedores",
+    "Categorias",
     "Produtos",
     "Notas e Itens",
 ])
@@ -502,7 +504,171 @@ with aba_forn:
 
 
 # ===========================================================================
-# ABA 3 — PRODUTOS
+# ABA 3 — CATEGORIAS (classificação mercadológica)
+# ===========================================================================
+
+with aba_cat:
+
+    db = next(get_session())
+    try:
+        repo = ComprasRepository(db, tenant_id)
+
+        # ---- Filtros internos de hierarquia ----
+        deptos = db.query(Departamento).order_by(Departamento.descricao).all()
+        opcoes_depto = {d.descricao: d.id for d in deptos}
+
+        col_f1, col_f2, col_f3 = st.columns(3)
+        sel_depto = col_f1.selectbox("Departamento", ["Todos"] + list(opcoes_depto.keys()), key="cat_depto")
+        departamento_id_cat = opcoes_depto.get(sel_depto)
+
+        sel_grupo = "Todos"
+        sel_cat = "Todos"
+        grupo_id_cat = None
+        categoria_id_cat = None
+
+        if departamento_id_cat:
+            grupos = (
+                db.query(Grupo)
+                .filter(Grupo.departamento_id == departamento_id_cat)
+                .order_by(Grupo.descricao)
+                .all()
+            )
+            opcoes_grupo = {g.descricao: g.id for g in grupos}
+            sel_grupo = col_f2.selectbox("Grupo", ["Todos"] + list(opcoes_grupo.keys()), key="cat_grupo")
+            grupo_id_cat = opcoes_grupo.get(sel_grupo)
+
+            if grupo_id_cat:
+                cats = (
+                    db.query(Categoria)
+                    .filter(Categoria.grupo_id == grupo_id_cat)
+                    .order_by(Categoria.descricao)
+                    .all()
+                )
+                opcoes_cat = {c.descricao: c.id for c in cats}
+                sel_cat = col_f3.selectbox("Categoria", ["Todos"] + list(opcoes_cat.keys()), key="cat_cat")
+                categoria_id_cat = opcoes_cat.get(sel_cat)
+
+        # ---- Carregar dados do nível ativo ----
+        if categoria_id_cat:
+            nivel_label = f"{sel_depto} › {sel_grupo} › {sel_cat}"
+            nivel_dados = repo.agrupar_por_produto_categoria(categoria_id_cat, **filtros)
+            nivel_tipo = "produto"
+        elif grupo_id_cat:
+            nivel_label = f"{sel_depto} › {sel_grupo}"
+            nivel_dados = repo.agrupar_por_categoria(grupo_id_cat, **filtros)
+            nivel_tipo = "categoria"
+        elif departamento_id_cat:
+            nivel_label = sel_depto
+            nivel_dados = repo.agrupar_por_grupo(departamento_id_cat, **filtros)
+            nivel_tipo = "grupo"
+        else:
+            nivel_label = "Todos os Departamentos"
+            nivel_dados = repo.agrupar_por_departamento(**filtros)
+            nivel_tipo = "departamento"
+
+    finally:
+        db.close()
+
+    # ---- Breadcrumb ----
+    st.caption(f"Nível: **{nivel_label}**")
+
+    if not nivel_dados:
+        st.info("Nenhum dado encontrado. Verifique se os produtos estão classificados.")
+    else:
+        grand_total_cat = sum(r.valor or 0.0 for r in nivel_dados)
+
+        # ---- Cards de resumo ----
+        total_skus = sum(getattr(r, "qtd_skus", 0) or 0 for r in nivel_dados) if nivel_tipo != "produto" else len(nivel_dados)
+        total_itens_cat = sum(getattr(r, "qtd_itens", 0) or 0 for r in nivel_dados)
+
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Valor Total", formatar_br(grand_total_cat))
+        col_m2.metric("SKUs distintos", f"{total_skus:,}".replace(",", "."))
+        col_m3.metric("Linhas de compra", f"{total_itens_cat:,}".replace(",", "."))
+
+        # ---- Gráfico de barras horizontais ----
+        if nivel_tipo == "produto":
+            nomes_chart = [(r.descricao_padrao or r.descr_item or r.cod_item or "—")[:40] for r in nivel_dados[:25]]
+            valores_chart = [r.vl_total or 0.0 for r in nivel_dados[:25]]
+        else:
+            nomes_chart = [(r.nome or "Não classificado")[:40] for r in nivel_dados[:25]]
+            valores_chart = [r.valor or 0.0 for r in nivel_dados[:25]]
+
+        # ordena crescente para barras horizontais (maior fica no topo)
+        pares = sorted(zip(valores_chart, nomes_chart), key=lambda x: x[0])
+        valores_ord = [p[0] for p in pares]
+        nomes_ord = [p[1] for p in pares]
+        pcts_ord = [v / grand_total_cat * 100 if grand_total_cat else 0.0 for v in valores_ord]
+
+        titulo_chart = {
+            "departamento": "Compras por Departamento",
+            "grupo": f"Grupos em {sel_depto}",
+            "categoria": f"Categorias em {sel_grupo}",
+            "produto": f"Produtos em {sel_cat}",
+        }[nivel_tipo]
+
+        fig_cat = go.Figure(go.Bar(
+            x=valores_ord,
+            y=nomes_ord,
+            orientation="h",
+            marker_color=AZUL,
+            text=[f"{formatar_br(v)} ({p:.1f}%)" for v, p in zip(valores_ord, pcts_ord)],
+            textposition="outside",
+            textfont=dict(size=10),
+        ))
+        fig_cat.update_layout(
+            **PLOTLY_LAYOUT,
+            title=titulo_chart,
+            xaxis_title="Valor (R$)",
+            height=max(360, len(nomes_ord) * 28 + 80),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+        # ---- Tabela detalhada ----
+        with st.expander("Ver tabela detalhada", expanded=False):
+            if nivel_tipo == "produto":
+                df_cat = pd.DataFrame([{
+                    "Código": r.cod_item or "—",
+                    "Descrição": r.descricao_padrao or r.descr_item or "—",
+                    "Unidade": r.unid_inv or "—",
+                    "Qtd. Total": r.qtd_total or 0.0,
+                    "Valor Total (R$)": r.vl_total or 0.0,
+                    "Nº Notas": r.qtd_notas or 0,
+                    "% do Nível": (r.vl_total or 0.0) / grand_total_cat * 100 if grand_total_cat else 0.0,
+                } for r in nivel_dados])
+                st.dataframe(
+                    df_cat,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Qtd. Total": st.column_config.NumberColumn(format="%.3f"),
+                        "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                        "% do Nível": st.column_config.NumberColumn(format="%.1f %%"),
+                    },
+                )
+            else:
+                df_cat = pd.DataFrame([{
+                    "Nome": r.nome or "Não classificado",
+                    "Valor Total (R$)": r.valor or 0.0,
+                    "Linhas": r.qtd_itens or 0,
+                    "SKUs": r.qtd_skus or 0,
+                    "% do Total": (r.valor or 0.0) / grand_total_cat * 100 if grand_total_cat else 0.0,
+                } for r in nivel_dados])
+                st.dataframe(
+                    df_cat,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Valor Total (R$)": st.column_config.NumberColumn(format="R$ %.2f"),
+                        "% do Total": st.column_config.NumberColumn(format="%.1f %%"),
+                    },
+                )
+            st.caption(f"{len(nivel_dados)} registro(s) | Total: {formatar_br(grand_total_cat)}")
+
+
+# ===========================================================================
+# ABA 4 — PRODUTOS
 # ===========================================================================
 
 with aba_prod:

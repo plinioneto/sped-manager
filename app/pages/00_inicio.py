@@ -4,6 +4,7 @@ import pandas as pd
 import app.models
 
 from app.components.sidebar import render_sidebar
+from app.components.filtro_hierarquia import render_filtro_hierarquia
 from app.repositories.vendas_repo import VendasRepository
 from app.repositories.fiscal_repo import FiscalRepository
 from app.repositories.compras_repo import ComprasRepository
@@ -18,6 +19,19 @@ st.set_page_config(page_title="Início", layout="wide")
 render_sidebar()
 
 tenant_id = st.session_state.tenant_id
+
+# Filtro de hierarquia na sidebar
+_db_hier = next(get_session())
+try:
+    filtro_h = render_filtro_hierarquia(_db_hier, key_prefix="inicio")
+finally:
+    _db_hier.close()
+
+h_params = {
+    "departamento_id": filtro_h["departamento_id"],
+    "grupo_id": filtro_h["grupo_id"],
+    "categoria_id": filtro_h["categoria_id"],
+}
 
 MESES_NOME = {
     "01": "Jan", "02": "Fev", "03": "Mar", "04": "Abr",
@@ -66,19 +80,22 @@ try:
     mes_num_ant = mes_ant[4:] if mes_ant else None
 
     # Métricas de vendas — mês atual e anterior
-    metricas_v = repo_v.metricas_globais(ano_atual, [mes_num_atual]) if mes_atual else {}
-    metricas_v_ant = repo_v.metricas_globais(ano_ant, [mes_num_ant]) if mes_ant else {}
+    metricas_v = repo_v.metricas_globais(ano_atual, [mes_num_atual], **h_params) if mes_atual else {}
+    metricas_v_ant = repo_v.metricas_globais(ano_ant, [mes_num_ant], **h_params) if mes_ant else {}
 
     # Métricas fiscais — mês atual
-    metricas_f = repo_f.metricas_visao_geral(ano=ano_atual, meses=[mes_num_atual]) if mes_atual else {}
+    metricas_f = repo_f.metricas_visao_geral(ano=ano_atual, meses=[mes_num_atual], **h_params) if mes_atual else {}
 
     # Evolução mensal de vendas (últimos 6 meses)
-    evolucao = repo_v.evolucao_mensal()
+    evolucao = repo_v.evolucao_mensal(**h_params)
     evolucao_6 = evolucao[-6:] if len(evolucao) >= 6 else evolucao
 
     # Top 5 fornecedores do mês atual
-    top_forn = repo_c.agrupar_por_fornecedor(ano=ano_atual, meses=[mes_num_atual])
+    top_forn = repo_c.agrupar_por_fornecedor(ano=ano_atual, meses=[mes_num_atual], **h_params)
     top5_forn = top_forn[:5] if top_forn else []
+
+    # Composição do faturamento por departamento (mês atual)
+    composicao_depto = repo_v.composicao_por_departamento(ano=ano_atual, meses=[mes_num_atual]) if mes_atual else []
 
     # Último arquivo importado
     ultimo_arq = (
@@ -103,7 +120,19 @@ periodo_label = (
 )
 
 st.title("Início")
-st.caption(f"Período de referência: **{periodo_label}** — dados do mês mais recente importado")
+
+filtro_ativo = filtro_h["departamento_id"] or filtro_h["grupo_id"] or filtro_h["categoria_id"]
+caption_parts = [f"Período de referência: **{periodo_label}** — dados do mês mais recente importado"]
+if filtro_ativo:
+    nomes = []
+    if filtro_h["departamento_id"]:
+        nomes.append(f"Depto: {st.session_state.get('inicio_depto', '')}")
+    if filtro_h["grupo_id"]:
+        nomes.append(f"Grupo: {st.session_state.get('inicio_grupo', '')}")
+    if filtro_h["categoria_id"]:
+        nomes.append(f"Cat: {st.session_state.get('inicio_cat', '')}")
+    caption_parts.append(f"Filtro ativo: {' > '.join(nomes)}")
+st.caption(" | ".join(caption_parts))
 st.divider()
 
 # ------------------------------------------------------------------
@@ -219,6 +248,34 @@ with col_dir:
         st.plotly_chart(fig_forn, use_container_width=True)
     else:
         st.info("Sem dados de fornecedores.")
+
+# ------------------------------------------------------------------
+# Composição por departamento
+# ------------------------------------------------------------------
+
+if composicao_depto:
+    st.divider()
+    st.subheader(f"Faturamento por Departamento — {periodo_label}")
+    df_dep = pd.DataFrame(composicao_depto)
+    df_dep = df_dep.sort_values("valor", ascending=True)
+    total_dep = df_dep["valor"].sum()
+    df_dep["pct"] = df_dep["valor"] / total_dep * 100 if total_dep else 0.0
+
+    fig_dep = go.Figure(go.Bar(
+        x=df_dep["valor"],
+        y=df_dep["departamento"],
+        orientation="h",
+        marker_color=AZUL,
+        text=[f"{fmt_brl_int(v)} ({p:.1f}%)" for v, p in zip(df_dep["valor"], df_dep["pct"])],
+        textposition="outside",
+    ))
+    fig_dep.update_layout(
+        **PLOTLY_LAYOUT,
+        xaxis_title="Valor (R$)",
+        height=max(320, len(df_dep) * 28 + 80),
+        showlegend=False,
+    )
+    st.plotly_chart(fig_dep, use_container_width=True)
 
 st.divider()
 

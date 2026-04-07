@@ -1,0 +1,1064 @@
+﻿Total de produtos : 3870
+Com categoria     : 2811 (72.6%)
+Sem categoria     : 1059 (27.4%)
+
+=== Produtos SEM categoria (descricao_padrao) ===
+  [regra] agulha descart 13x0 45mm descarpack
+  [regra] aladdin continental branca 3536 garrafa 500ml
+  [regra] aladdin continental branca/verm/preto 3532 1l garrafa
+  [regra] aladdin massima rolha marrom/salmao 3241 1l garrafa
+  [regra] ambev retornavel garrafa 300ml
+  [regra] aminofort inj pearson 250ml
+  [manual] ave frango congelado seara kg
+  [regra] avental cca estampado
+  [manual] azeite oliva andorinha extra virgem vd 500ml
+  [manual] azeite oliva cordoba extra virgem vd 500ml
+  [manual] azeite oliva gallo extra virgem vd 500ml
+  [manual] azeite oliva gallo tipo unico vd 500ml
+  [manual] banana prata kg
+  [manual] beb lactea cemil morango 200ml
+  [manual] beb lactea damare chocolate 200ml
+  [manual] beb lactea damare morango 200ml
+  [manual] beb lactea ibituruna chocolate 1l
+  [manual] beb lactea ibituruna chocolate 200ml
+  [manual] beb lactea ibituruna morango 200ml
+  [manual] beb lactea ibituruna vitamina frutas 1l
+  [manual] beb lactea ibituruna vitamina frutas 200ml
+  [manual] beb lactea itambe chocolate 200ml
+  [manual] beb lactea itambe morango 200ml
+  [manual] beb lactea piracanjuba chocolate 200ml
+  [manual] beb lactea piracanjuba whey 15g protetor chocolate 250ml
+  [manual] beb lactea piracanjuba whey 15g protetor morango 250ml
+  [manual] beb lactea pulsi morango 1.1kg
+  [manual] beb lactea quatazinho chocolate 200ml
+  [manual] beb lactea toddynho chocolate 200ml
+  [manual] beb lactea toddynho chocolate levinho 200ml
+  [manual] beb lactea yoguedes coco 170g
+  [manual] beb lactea yoguedes coco 450g
+  [manual] beb lactea yoguedes coco 850g
+  [manual] beb lactea yoguedes morango 170g
+  [manual] beb lactea yoguedes morango 450g
+  [manual] beb lactea yoguedes morango 850g
+  [manual] beb lactea yoguedes sache morango 900g
+  [manual] beb lactea yoguedes sache morango 90g
+  [regra] benjamim forlux bipolar bco
+  [regra] benjamim forlux tripolar bco
+  [regra] biscoito aymore maria 185g
+  [regra] biscoito bauducco choco biscuit ao leite 80g
+  [regra] biscoito casaredo maria 350g
+  [regra] biscoito cruzeiro queijo 200g
+  [regra] biscoito marilan teens chocolate 80g
+  [regra] biscoito max paes palito cristal 450g
+  [regra] biscoito naga leite lact 800g zero
+  [regra] biscoito nesfit cacau/cereais 160g integral
+  [regra] biscoito nestle passatempo leite 150g
+  [regra] biscoito petisco tikinho 2kg
+  [regra] biscoito piraque leite maltado 132g
+  [regra] biscoito renata leite 170g
+  [regra] biscoito vitarella delicita cristal 414g
+  [regra] bloco c. acoplada limppano inspire frescor montanha 1un
+  [regra] bloco c. acoplada limppano inspire lavanda 1un
+  [regra] bobina picotada estrela grande 38x60 un 60un
+  [regra] bobina picotada estrela pequena 25 x 40un
+  [regra] body splash giovanna baby cherry 260ml
+  [regra] borracha mercur record 40 1un
+  [regra] bota boot minase sola borracha 41
+  [manual] brocolis cabeca un
+  [regra] bucha amort. inf. tras. op. pneu
+  [regra] bucha amortecedor traseiro l200 s10 bandinha
+  [regra] bucha banho cca vegetal
+  [regra] bucha banho cca vegetal oval dupla face
+  [regra] bucha barra estab. diant. fusion 06/
+  [regra] cabo usb am x bm 1.8mts ver 2.0 preto
+  [regra] cadeado pado 20mm
+  [regra] cadeado pado 30mm
+  [regra] cadeira exec.s/brc.pta curvim
+  [regra] caderno foroni broch capa mole 60f
+  [regra] cajuzinho noponto 200g
+  [regra] calca brim branca c/bolso un
+  [regra] calca termica nylon camara fria
+  [regra] calculadora
+  [regra] camomila incoreg 3g
+  [regra] caneca jaguar plastico ref infantil 7728un
+  [regra] caneca porc colorida ref32 150ml
+  [regra] canela casca incoreg 50g
+  [regra] canela casca incoreg 7g
+  [regra] canela moida incoreg 10g
+  [regra] canela moida incoreg plastico 30g tubo
+  [regra] canjiquinha pacha 1kg
+  [regra] caqui bandeja
+  [regra] carga ap dr jones razor 4l 4un
+  [regra] carga ap dr jones razor 6l 4un
+  [regra] carga gillette mach3 2un
+  [regra] carga gillette mach3 sensitive 2un
+  [manual] carne bovino acem kg
+  [manual] carne bovino alcatra kg
+  [manual] carne bovino contra file reserva kg
+  [manual] carne bovino costela friboi minga kg
+  [manual] carne bovino coxao duro angus kg
+  [manual] carne bovino coxao duro kg
+  [manual] carne bovino coxao duro swift black kg
+  [manual] carne bovino coxao mole kg
+  [manual] carne bovino fraldinha kg
+  [manual] carne bovino maca de peito kg
+  [manual] carne bovino musculo kg
+  [manual] carne bovino paleta kg
+  [regra] carrinho carga350k pneu/camara met
+  [regra] carrinho supermercado z a 130l
+  [regra] castanha caju fontini 150g
+  [regra] castanha para fontini sem casca 150g
+  [regra] cca listradao 58x78cm saco
+  [regra] cera bravo revitaliza amarela 750ml
+  [regra] cera liquido automotiva proauto super brilho 500ml
+  [regra] cera liquido brilhowax incolor 750ml
+  [regra] cera liquido ingleza ardosia incolor 750ml
+  [regra] cera liquido ingleza maxx incolor b.int. 750ml
+  [regra] cera pasta proauto carnauba 200g lata
+  [regra] cereal neston nestle vitamina maca/banana/mamao 400g
+  [regra] cereja em calda c/talo sicola 2kg
+  [manual] cerveja amstel lager latao 473ml
+  [manual] cerveja antarctica lata 350ml
+  [manual] cerveja antarctica latao 473ml
+  [manual] cerveja antarctica litrinho 300ml
+  [manual] cerveja antarctica sub lata zero 350ml
+  [manual] cerveja antarctica sub latao zero 473ml
+  [manual] cerveja baden cristal lata 350ml
+  [manual] cerveja bohemia lata 473ml
+  [manual] cerveja brahma alcool lata zero 350ml
+  [manual] cerveja brahma chopp lata 350ml
+  [manual] cerveja brahma chopp latao 473ml
+  [manual] cerveja brahma chopp litrinho 300ml
+  [manual] cerveja brahma chopp mega latao 550ml
+  [manual] cerveja brahma chopp pack c/ latao 12un
+  [manual] cerveja brahma duplo malte latao 473ml
+  [manual] cerveja brahma long neck 355ml
+  [manual] cerveja brahma malzbier lata 350ml
+  [manual] cerveja budweiser alcool long neck zero 330ml
+  [manual] cerveja budweiser latao 473ml
+  [manual] cerveja budweiser litrinho 300ml
+  [manual] cerveja budweiser long neck 330ml
+  [manual] cerveja caracu lata 350ml
+  [manual] cerveja corona cero sunbrew alcool long neck zero 330ml
+  [manual] cerveja corona extra latao 473ml
+  [manual] cerveja corona extra long neck 330ml
+  [manual] cerveja coronita extra long neck 210ml
+  [manual] cerveja eisenbah pilsen puro malte latao 473ml
+  [manual] cerveja eisenbahn puro malte pils long neck 355ml
+  [manual] cerveja estrella galicia puro malte lager lata 350ml
+  [manual] cerveja heineken alcool lata zero 350ml
+  [manual] cerveja heineken alcool long neck zero 330ml
+  [manual] cerveja heineken garrafa 600ml
+  [manual] cerveja heineken lata 350ml
+  [manual] cerveja heineken latao 473ml
+  [manual] cerveja heineken long neck 330ml
+  [manual] cerveja imperio pilsen latao 473ml
+  [manual] cerveja itaipava latao 473ml
+  [manual] cerveja itaipava mega latao 550ml
+  [manual] cerveja lata original 350ml
+  [manual] cerveja latao original 473ml
+  [manual] cerveja puro malte pilsen latao 473ml
+  [manual] cerveja skol lata 350ml
+  [manual] cerveja skol latao 473ml
+  [manual] cerveja skol litrinho 300ml
+  [manual] cerveja spaten munich garrafa 600ml
+  [manual] cerveja spaten munich lata 350ml
+  [manual] cerveja spaten munich latao 473ml
+  [manual] cerveja spaten munich long neck 330ml
+  [manual] cerveja stella artois garrafa 600ml
+  [manual] cerveja stella artois latao 473ml
+  [manual] cerveja stella artois long neck 330ml
+  [manual] cerveja stella artois pure gold long neck 330ml
+  [manual] cerveja therezopolis latao 473ml
+  [manual] cerveja therezopolis long neck 355ml
+  [regra] cestinho guarana
+  [regra] cevada corsetti torrada 500g
+  [regra] ch ip classica happy rosa/azul 25279 33/40
+  [regra] chaveiro emborrachado coelho
+  [regra] check out metalico
+  [regra] cheiro verde unid
+  [regra] chimichurri incoreg 10g
+  [manual] chocolate arcor barra 40 meio amargo 80g
+  [manual] chocolate arcor barra ao leite 80g
+  [manual] chocolate arcor barra branco 80g
+  [manual] chocolate arcor barra brigadeiro 80g
+  [manual] chocolate arcor barra inspiration 53 cacau 80g
+  [manual] chocolate arcor barra inspiration 70 cacau 80g
+  [manual] chocolate arcor barra rocklets 80g
+  [manual] chocolate arcor special amargo cast do para 60g
+  [manual] chocolate arcor special ao leite cast de caju 60g
+  [manual] chocolate arcor special branco cast caju 60g
+  [manual] chocolate arcor tortuguita baunilha 15.5g
+  [manual] chocolate arcor tortuguita branco 15.5g
+  [manual] chocolate arcor tortuguita brigadeiro 15.5g
+  [manual] chocolate arcor tortuguita snack baunilha 28g
+  [manual] chocolate arcor tortuguita snack brigadeiro 28g
+  [manual] chocolate dori disqueti chocolate 60g
+  [manual] chocolate dori disqueti chocolate ao leite 120g
+  [manual] chocolate garoto barra ao leite 80g
+  [manual] chocolate garoto barra branco 80g
+  [manual] chocolate garoto barra branco e negresco 80g
+  [manual] chocolate garoto barra caju e passas 80g
+  [manual] chocolate garoto barra cast caju 80g
+  [manual] chocolate garoto barra crocante 80g
+  [manual] chocolate garoto barra meio amargo 80g
+  [manual] chocolate garoto baton 2 em 1 duo 16g
+  [manual] chocolate garoto baton ao leite 16g
+  [manual] chocolate garoto baton branco 16g
+  [manual] chocolate garoto chocotrio negresco 90g
+  [manual] chocolate garoto crocante 25g
+  [manual] chocolate garoto talento amendoas e passas 85g
+  [manual] chocolate garoto talento avelas 85g
+  [manual] chocolate garoto talento branco cereais e passas 85g
+  [manual] chocolate garoto talento castanha do para 85g
+  [manual] chocolate garoto talento castanha para 25g
+  [manual] chocolate garoto talento meio amargo/amendoas 25g
+  [manual] chocolate harald confeiteiro barra meio amargo 1.01kg
+  [manual] chocolate harald top barra ao leite 1.01kg
+  [manual] chocolate lacta 5 star 40g
+  [manual] chocolate lacta ao leite 34g
+  [manual] chocolate lacta barra ao leite 80g
+  [manual] chocolate lacta barra laka 28g
+  [manual] chocolate lacta barra laka 80g
+  [manual] chocolate lacta laka 34g
+  [manual] chocolate linea ao leite lactose 30g zero
+  [manual] chocolate m m confet ao leite display 45g
+  [manual] chocolate m m confet ao leite tubo 30g
+  [manual] chocolate nestle barra classic meio amargo 80g
+  [manual] chocolate nestle chokito 32g
+  [manual] chocolate nestle kitkat ao leite 41.5g
+  [manual] chocolate nestle prestigio 33g
+  [manual] chocolate po garoto 50 cacau 200g
+  [manual] chocolate rocklets sortido 40g
+  [manual] chocolate selecta barra cobertura fracionada ao leite 1.01kg
+  [manual] chocolate selecta barra cobertura fracionada meio amargo 1.01kg
+  [manual] chocolate snickers 45g original
+  [manual] chocolate snickers branco 42g
+  [manual] chocolate snickers dark 42g
+  [manual] chocolate talento amendoas/ passas 25g
+  [manual] chocolate talento avelas 25g
+  [manual] chocolate talento branco cereais e passas 25g
+  [manual] chocolate tortuguita ovinhos ao leite 80g
+  [regra] chuv lorenzetti maxducha 5500w
+  [regra] cloro asa leste 1l
+  [regra] cloro asa leste 2l
+  [regra] cloro asa leste 5l
+  [regra] cloro gel magico mayor 2l
+  [regra] coalho ha la 200ml
+  [manual] coco seco kg
+  [manual] coentro grao incoreg 10g
+  [manual] coentro moido incoreg 10g
+  [regra] cola almasuper 20g
+  [regra] cola almasuper ultrarapido almata 20g
+  [regra] cola durepoxi 50g
+  [regra] cola durepoxi cartela 100g
+  [regra] cola mercur branca escolar 40g
+  [regra] cola mercur branca escolar 90g
+  [regra] cola superbonder 3g
+  [regra] cola three bond super 1000 2g
+  [regra] cola three bond super gel 3g
+  [regra] colher line silicone interica 27cm un original
+  [regra] colher sintonia labirinto preto 6pc
+  [regra] colher straw fest mista c/50 desnatado
+  [regra] conhaque alcatrao s j barra 900ml
+  [regra] conhaque dreher 900ml
+  [regra] conhaque presidente 900ml
+  [regra] conj. bocal b.22 hd completo
+  [regra] copo copoflex transp c/100 desnatado 200ml
+  [regra] copo dsecart copozan c/ 300ml
+  [regra] copo nadir americano 2010 190ml
+  [regra] copo nadir americano duplo 2710 300ml
+  [regra] copo plastico erca graduado 500ml
+  [regra] copo totalplast c/100 desnatado 200ml
+  [regra] copo totalplast trans desnatado 100un
+  [regra] corda varal aco policorda 20 mts
+  [regra] corda varal plastico policorda n 5 10m
+  [regra] cortador de unhas enox grande
+  [regra] cortador de unhas enox pequeno
+  [regra] cortador de unhas mundial flex grande
+  [manual] couve flor cabeca un
+  [regra] coxa sobrecoxa avivar defumada 800g
+  [regra] coxinha da asa sadia empanada 400g
+  [regra] cravo da india incoreg 30g
+  [regra] cravo da india incoreg 7g
+  [regra] cream cheese canto de minas 150g
+  [regra] creme avela nutella 140g
+  [regra] creme avela nutella 350g
+  [regra] creme confeiteiro fleischmann 1kg
+  [regra] creme dent prevent antiplaca 90g
+  [regra] creme multifuncional yamasterol babosa 200g
+  [regra] creme nivea 56g lata
+  [regra] cupom sorteio trade ajino
+  [regra] curcuma acafrao nutrimais 100g
+  [regra] curry incoreg 10g
+  [regra] desengripante lub fast spray 300ml
+  [regra] desentupidor diabo verde 1l
+  [regra] desentupidor diabo verde 300g
+  [manual] desodorante alma de flores spray baunilha 90ml
+  [manual] desodorante alma de flores spray classico 90ml
+  [manual] desodorante avanco spray original 85ml
+  [manual] desodorante dove aero fem amora 150ml
+  [manual] desodorante dove aero fem antibac cuida e protege 150ml
+  [manual] desodorante dove aero fem beauty finish 150ml
+  [manual] desodorante dove aero fem go fresh pepino/cha verde 150ml
+  [manual] desodorante dove aero fem go fresh roma e verbena 150ml
+  [manual] desodorante dove aero original 150ml
+  [manual] desodorante dove rollon fem go fresh roma e verbena 50ml
+  [manual] desodorante dove rollon invisible dry 50ml
+  [manual] desodorante dove rollon men care invisible dry 50ml
+  [manual] desodorante dove rollon men cuidado total 50ml
+  [manual] desodorante dove rollon men s/perfume 50ml
+  [manual] desodorante dove rollon original 50ml
+  [manual] desodorante giovanna baby rollon blue 2un
+  [manual] desodorante giovanna baby rollon blue 50ml
+  [manual] desodorante giovanna baby rollon cherry 2un
+  [manual] desodorante giovanna baby rollon classic 50ml
+  [manual] desodorante herbissimo spray tradicional 90ml
+  [manual] desodorante monange rollon flor lavanda 50ml
+  [manual] desodorante monange rollon hidratacao intensiva 50ml
+  [manual] desodorante nivea aero fem b w invisible clear 150ml
+  [manual] desodorante nivea aero fem black pearl beauty 150ml
+  [manual] desodorante nivea aero fem dermo clareador 150ml
+  [manual] desodorante nivea aero fem dry comfort plus 150ml
+  [manual] desodorante nivea aero fem fresh natural 150ml
+  [manual] desodorante nivea aero fem fresh sensation 150ml
+  [manual] desodorante nivea aero fem pearl beauty 150ml
+  [manual] desodorante nivea aero fem protect care 150ml
+  [manual] desodorante nivea aero fem sem perfume 150ml
+  [manual] desodorante nivea aero men b w fresh 150ml
+  [manual] desodorante nivea aero men deep amadeirado 150ml
+  [manual] desodorante nivea aero men dry impact 150ml
+  [manual] desodorante nivea aero men fresh sensation 150ml
+  [manual] desodorante nivea aero men protect original 150ml
+  [manual] desodorante nivea aero men sensitive protect 150ml
+  [manual] desodorante nivea rollon fem dry confort 50ml
+  [manual] desodorante nivea rollon fem pearl beaut 50ml
+  [manual] desodorante nivea rollon fem protec care 50ml
+  [manual] desodorante nivea rollon fem s/perfume 50ml
+  [manual] desodorante nivea rollon men black/white 50ml
+  [manual] desodorante nivea rollon men dry fresh 50ml
+  [manual] desodorante nivea rollon men dry impact 50ml
+  [manual] desodorante nivea rollon men protect original 50ml
+  [manual] desodorante nivea spray fem fresh 0 natural 90ml
+  [manual] desodorante nivea spray men fresh active 90ml
+  [manual] desodorante rexona aero clinical men clean
+  [manual] desodorante rexona aero fem cotton dry 150ml
+  [manual] desodorante rexona aero fem frutas vermelhas 150ml
+  [manual] desodorante rexona aero fem invisible 150ml
+  [manual] desodorante rexona aero fem powder dry 150ml
+  [manual] desodorante rexona aero fem stay fresh bamboo 150ml
+  [manual] desodorante rexona aero men active dry 150ml
+  [manual] desodorante rexona aero men antibacterial 150ml
+  [manual] desodorante rexona aero men antibacterial invisible 150ml
+  [manual] desodorante rexona aero men impacto 150ml
+  [manual] desodorante rexona aero men invisible 150ml
+  [manual] desodorante rexona aero men sem perfume 150ml
+  [manual] desodorante rexona aero men v8 150ml
+  [manual] desodorante rexona aero men xtracool 150ml
+  [manual] desodorante rexona rollon fem antibac invisible 50ml
+  [manual] desodorante rexona rollon fem cotton dry 50ml
+  [manual] desodorante rexona rollon fem powder dry 50ml
+  [manual] desodorante rexona rollon fem s/perfume 50ml
+  [manual] desodorante rexona rollon fem stay fresh 50ml
+  [manual] desodorante rexona rollon men active dry 50ml
+  [manual] desodorante rexona rollon men antibac invisible 50ml
+  [manual] desodorante rexona rollon men invisible 50ml
+  [manual] desodorante rexona rollon men s/perfume 50ml
+  [manual] desodorante rexona rollon men v8 50ml
+  [manual] desodorante rexona rollon men xtracool 50ml
+  [manual] desodorante skala rollon erva doce 60ml
+  [manual] desodorante skala rollon rosas amendoas 60ml
+  [manual] desodorante tabu spray 90ml
+  [manual] desodorante tres marchand spray classic 100ml
+  [regra] deterg spa soft neutro 5l
+  [regra] diesel aditivado
+  [regra] diesel comum
+  [regra] difusor amb coala lavanda 100ml
+  [regra] disco corte 7 1/2
+  [regra] display tamanho p piraque p/ baseline
+  [regra] drink pronto beats gt lata 269ml
+  [regra] drink pronto beats red mix lata 269ml
+  [regra] drink pronto beats senses lata 269ml
+  [regra] drink pronto beats tropical lata 269ml
+  [regra] edu guedes incoreg 10g
+  [regra] erva doce incoreg 200g
+  [regra] erva doce incoreg 50g
+  [regra] erva doce incoreg 7g
+  [regra] escorredor lava tudo plasutil ref 2607un
+  [regra] escova brubalar vaso sanitario un
+  [regra] escova condor madeira lavar ref.16
+  [regra] escova smart vaso sanitario com suporte
+  [regra] escova smart vaso sanitario unitario
+  [regra] espelho coa facil n 14
+  [regra] espelho coa facil n 16
+  [regra] espelho coa facil n 18
+  [regra] espeto churrasco fiat lux bambu 25cm 50un
+  [regra] espeto gaucho grill duplo 75cm
+  [regra] espuma barbear above men suavizante 200ml
+  [regra] espuma magica proauto aerossol 400ml
+  [regra] espuma magica proauto gatilho 500ml
+  [regra] estopa branca 150g
+  [regra] etanol comum
+  [regra] etiquetas p/ balanca 40x40
+  [regra] extensao megatron 03m
+  [regra] extensao megatron 03mt 3saida
+  [regra] extensao megatron 05mt 3saida
+  [regra] extrato jaborandi bio extratus natural 100ml
+  [regra] faca sintonia labirinto preto 6pc
+  [regra] faca tramontina carbon ref 22950/107
+  [manual] farinha de milho pacha 500g
+  [manual] farinha de rosca pacha 500g
+  [manual] farinha lactea nestle lata 360g
+  [manual] farinha lactea nestle sache 160g
+  [manual] farinha mandioca amarela kg
+  [manual] farinha mandioca branca kg
+  [manual] farinha milho yoki kimilho 500g
+  [manual] farinha trigo dona benta c/fermento 1kg
+  [manual] farinha trigo dona benta s/fermento 1kg
+  [manual] farinha trigo fontini s/fermento 1kg
+  [manual] farinha trigo rosa branca s/fermento 1kg
+  [regra] ferro passar roupa black decker antiad 127w
+  [regra] fervedor aluminio antiaderente n14
+  [regra] fervedor aluminio antiaderente n16
+  [regra] file de peito aurora bdj 1kg
+  [regra] file de peito perdigao bdj 1kg
+  [regra] file de peito pif paf bdj 1kg
+  [regra] file de peito rivelli bdj 1kg
+  [regra] file de peito seara bdj 1kg
+  [regra] filtro a.c. palio strda siena ideia 01/
+  [regra] filtro ar cond. l200 triton pajero dakar 07/
+  [regra] filtro ar l200 4x4 01/09 frontier 2.8 02/07
+  [regra] filtro combustivel strada fci 1660
+  [regra] fita isolante adelbras 05mx19mm
+  [regra] fita veda rosca fitaflon 18mmx10m
+  [regra] flanela cca colorida 38x58cm
+  [regra] flanela cca ouro 38x58 cm
+  [regra] flanelao cca 58x78cm
+  [regra] fluido p/ freios hi tech dot3 500ml
+  [regra] folha de louro incoreg 40g
+  [regra] folha de louro incoreg 5g
+  [regra] fralda evolution jumbinho eg desnatado 14un
+  [regra] fralda evolution jumbinho g desnatado 18un
+  [regra] fralda evolution jumbinho m desnatado 20un
+  [regra] fralda evolution jumbinho p desnatado 24un
+  [regra] fralda personal baby jumbo g desnatado 22un
+  [regra] fralda personal baby jumbo m desnatado 26un
+  [regra] fralda personal baby jumbo p desnatado 28un
+  [regra] fralda personal baby jumbo xg desnatado 18un
+  [regra] fralda personal jumbo xxg desnatado 16un
+  [regra] fritadeira air fr. cadense 1300w pto 3.8l
+  [regra] fuba mimoso anchieta 1kg
+  [regra] fumo juriti desf 22g
+  [regra] funil alves plastico n 3
+  [regra] funil alves plastico n 4 ref.100
+  [regra] gancho giratorio p/carne grande inox
+  [regra] garfo sintonia labirinto preto 6pc
+  [regra] garrafao term invicta azul 3l
+  [regra] garrafao term invicta azul 5l
+  [regra] garrafeira plastico ambev 24 gfa 300ml
+  [regra] gasolina comum
+  [regra] gaveta din preta gd56m elgin bematech
+  [regra] gel bozzano amarelo protecao solar 300g
+  [regra] gel fix bozzano bri molh 300g
+  [regra] gel kanechom gel fix amarelo 230g
+  [regra] gel kanechom gel fix azul 230g
+  [regra] gema liquida inovo lata 1l
+  [regra] gengibre incoreg 10g
+  [regra] gengibre kg
+  [regra] gertec terminal consulta busca preco
+  [regra] glicerina farmax aloe vera 100ml
+  [manual] goiaba in natura kg
+  [regra] goma alvorada kg
+  [regra] goma elastica p/cedula mercur 2.2un
+  [regra] grampo p/ cabelo darma preto c/100 n 5
+  [regra] granola mae terra c/castanha 400g
+  [regra] granola tia sonia 200g
+  [regra] grao de bico pacha 500g
+  [regra] graxa nugget liquido marrom 60ml
+  [regra] graxa nugget liquido preto 60ml
+  [regra] graxa nugget pasta preto 36g
+  [regra] grelha comprel galv 30x40cm
+  [regra] guarnicao acabamento alargador paralamas preto
+  [regra] hastes flex topz pote 150un
+  [regra] hot dog par ou impar saco 50un
+  [regra] iec papel mix 7 c/500 saco 5kg
+  [regra] iec papel mix c/500 saco 10kg
+  [regra] impressora fiscal term elgin i9 usb
+  [regra] isqueiro bic maxi
+  [regra] japona camara fria azul
+  [regra] jarra colorex ladrilhos 5412 1 2l
+  [regra] jarra nitron c/tpa ref032 2l
+  [regra] jogo copo nadir amazon 2049 190ml
+  [regra] jogo copo sm zumba c/6
+  [regra] k-othrine saco 30ml
+  [regra] kit feijoada duporco 1kg
+  [manual] kit refrigerante coca cola coca cola 2l zero
+  [manual] kit refrigerante coca cola fanta guarana 2l
+  [manual] kit refrigerante coca cola fanta laranja 2l
+  [manual] kiwi nacional kg
+  [regra] lamina bic chrome platinum c/5
+  [regra] lamina wilkinson c/ 3un
+  [manual] laranja bahia kg
+  [manual] laranja pera rio kg
+  [regra] leave in elseve cicatri renov reparacao total 5 50ml
+  [regra] leitor cb li fixo vsi 410 - prix toledo
+  [regra] leitor de codigo de barras elgin ei8600
+  [manual] limao kg
+  [regra] limpa aluminio magico 500ml
+  [regra] limpa pedra sanlimp 1l
+  [regra] limpa pisos asa leste 2l
+  [regra] limpa pisos azulim lavanda 1l
+  [regra] limpa pisos uau porcelanatos e cer. 750ml
+  [regra] liquidificador mondial easy power l-550 550w 127v
+  [regra] lixa p/ unha santa clara big canario amarela un
+  [regra] lixa unha darma ref.207
+  [regra] lona preta max lona 4x1.00mt
+  [regra] lubrax avante 10w40
+  [regra] lubrax essencial 2t
+  [regra] luminaria led 18w 6500k emb.qua.bl
+  [manual] maca argentina in natura kg
+  [manual] maca in natura kg
+  [manual] macarrao barbalho semola espaguete n8 500g
+  [manual] macarrao barilla ovos espaguete n8 500g
+  [manual] macarrao barilla risoni 500g
+  [manual] macarrao don sapore ovos espaguete 8 500g
+  [manual] macarrao don sapore ovos parafuso 500g
+  [manual] macarrao flor de lis ovos parafuso 500g
+  [manual] macarrao mara azul semola espaguete 5 1kg
+  [manual] macarrao mara azul semola espaguete 8 1kg
+  [manual] macarrao mara azul semola espaguete 8 500g
+  [manual] macarrao mara semola apara 5kg
+  [manual] macarrao oregon espaguete 8 500g
+  [manual] macarrao oregon pai nosso 500g
+  [manual] macarrao oregon parafuso 500g
+  [manual] macarrao periquito ovos curvinha 500g
+  [manual] macarrao periquito semola curvinha 500g
+  [manual] macarrao periquito semola dente 500g
+  [manual] macarrao periquito semola espaguete 1kg
+  [manual] macarrao periquito semola espaguete 500g
+  [manual] macarrao periquito semola padre nosso 500g
+  [manual] macarrao periquito semola parafuso 500g
+  [manual] macarrao periquito semola penne 500g
+  [manual] macarrao santa amalia ovos alfabeto 500g
+  [manual] macarrao santa amalia ovos ave maria 500g
+  [manual] macarrao santa amalia ovos boca leao 500g
+  [manual] macarrao santa amalia ovos caracol 500g
+  [manual] macarrao santa amalia ovos conchinha 500g
+  [manual] macarrao santa amalia ovos espaguete n 8 500g
+  [manual] macarrao santa amalia ovos espaguete n10 500g
+  [manual] macarrao santa amalia ovos linguine 500g
+  [manual] macarrao santa amalia ovos padre nosso 500g
+  [manual] macarrao santa amalia ovos parafuso 500g
+  [manual] macarrao santa amalia ovos parafuso vegetais 500g
+  [manual] macarrao santa amalia semola ave maria 500g
+  [manual] macarrao santa amalia semola espaguete n10 500g
+  [manual] macarrao santa amalia semola espaguete n8 1kg
+  [manual] macarrao santa amalia semola espaguete n8 500g
+  [manual] macarrao santa amalia semola padre nosso 500g
+  [manual] macarrao santa amalia semola parafuso 500g
+  [manual] macarrao santa amalia semola pena 500g
+  [manual] macarrao vilma ovos aletria cabelo anjo 500g
+  [manual] macarrao vilma ovos ave maria 500g
+  [manual] macarrao vilma ovos caracol 500g
+  [manual] macarrao vilma ovos espaguete 10 500g
+  [manual] macarrao vilma ovos espaguete 3 500g
+  [manual] macarrao vilma ovos espaguete 8 500g
+  [manual] macarrao vilma ovos gnocchi 500g
+  [manual] macarrao vilma ovos linguine 500g
+  [manual] macarrao vilma ovos ninho 1 500g
+  [manual] macarrao vilma ovos ninho 3 500g
+  [manual] macarrao vilma ovos pai nosso 500g
+  [manual] macarrao vilma ovos pappardelle 500g
+  [manual] macarrao vilma ovos parafuso 500g
+  [manual] macarrao vilma ovos parafuso tricolor 500g
+  [manual_sem_cat] macarrao vilma ovos penne 500g
+  [manual_sem_cat] macarrao vilma ovos serpentinni 500g
+  [manual_sem_cat] macarrao vilma ovos tubetti 500g
+  [manual_sem_cat] macarrao vilma semola ave maria 500g
+  [manual_sem_cat] macarrao vilma semola caracol 500g
+  [manual_sem_cat] macarrao vilma semola espaguete 10 500g
+  [manual_sem_cat] macarrao vilma semola espaguete 8 1kg
+  [manual_sem_cat] macarrao vilma semola espaguete 8 500g
+  [manual_sem_cat] macarrao vilma semola linguine 500g
+  [manual_sem_cat] macarrao vilma semola ninho 3 500g
+  [manual_sem_cat] macarrao vilma semola pai nosso 500g
+  [manual_sem_cat] macarrao vilma semola parafuso 500g
+  [manual_sem_cat] macarrao vilma semola penne 500g
+  [regra] mamadeira petita azul premium 240ml
+  [regra] mamadeira petita rosa premium 240ml
+  [regra] mamadeira petita sil ort azul premium 240ml
+  [regra] mamadeira petita sil ort rosa premium 240ml
+  [manual] mamao havai kg
+  [regra] mandiokita pif paf 300g
+  [manual] manga kg
+  [regra] mangueira combustivel 5mm lonada preco p/ metro
+  [regra] mangueira intercooler l200 sport hpe 03
+  [regra] mangueira lava auto psi flexivel
+  [manual] maracuja kg
+  [regra] marmita term treviso 1 8l
+  [regra] marrom glace predilecta 350g
+  [regra] mascara forever liss botox 250g zero
+  [regra] mascara forever liss oil argan 250g
+  [regra] mascara pantene hidratacao 270ml
+  [regra] mascara tratamento pantene pro-v restauracao 270ml
+  [regra] mascara tratamento pantene provolone nutricao umectante 270ml
+  [manual_sem_cat] massa biscoito queijo compr arte e cia 3.3kg
+  [manual_sem_cat] massa pao de cebola arte e cia 60g 3.3kg
+  [manual_sem_cat] massa pao doce boleado hamb. arte e cia 80g 3.3kg
+  [manual_sem_cat] massa pao doce caracol arte e cia 70g 3.3kg
+  [manual_sem_cat] massa pao doce comprido arte e cia 70g 3.3kg
+  [manual_sem_cat] massa pao doce ferradura arte e cia 70g 3.3kg
+  [manual_sem_cat] massa pao fofinho arte e cia 3.3kg
+  [manual_sem_cat] massa pao tranca arte e cia 330g 3.3kg
+  [manual_sem_cat] massa pao trancinha arte e cia 70g 3.3kg
+  [manual_sem_cat] massa para tapioca amafil 500g
+  [manual_sem_cat] massa pastel dona bia bobina 500g
+  [manual_sem_cat] massa pastel dona bia grande 500g
+  [manual_sem_cat] massa pastel dona bia media 500g
+  [manual_sem_cat] massa rosca arte e cia 330g 3.3kg
+  [regra] mata bicheira fort sv 500ml
+  [regra] meia trifil feminina preto
+  [regra] meio da asa sadia iqf 1kg
+  [manual] mel verde e vida puro 500g
+  [manual] melancia kg
+  [manual] melao amarelo kg
+  [regra] mexerica importada kg
+  [regra] mexerica pocan kg
+  [regra] micro motor 1/25 bivolt helice plastica - n10-20/704 up/ eos/ elco/ ventech
+  [regra] mille c/tampa g pote 200un
+  [regra] mistura creme conf cremulzin 800g
+  [regra] mistura lactea condensada habitus 395g tetra pak
+  [manual] miudo bovino dobradinha kg
+  [manual] miudo bovino figado kg
+  [manual] molho alho supra ervas finas 150ml
+  [manual] molho barbecue predilecta bsng 200g
+  [manual] molho p/salada liza limao 234ml
+  [manual] molho p/salada liza rose 234ml
+  [manual] molho pimenta incoreg 150ml
+  [manual] molho pimenta incoreg extra forte 150ml
+  [manual] molho pimenta marata gota 150ml
+  [manual] molho pimenta supra alho e ervas 150g
+  [manual] molho pimenta supra biquinho cremoso 150ml
+  [manual] molho pimenta supra verde cremoso 150ml
+  [manual] molho predilecta bolonhesa sache 300g
+  [manual] molho shoyu incoreg 150ml
+  [manual] molho shoyu incoreg 900ml
+  [manual] molho shoyu sakura aji no shoyu 150ml
+  [manual] molho supra tartaro 380g
+  [manual] molho tomate heinz 240g tradicional
+  [manual] molho tomate pomarola caseiro sache 300g
+  [manual] molho tomate pomarola manjericao sache 300g
+  [manual] molho tomate pomarola sache 300g tradicional
+  [manual] molho tomate pomodoro sache 300g tradicional
+  [manual] molho tomate predilecta bolonhesa sache 300g
+  [manual] molho tomate predilecta ervas finas sache 300g
+  [manual] molho tomate predilecta hot dog sache 300g
+  [manual] molho tomate predilecta manjericao sache 300g
+  [manual] molho tomate predilecta parmegiana sache 300g
+  [manual] molho tomate predilecta refogado sache 300g tradicional
+  [manual] molho tomate tarantella sache 300g tradicional
+  [regra] monitor samsung 19p ls19c301fsmzd
+  [manual] morango in natura bdj
+  [regra] mucita sortido 10g
+  [regra] naftalina sanilar 50g
+  [regra] naftalina smart 30g
+  [regra] navalhete enox med inox
+  [regra] noz moscada incoreg 8g
+  [regra] noz moscada incoreg moida 8g
+  [regra] nozes fontini s/casca light 150g
+  [manual_sem_cat] oleo atalaia restaurador 120ml
+  [manual_sem_cat] oleo capil ricino vita seiva purissimo 60ml
+  [manual_sem_cat] oleo capil vita muriel abacate 80ml
+  [manual_sem_cat] oleo capil vita muriel babosa 80ml
+  [manual_sem_cat] oleo capil vita muriel jaborandi 80ml
+  [manual_sem_cat] oleo capil vita muriel ricino 100 30ml
+  [manual_sem_cat] oleo capil vita seiva rosa mosqueta 30ml
+  [manual_sem_cat] oleo coco copra s/sabor/cheiro 200ml
+  [manual_sem_cat] oleo coco vita seiva vegano 30ml
+  [manual_sem_cat] oleo composto maria cebola/alho pet 500ml
+  [manual_sem_cat] oleo composto maria lata tradicional 200ml
+  [manual_sem_cat] oleo composto maria lata tradicional 500ml
+  [manual_sem_cat] oleo composto maria pet tradicional 500ml
+  [manual_sem_cat] oleo girassol sinha pet 900ml
+  [manual_sem_cat] oleo milho sinha pet 900ml
+  [manual_sem_cat] oleo soja concordia pet 900ml
+  [manual_sem_cat] oleo soja liza pet 900ml
+  [manual_sem_cat] oleo soja vitaliv pet 900ml
+  [regra] oregano incoreg 100g
+  [regra] oregano incoreg 4g
+  [regra] oregano incoreg 50g
+  [manual] ovo branco un medio
+  [manual] ovo codorna cartela un
+  [regra] paliteiro santana clear
+  [regra] palito dente fiat lux bambu 240un
+  [regra] palito dente gina rolico madeira 100un
+  [regra] palito gina rolico madeira 200un
+  [regra] palito p/ unha paraju fino ponta un
+  [regra] pano microfribra cca 40x47
+  [regra] pano microfribra cca 50x70cm
+  [regra] paprica doce incoreg 10g
+  [regra] paprica doce incoreg defumada 10g
+  [regra] paprica picante incoreg 10g
+  [regra] parafuso roda fox/polo/golf/a3 un 3un
+  [regra] pasta adesiva limppano inspira citrus 3p
+  [regra] pasta adesiva limppano inspira lavanda 3p
+  [regra] pasta adesiva limppano inspira marine 3p
+  [regra] pasta adesiva pato lavanda c/3
+  [regra] pasta suspensa marmorizada plastificada sem acessorios
+  [regra] pastilha docile mini minty hortela 14g
+  [regra] pastilha docile mini minty hortela/lar. 14g
+  [regra] pastilha docile mini minty tutti-frutti 14g
+  [regra] pastilha hortela garoto 17g
+  [regra] pe de moca aritana 55g
+  [regra] pe de moleque aritana 60g
+  [regra] pecas carros/motos
+  [regra] pente ricca cabo borracha
+  [manual] pera kg
+  [regra] pescoco peru kg
+  [regra] petisco p/ cao lippy dog tirinhas carne 50g
+  [regra] petronas tutela calcio grafite fca 20kg
+  [regra] pilao santana plastico p/ tempero/caipirinha ref 643
+  [regra] pimenta biquinho bdj
+  [regra] pimenta biquinho supra 100g
+  [regra] pimenta cheiro pacote
+  [regra] pinha in natura kg
+  [regra] placa pci express 1x 2 porta serial
+  [regra] plastica 130l fechada branco acougue caixa
+  [regra] plastico 1.2l slim garrafa
+  [regra] plastico 20 x 30 virgem saco
+  [regra] plastico plasutil decanter n. york a1 garrafa 1l
+  [regra] porca roda tras/quadro elast
+  [regra] prendedor roupa arqplast plastico 12un
+  [regra] prendedor roupa mad baboardi 12un
+  [regra] proteina soja pacha text clara 400g
+  [regra] psyllium nutrimais 100g
+  [regra] pulverizador tiba graduado 550ml
+  [regra] quebra-queixo kadoces 600g
+  [manual] queijo coalho porto alegre espetos un
+  [manual] queijo parmesao itambe ralado 50g
+  [manual] queijo parmesao mineirinho ralado 40g
+  [manual] queijo parmesao santa amalia ralado 50g
+  [regra] querosene jacare 900ml
+  [regra] querosene thinsol 900ml
+  [regra] radiador mit l200 sport
+  [regra] ralador line 4faces original
+  [regra] ralador line inox 4 faces original
+  [regra] rapadura sitio peixotos 650g natural
+  [regra] rapadura sitio peixotos pe de moleque 500g
+  [regra] refletor led asus preto 50w 6500 biv
+  [manual] refrigerante coca cola cafe lata 220ml
+  [manual] refrigerante coca cola lata 350ml
+  [manual] refrigerante coca cola lata zero 350ml
+  [manual] refrigerante coca cola mini lata 220ml
+  [manual] refrigerante coca cola mini lata zero 220ml
+  [manual] refrigerante coca cola mini pet 200ml
+  [manual] refrigerante coca cola mini pet zero 200ml
+  [manual] refrigerante coca cola pet 2l
+  [manual] refrigerante coca cola pet 2l zero
+  [manual] refrigerante coca cola pet 600ml
+  [manual] refrigerante coca cola pet zero 600ml
+  [manual] refrigerante coca cola retornavel 2l
+  [manual] refrigerante fanta guarana lata 350ml
+  [manual] refrigerante fanta laranja lata 220ml
+  [manual] refrigerante fanta laranja lata 350ml
+  [manual] refrigerante fanta laranja mini pet 200ml
+  [manual] refrigerante fanta laranja pet 2l
+  [manual] refrigerante fanta uva lata 220ml
+  [manual] refrigerante fanta uva lata 350ml
+  [manual] refrigerante fanta uva pet 2l
+  [manual] refrigerante fys guarana lata 350ml
+  [manual] refrigerante h2oh limao pet 1.5l
+  [manual] refrigerante h2oh limao pet 500ml
+  [manual] refrigerante h2oh limoneto pet 1.5l
+  [manual] refrigerante h2oh limoneto pet 500ml
+  [manual] refrigerante it cola pet 2l
+  [manual] refrigerante it guarana pet 2l
+  [manual] refrigerante it laranja pet 2l
+  [manual] refrigerante it limao pet 2l
+  [manual] refrigerante mate cola pet 1 5 l
+  [manual] refrigerante mate cola pet 250ml
+  [manual] refrigerante mate cola pet 600ml
+  [manual] refrigerante pepsi black cola pet 2l zero
+  [manual] refrigerante pepsi black cola pet zero 200ml
+  [manual] refrigerante pepsi black lata zero 350ml
+  [manual] refrigerante pepsi black pet 1.5l
+  [manual] refrigerante pepsi cola pet 1l
+  [manual] refrigerante pepsi cola pet 200ml
+  [manual] refrigerante pepsi cola pet 2l
+  [manual] refrigerante pepsi cola pet 3l
+  [manual] refrigerante pepsi lata 350ml
+  [manual] refrigerante pepsi pet 1.5l
+  [manual] refrigerante pepsi twist pet 200ml
+  [manual] refrigerante pepsi twist pet 2l
+  [manual] refrigerante schweppes citrus lata original 350ml
+  [manual] refrigerante schweppes tonica lata 350ml
+  [manual] refrigerante soda limonada antarctica pet 200ml
+  [manual] refrigerante soda limonada antarctica pet 2l
+  [manual] refrigerante sprite lata 350ml
+  [manual] refrigerante sprite lemon fresh pet 1.5l
+  [manual] refrigerante sprite lemon fresh pet 510ml
+  [manual] refrigerante sprite mini lata 220ml
+  [manual] refrigerante sprite pet 2l
+  [manual] refrigerante sukita laranja lata 350ml
+  [manual] refrigerante sukita laranja pet 1l
+  [manual] refrigerante sukita laranja pet 200ml
+  [manual] refrigerante sukita laranja pet 2l
+  [manual] refrigerante sukita limao pet 2l
+  [manual] refrigerante sukita tubaina pet 2l
+  [manual] refrigerante sukita uva lata 350ml
+  [manual] refrigerante sukita uva pet 200ml
+  [manual] refrigerante sukita uva pet 2l
+  [manual] refrigerante tropical cola pet 2l
+  [manual] refrigerante tropical guarana pet 2l
+  [manual] refrigerante tropical laranja pet 2l
+  [manual] refrigerante tropical limao pet 2l
+  [manual] refrigerante tropical uva pet 2l
+  [regra] reparador pontas bicho seda brilho resina 170ml
+  [regra] reparador pontas oil bicho da seda 30ml
+  [regra] reparador pontas oil brilho seda 30ml
+  [manual] repolho verde kg
+  [manual_sem_cat] sabonete asa leste liquido erva doce 1l
+  [manual_sem_cat] sabonete asepxia detox 80g
+  [manual_sem_cat] sabonete davene la flore cereja 150g
+  [manual_sem_cat] sabonete davene la flore erva doce 150g
+  [manual_sem_cat] sabonete davene la flore lavanda 150g
+  [manual_sem_cat] sabonete davene la flore lichia 150g
+  [manual_sem_cat] sabonete davene la flore maracuja 150g
+  [manual_sem_cat] sabonete davene la flore uva roxa 150g
+  [manual_sem_cat] sabonete davene la flore vanila 150g
+  [manual_sem_cat] sabonete davene la fruta morango 150g
+  [manual_sem_cat] sabonete dove antibacteriano 90g
+  [manual_sem_cat] sabonete dove cremoso 90g original
+  [manual_sem_cat] sabonete dove erva doce 90g
+  [manual_sem_cat] sabonete dove esfoliante 90g suave
+  [manual_sem_cat] sabonete dove go fresh revigorante 90g
+  [manual_sem_cat] sabonete dove liquido nutricao profunda 250ml
+  [manual_sem_cat] sabonete elite sof barra relax 85g
+  [manual_sem_cat] sabonete farnese erva doce 180g
+  [manual_sem_cat] sabonete farnese erva doce 85g
+  [manual_sem_cat] sabonete farnese floral 180g
+  [manual_sem_cat] sabonete farnese frutas vermelhas 85g
+  [manual_sem_cat] sabonete farnese lavanda 180g
+  [manual_sem_cat] sabonete farnese liquido erva doce e hortela 500ml
+  [manual_sem_cat] sabonete farnese liquido flor de cerejeira/vanila 500ml
+  [manual_sem_cat] sabonete farnese liquido lavanda e menta 500ml
+  [manual_sem_cat] sabonete farnese morango e framboesa 180g
+  [manual_sem_cat] sabonete farnese puro hidratante 180g
+  [manual_sem_cat] sabonete flor de ype flor de baunilha e amendoas 85g
+  [manual_sem_cat] sabonete flor de ype flor de laranjeira e damasco 85g
+  [manual_sem_cat] sabonete flor de ype flor de maca e framboesa 85g
+  [manual_sem_cat] sabonete flor de ype fresia e pesseco 85g
+  [manual_sem_cat] sabonete flor de ype rosas brancas e avela 85g
+  [manual_sem_cat] sabonete flor ype sv bco garden argan 85g
+  [manual_sem_cat] sabonete francis brasilidades acerola 80g
+  [manual_sem_cat] sabonete francis brasilidades amora 80g
+  [manual_sem_cat] sabonete francis brasilidades capim limao 80g
+  [manual_sem_cat] sabonete francis brasilidades carambola 80g
+  [manual_sem_cat] sabonete francis brasilidades lima doce 80g
+  [manual_sem_cat] sabonete francis brasilidades manga rosa 80g
+  [manual_sem_cat] sabonete francis hidratante bco leite amendoas 90g
+  [manual_sem_cat] sabonete francis luxo az.orquidea 90g
+  [manual_sem_cat] sabonete francis luxo bco rosa bca/patcholi 90g
+  [manual_sem_cat] sabonete francis luxo bege groselha negra/cedro 90g
+  [manual_sem_cat] sabonete francis luxo hydratta marula madagascar 90g
+  [manual_sem_cat] sabonete francis luxo lilas lavanda 90g
+  [manual_sem_cat] sabonete francis luxo marinho 90g
+  [manual_sem_cat] sabonete francis luxo roma 90g
+  [manual_sem_cat] sabonete francis luxo rosa cerejeira/ylang 90g
+  [manual_sem_cat] sabonete francis luxo verde 90g
+  [manual_sem_cat] sabonete gipsy desejo morango 80g
+  [manual_sem_cat] sabonete gipsy energia amazonia 80g
+  [manual_sem_cat] sabonete gipsy perfume sonhos 80g
+  [manual_sem_cat] sabonete gipsy toque lavanda 80g
+  [manual_sem_cat] sabonete granado bebe liquido glicerina 250ml
+  [manual_sem_cat] sabonete granado bebe liquido refil glicerina 250ml
+  [manual_sem_cat] sabonete granado veg glicerina 90g
+  [manual_sem_cat] sabonete hidramais bebe liquido 500ml
+  [manual_sem_cat] sabonete hidramais liquido ameixa negra 500ml
+  [manual_sem_cat] sabonete hidramais liquido morango 500ml
+  [manual_sem_cat] sabonete iara 2 cores c/4 75g
+  [manual_sem_cat] sabonete isacare cuidado delicado 80g
+  [manual_sem_cat] sabonete johnsons baby liquido cabeca aos pes 200ml
+  [manual_sem_cat] sabonete lux bot buque de jasmim 125g
+  [manual_sem_cat] sabonete lux bot buque de jasmin 85g
+  [manual_sem_cat] sabonete lux bot flor de lotus 85g
+  [manual_sem_cat] sabonete lux bot flor de verbena 85g
+  [manual_sem_cat] sabonete lux bot lavanda 85g
+  [manual_sem_cat] sabonete lux bot lirio azul 125g
+  [manual_sem_cat] sabonete lux bot lirio azul 85g
+  [manual_sem_cat] sabonete lux bot rosas francesas 125g
+  [manual_sem_cat] sabonete lux bot rosas francesas 85g
+  [manual_sem_cat] sabonete nivea baunilha 85g
+  [manual_sem_cat] sabonete nivea creme care 90g
+  [manual_sem_cat] sabonete nivea erva doce e oleos 85g
+  [manual_sem_cat] sabonete nivea lavanda 85g
+  [manual_sem_cat] sabonete nivea leite 85g
+  [manual_sem_cat] sabonete nivea liquido oleo de banho 200ml
+  [manual_sem_cat] sabonete nivea orquideas 85g
+  [manual_sem_cat] sabonete palmolive aloe e oliva verd 150g
+  [manual_sem_cat] sabonete palmolive framb/turmalina 150g
+  [manual_sem_cat] sabonete palmolive hidrat c/karite 150g
+  [manual_sem_cat] sabonete palmolive jasmin/cacau 150g
+  [manual_sem_cat] sabonete palmolive naturals framb/amora 85g
+  [manual_sem_cat] sabonete palmolive naturals karite 85g
+  [manual_sem_cat] sabonete palmolive naturals leite/rosas 85g
+  [manual_sem_cat] sabonete palmolive naturals melan/lichia 85g
+  [manual_sem_cat] sabonete palmolive sensacao purificante 150g
+  [manual_sem_cat] sabonete palmolive tangerina/alecrim 150g
+  [manual_sem_cat] sabonete phebo amazonas 90g
+  [manual_sem_cat] sabonete phebo frescor da manha 90g
+  [manual_sem_cat] sabonete phebo lima da persia 90g
+  [manual_sem_cat] sabonete phebo naturelle 90g
+  [manual_sem_cat] sabonete phebo odor de rosas 90g
+  [manual_sem_cat] sabonete phebo patchouly 90g
+  [manual_sem_cat] sabonete phebo raiz do oriente 90g
+  [manual_sem_cat] sabonete phebo toque de lavanda 90g
+  [manual_sem_cat] sabonete pompom baby glicerinado 70g
+  [manual_sem_cat] sabonete pompom locao hidratante 70g
+  [manual_sem_cat] sabonete protex balance saudavel 85g
+  [manual_sem_cat] sabonete protex complete 12 85g
+  [manual_sem_cat] sabonete protex cream 85g
+  [manual_sem_cat] sabonete protex erva doce 85g
+  [manual_sem_cat] sabonete protex limpeza profunda 85g
+  [manual_sem_cat] sabonete protex macadamia 85g
+  [manual_sem_cat] sabonete protex omega 3 85g
+  [manual_sem_cat] sabonete protex vitamina e 85g
+  [regra] saboneteira erca c/tela
+  [regra] saboneteira plastico santa clara ref 1253un
+  [regra] saca rolha cb plastico viel
+  [regra] sacola retornavel medeiros media
+  [regra] sacola smart grande
+  [regra] sacola smart media
+  [regra] sacola smart pequena
+  [manual_sem_cat] sal aji sal parrila churrasco 500g
+  [manual_sem_cat] sal aji sal parrila churrasco c/ pimenta 500g
+  [manual_sem_cat] sal cavalinho refinado 1kg
+  [manual_sem_cat] sal dunorte refinado 1kg
+  [manual_sem_cat] sal nutri mais marinho integral 1kg
+  [manual_sem_cat] sal supra defumado fino 500g
+  [manual_sem_cat] sal supra parrilla chimichurri 270g
+  [manual_sem_cat] sal supra parrilla defumado 270g
+  [manual_sem_cat] sal supra parrilla lemon pepper 270g
+  [regra] saleiro santana clear
+  [regra] salsa in natura un
+  [regra] saquinhos chup-chup brasinha incoreg 100un
+  [regra] serquimica arla 32 - branca - lata 20l
+  [regra] serum elseve glycolic gloss 100ml
+  [regra] silicone m500 spray lavanda 300ml
+  [regra] silicone proauto gel alta performance perf. 150g
+  [regra] silicone proauto liquido secagem rapida 120ml
+  [regra] soda caustica escorpiao 500g pote
+  [regra] soda caustica escorpiao pote 1kg
+  [regra] soda caustica ita liquida 1l
+  [regra] soda caustica yara 950g
+  [regra] sopao maggi galinha caipira 200g
+  [regra] soquete polipropileno b-22 nr12
+  [regra] spray fixador careliss forte 150ml
+  [manual] suco aurora uva tinto tp 1.5l integral
+  [manual] suco aurora uva tinto vd 1.5l integral
+  [manual] suco aurora uva tinto vd 1l integral
+  [manual] suco campo largo uva pet 1.350l integral
+  [manual] suco campo largo uva pet integral 250ml
+  [manual] suco dafruta concentrado uva pet 500ml
+  [manual] suco del valle laranja tp 1l integral
+  [manual] suco del valle uva tp 1l integral
+  [manual] suco one laranja/ maca pet natural 180ml
+  [manual] suco one uva e maca blend pet natural 180ml
+  [regra] suporte fixacao de parede
+  [regra] tabua plastico alves p/corta frios ref12
+  [regra] tapete cca de piso lisa
+  [regra] tapete cca imperio 46x73cm
+  [regra] tapete cca malha c/malha
+  [regra] tapete cca malha xadrez
+  [regra] tapete cca popcorn antiderrapante un
+  [regra] tapioca amafil granulada media 500g
+  [regra] tecbril tecmotor total flex
+  [manual] tempero ana maria incoreg 10g
+  [manual] tempero baiano incoreg 10g
+  [manual] tempero baiano incoreg 200g
+  [manual] tempero incoreg completo pote 1kg
+  [manual] tempero incoreg completo pote 300g
+  [manual] tempero incoreg completo s/pimenta pote 1kg
+  [manual] tempero incoreg completo s/pimenta pote 300g
+  [manual] tempero incoreg sacola completo 500g
+  [manual] tempero incoreg sacola completo s/ pimenta 500g
+  [manual] tempero incoreg sacola sal e alho 500g
+  [manual] tempero incoreg sacola verde 500g
+  [manual] tempero incoreg sal e alho pote 1kg
+  [manual] tempero incoreg sal e alho pote 300g
+  [manual] tempero incoreg verde pote 1kg
+  [manual] tempero incoreg verde pote 300g
+  [manual] tempero knorr meu assado caipira 23g
+  [manual] tempero knorr meu assado limao/oregano 25g
+  [manual] tempero lemon pepper incoreg 20g
+  [manual] tempero mineiro incoreg 10g
+  [manual] tempero pacha sache carnes 50g
+  [manual] tempero pacha sache frango 50g
+  [manual] tempero pega marido incoreg 10g
+  [manual] tempero receita casa caseiro 450g
+  [manual] tempero sazon amarelo legumes 60g
+  [manual] tempero sazon branco arroz 60g
+  [manual] tempero sazon laranja massas 60g
+  [manual] tempero sazon lilas toque de alho 60g
+  [manual] tempero sazon marron feijao 60g
+  [manual] tempero sazon nordeste carn/ave/peixe 60g
+  [manual] tempero sazon verde frango 60g
+  [manual] tempero sazon vermelho carnes 60g
+  [regra] tenys pe baruel canforado aerosol 150ml
+  [regra] tenys pe baruel po 100g original
+  [regra] tenys pe baruel po action 100g
+  [regra] tenys pe baruel po canforado 100g
+  [regra] tenys pe baruel po woman 100g
+  [regra] tenys pe baruel protetor diaria aerosol 150ml
+  [regra] term aladdin continental preta 2028 1l garrafa
+  [regra] terramicina mais zoetis 50ml
+  [regra] tesoura escolar cis
+  [regra] tesoura escolar leonora inox 13cm
+  [regra] tingecor guarany preto 40g
+  [regra] toalha umed anjinho l100 p90
+  [regra] toalha umed personal baby 100un
+  [regra] toalha umed personal baby 50un
+  [regra] tonico capil natuhair ex alecrim 115ml
+  [regra] torrada bauducco 142g integral
+  [regra] torrada marilan magic toast 110g integral
+  [regra] torrada marilan magic toast peito de peru 110g
+  [regra] torresmo mais sabor pronto 100g
+  [regra] torresmo mais sabor pronto 50g
+  [regra] torresmo torresminas pronto 200g semidesnatado
+  [regra] torresmo torresminas pronto 70g
+  [regra] touca descartavel c/100
+  [regra] trigo pacha p/ quibe 500g
+  [regra] urna media
+  [manual] uva jubili nacional bdj
+  [manual] uva nacional kg
+  [manual] uva passa la violetera escura 100g
+  [manual] uva passas incoreg s/semente 150g
+  [manual] uva passas incoreg s/semente 60g
+  [manual] uva passas kg
+  [manual] uva thompson verde bandeja
+  [manual] uva vitoria s/ semente bdj
+  [regra] valvula liquida dosadora reposicao p/ reservatoriode saboneteira dosadora nobre top
+  [regra] vela aniver par ou impar big azul interrogacao
+  [regra] vela aniver par ou impar big bco interrogacao
+  [regra] vela aniver par ou impar big rosa interrogacao
+  [regra] vela par ou impar chama estrelar un
+  [regra] vela par ou impar fonte estrelar un
+  [regra] vela teiu gigante c/ 8un
+  [regra] vela teiu gigante citronela 90g 2un
+  [regra] velas mimo g c/8
+  [regra] velas mimo n 8 8un
+  [regra] velas teiu 08 c/ 34 g 8un
+  [regra] ventilador parede 60cm pt150w biv
+  [manual] vinho cancao tinto suave 750ml
+  [manual] vinho cantina serra tinto 1.5l
+  [manual] vinho cantina serra tinto 880ml
+  [manual] vinho concha y toro reservado cabernet sauvignon tinto 750ml
+  [manual] vinho concha y toro reservado sauvignon branco 750ml
+  [manual] vinho dom bosco tinto suave 750ml
+  [manual] vinho leao do norte jurubeba tinto seco 600ml
+  [manual] vinho pergola branco 1l suave
+  [manual] vinho pergola tinto 1l suave
+  [manual] vinho pergola tinto seco 1l
+  [manual] vinho presidente tinto suave 750ml
+  [regra] wrap wickbold 270g integral
+  [regra] xadrez g saco
+  [regra] ypf elayon f50 5w40 - plus - 12x1 lata 1l

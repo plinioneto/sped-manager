@@ -50,7 +50,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 ## Status das páginas
 | Página | Status | Observações |
 |--------|--------|-------------|
-| 00_inicio.py | ✅ concluído | resumo executivo: cards (faturamento, ICMS a pagar, ticket médio, PIS+COFINS), evolução últimos 6 meses, top 5 fornecedores, rodapé com última data e arquivo importado |
+| 00_inicio.py | ✅ concluído | resumo executivo: cards (faturamento, ICMS a pagar, ticket médio, PIS+COFINS), evolução últimos 6 meses, top 5 fornecedores, gráfico de composição por departamento (via C170 saída — aparece quando há itens de saída detalhados), filtro hierarquia Depto>Grupo>Cat na sidebar, rodapé com última data e arquivo importado |
 | 01_gestao_vendas.py | ✅ concluído | gestão de vendas: visão geral com evolução mensal, ritmo de vendas (heatmap dia×mês, histograma de ticket), mix comercial (CFOP/CST via C190), clientes B2B e notas; 2 filtros (período, dia da semana) |
 | 02_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
 | 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
@@ -137,9 +137,20 @@ Permitir que donos de grupos vejam dados consolidados de todas as lojas e filtre
 
 Compatibilidade garantida: tenant sem grupo funciona idêntico ao atual (`active_tenant_ids = [tenant.id]`).
 
+### 🟠 Etapa 3 — Gestão Macro→Micro (Depto > Grupo > Cat > Produto)
+
+Infraestrutura criada (2026-04-06): `app/components/filtro_hierarquia.py` + helpers em `base_repo.py` (`_filtro_hierarquia_via_doc`, `_filtro_hierarquia_via_item`, `_filtro_hierarquia_por_produto`). Página Início já integrada. **Limitação descoberta: supermercados não emitem C170 de saída → gráfico de composição por departamento de vendas só funcionará após importação XML.**
+
+Fases pendentes:
+- **Fase 2 (Compras):** `compras_repo.py` — `agrupar_por_departamento()`, `agrupar_por_grupo()`, `agrupar_por_categoria()`; `02_compras.py` — nova seção/aba de drill-down hierárquico
+- **Fase 3 (Fiscal):** `fiscal_repo.py` — carga tributária por departamento/grupo; `03_gestao_fiscal.py`
+- **Fase 4 (Vendas):** depende da importação XML para ter granularidade de produto nas saídas
+- **Fase 5 (Inventário):** `estoque_repo.py` / `inventario_repo.py` — saldo por departamento/grupo
+- **Fase 6 (Produtos):** unificar filtros parciais das abas 2 e 3 com `filtro_hierarquia.py`
+
 ### 🟡 Média prioridade — funcionalidades novas de valor
 
-- [ ] **Importação de NF-e XML** como fonte independente de dados (arquitetura decidida — ver seção abaixo)
+- [ ] **Importação de NF-e XML** como fonte independente de dados (arquitetura decidida — ver seção abaixo); **pré-requisito para Fase 4 da gestão macro→micro** (composição de vendas por departamento)
 - [ ] **Página `07_configuracoes.py`** — dados do tenant, gestão de usuários, código de acesso; escopo ainda a definir
 - [ ] **Padrão de cores** — todas as páginas usam cores diferentes; definir paleta de 5–6 cores e aplicar globalmente via constantes em `utils/` ou tema Streamlit
 
@@ -173,22 +184,23 @@ Compatibilidade garantida: tenant sem grupo funciona idêntico ao atual (`active
 - [x] Tokens desconhecidos salvos no banco para revisão futura
 - [x] Catálogo global de EAN (`catalogo_produtos`) — herança de classificação entre tenants; backfill rodado com 2.657 entradas
 - [x] GrupoEmpresarial — model + FK em Tenant + TenantService com 5 métodos; aba Clientes & Upload no admin com gestão de grupos
+- [x] Infraestrutura macro→micro: `filtro_hierarquia.py` (componente sidebar cascateado), helpers `_filtro_hierarquia_via_doc/item/por_produto` no `base_repo.py`; página Início integrada com filtro e gráfico de composição por departamento; repos `vendas`, `compras`, `fiscal` com params de hierarquia
 
 ## Checklist de testes — funcionalidades recentes (2026-04-06)
 
 ### 1. Banco de dados (verificação inicial)
-- [ ] `grupos_empresariais` existe no SQLite ✅
-- [ ] `tenants.grupo_id` existe ✅
-- [ ] `catalogo_produtos` tem 2.657 entradas ✅
+- [x] `grupos_empresariais` existe no SQLite ✅
+- [x] `tenants.grupo_id` existe ✅
+- [x] `catalogo_produtos` tem 2.657 entradas ✅
 
 ### 2. Admin — Grupos Empresariais (Seção D da aba Clientes & Upload)
-- [ ] Abrir `localhost:8501/08_admin_revisao`, logar com a senha admin
-- [ ] Ir para aba **Clientes & Upload** → rolar até **Grupos Empresariais**
-- [ ] Criar grupo: ex. "Rede GS"
-- [ ] Verificar que o grupo aparece na tabela com coluna "Lojas" vazia
+- [x] Abrir `localhost:8501/08_admin_revisao`, logar com a senha admin
+- [x] Ir para aba **Clientes & Upload** → rolar até **Grupos Empresariais**
+- [x] Criar grupo: ex. "Rede GS"
+- [x] Verificar que o grupo aparece na tabela com coluna "Lojas" vazia
 
 ### 3. Admin — Cadastrar GS Mercearia
-- [ ] Seção **Cadastrar novo cliente**: preencher nome "GS Mercearia", CNPJ correto
+- [x] Seção **Cadastrar novo cliente**: preencher nome "GS Mercearia", CNPJ correto
 - [ ] Selecionar grupo "Rede GS" no dropdown opcional
 - [ ] Clicar Cadastrar → verificar mensagem de sucesso
 - [ ] Verificar na tabela da Seção A que a GS aparece com coluna "Grupo: Rede GS"
@@ -303,6 +315,14 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 **Fabricantes** — `Nome | aliases separados por vírgula` (vai para `identificador.py`)
 
+**Combinações não adjacentes** — `{TOKEN_A, TOKEN_B}` → `Departamento > Grupo > Categoria` (vai para `categorizador.py` → `_VOCAB_COMBINACAO`)
+- Use quando dois tokens **juntos** definem uma categoria, mas podem aparecer separados por marca ou outros termos
+- Ex: "COCO ANCHIETA RALADO" — COCO e RALADO não são adjacentes, mas juntos indicam MERCEARIA DOCE > CULINARIA DOCE > COCO RALADO
+- Ex: "FARINHA DONA BENTA TRIGO 1KG" — FARINHA e TRIGO separados pela marca
+- Escreva os tokens em maiúsculo, separados por vírgula dentro de chaves
+- **Quando usar `> -` (sem categoria)**: se o match for apenas até o grupo (ex: FARINHA DE TRIGO é grupo, não categoria), coloque `-` no nível de categoria; o Claude usará `_match_por_grupo_nome` automaticamente
+- Prioridade: combinações são checadas APÓS bigramas adjacentes do `_VOCAB_CATEGORIA`, mas ANTES do `_VOCAB_TIPO_PRODUTO`; logo, só precisam cobrir casos que bigramas adjacentes não conseguem
+
 ---
 
 ### ✏️ Fila — preencha abaixo, peça "aplica a fila" quando quiser aplicar
@@ -310,15 +330,14 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 #### Abreviações
 <!-- formato: abrev → expansão -->
 
-
 #### Categorias
 <!-- formato: keyword → Departamento > Grupo > Categoria -->
 
+#### Combinações não adjacentes
+<!-- formato: {TOKEN_A, TOKEN_B} → Departamento > Grupo > Categoria (ou > - se só até o grupo) -->
 
 #### Marcas
 <!-- formato: Nome | Fabricante | alias1, alias2, ... -->
-
-
 #### Fabricantes
 <!-- formato: Nome | alias1, alias2, ... -->
 
@@ -384,6 +403,148 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 | 2026-04-03 | Marca | TIAL \| TIAL |
 | 2026-04-03 | Marca | PIF PAF \| PIF PAF ALIMENTOS \| alias: PIFPAF |
 | 2026-04-03 | Marca | AYMORE \| ARCOR \| alias: AYMORÉ |
+| 2026-04-06 | Combinação não adjacente | `COCO` + `RALADO` → Mercearia Doce > Culinária Doce > Coco Ralado |
+| 2026-04-06 | Combinação não adjacente | `BANANA` + `PASSA` → Mercearia Doce > Frutas Secas > Uva Passa |
+| 2026-04-06 | Combinação não adjacente | `ALHO` + `PO/GRANULADO/DESIDRATADO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
+| 2026-04-06 | Combinação não adjacente | `CEBOLA` + `FLOCOS/DESIDRATADA/PO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
+| 2026-04-06 | Combinação não adjacente | `TOMATE` + `SECO` → Mercearia Salgada > Conservas e Enlatados > Outras Conservas |
+| 2026-04-06 | Combinação não adjacente | `BATATA` + `CHIPS` → Mercearia Doce > Salgadinho > Batata Frita |
+| 2026-04-06 | Combinação não adjacente | `BATATA` + `SNACK` → Mercearia Doce > Salgadinho > Salgadinhos Sabores |
+| 2026-04-06 | Combinação não adjacente | `LEITE` + `COCO` → Mercearia Doce > Culinária Doce > Leite de Coco |
+| 2026-04-06 | Combinação não adjacente | `OLEO` + `COCO` → Mercearia Salgada > Óleo > Óleo de Coco |
+| 2026-04-06 | Combinação não adjacente | `FARINHA` + `MANDIOCA` → Commodities > Farináceos > Farinha de Mandioca |
+| 2026-04-06 | Combinação não adjacente | `FARINHA` + `TRIGO` → Commodities > Farinha de Trigo > - (nível grupo) |
+| 2026-04-06 | Combinação não adjacente | `ACUCAR` + `MASCAVO/REFINADO/CRISTAL/DEMERARA` → Commodities > Açúcar > subtipo |
+| 2026-04-06 | Abreviação | `whiskey` → whisky |
+| 2026-04-06 | Abreviação | `whisk` → whisky |
+| 2026-04-06 | Abreviação | `sard` → sardinha |
+| 2026-04-06 | Categoria | `mingau` → Mercearia Doce > Matinais > Cereais |
+| 2026-04-06 | Combinação não adjacente | `PESSEGO` + `CALDA` → Mercearia Doce > Sobremesas e Outros Doces > Compotas de Frutas |
+| 2026-04-06 | Combinação não adjacente | `PO` + `DESCOLORANTE` → Perfumaria > Produtos Capilares > Tintura / Descolorantes para Cabelo |
+| 2026-04-06 | Abreviação | `plast` → plastico |
+| 2026-04-06 | Abreviação | `beb` → bebida |
+| 2026-04-06 | Abreviação | `amant` → amanteigado |
+| 2026-04-06 | Abreviação | `bisc` → biscoito |
+| 2026-04-06 | Categoria | `bacia` → Bazar Geral > Utilidades da Cozinha (nível grupo) |
+| 2026-04-06 | Categoria | `club social` → Mercearia Doce > Biscoito Salgado > Água e Sal |
+| 2026-04-06 | Categoria | `biscoito amanteigado` → Mercearia Doce > Biscoito Doce > Biscoito Amenteigado (bridge grafia popular) |
+| 2026-04-06 | Combinação não adjacente | `AMEIXA` + `SECA` → Hortifruti > Frutas Secas > Frutas Secas / Cristalizadas |
+| 2026-04-06 | Combinação não adjacente | `SEQUILHO` + `LEITE` → Mercearia Doce > Biscoito Doce > Rosquinhas e Sequilhos |
+| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `AGUA` → Mercearia Doce > Biscoito Salgado > Água e Sal |
+| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `MAIZENA` → Mercearia Doce > Biscoito Doce > Biscoito Maizena |
+| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `RECHEADO` → Mercearia Doce > Biscoito Doce > Biscoito Recheado |
+| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `CRACKER` → Mercearia Doce > Biscoito Salgado > Cream Cracker |
+| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `AMANTEIGADO` → Mercearia Doce > Biscoito Doce > Biscoito Amenteigado |
+| 2026-04-06 | Combinação não adjacente | `BANANA` + `CHIPS` → Mercearia Doce > Salgadinho > Snacks |
+| 2026-04-06 | Combinação não adjacente | `BARRA` + `CEREAL` → Mercearia Doce > Mercearia Doce Light e Diet > Cereais em Barra |
+| 2026-04-06 | Combinação não adjacente | `BICARBONATO` + `SODIO` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-06 | Abreviação | `deseng` → desengordurante |
+| 2026-04-06 | Abreviação | `preserv` → preservativo |
+| 2026-04-06 | Categoria | `preservativo` → Perfumaria > Farmácia > Preservativos |
+| 2026-04-06 | Categoria | `banha` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
+| 2026-04-06 | Combinação não adjacente | `BANHA` + `SUINA` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
+| 2026-04-06 | Combinação não adjacente | `GORDURA` + `SUINA` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
+| 2026-04-06 | Combinação não adjacente | `SABAO` + `COCO` → Limpeza > Limpeza para Roupas > Sabão em Barra e Pasta |
+| 2026-04-06 | Combinação não adjacente | `BALDE` + `PLASTICO` → Bazar Geral > Utilidades da Cozinha > Baldes de Plástico |
+| 2026-04-06 | Categoria | `corante alimenticio` / `corante alimentar` → Mercearia Doce > Culinária Doce > Complementos (bigrama — evita conflito com corante de roupa) |
+| 2026-04-06 | Categoria | `anilina` → Mercearia Doce > Culinária Doce > Complementos |
+| 2026-04-06 | Categoria | `essencia` → Mercearia Doce > Culinária Doce > Complementos |
+| 2026-04-06 | Abreviação | `empan` → empanado |
+| 2026-04-06 | Abreviação | `trat` → tratamento |
+| 2026-04-06 | Abreviação | `aero` → aerosol |
+| 2026-04-06 | Abreviação | `masc` → mascara |
+| 2026-04-06 | Abreviação | `pent` → pentear |
+| 2026-04-06 | Categoria | `salpet` → Mercearia Doce > Biscoito Salgado > Salpet |
+| 2026-04-06 | Categoria | `cominho` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-06 | Categoria | `caneta` → Bazar Geral > Artigos para Papelaria e Armarinho > Canetas em Geral |
+| 2026-04-06 | Categoria | `marcador` → Bazar Geral > Artigos para Papelaria e Armarinho > Canetas em Geral |
+| 2026-04-06 | Categoria | `pacoca` / `pacoquinha` / `pacoquita` → Mercearia Doce > Guloseimas > Doces de Amendoim |
+| 2026-04-06 | Categoria | `peneira` → Bazar Geral > Utilidades da Cozinha > Escorredores e Peneiras |
+| 2026-04-06 | Categoria | `luva` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
+| 2026-04-06 | Categoria | `haste flexivel` / `hastes flexiveis` → Perfumaria > Higiene Corporal (nível grupo; HASTE FLEXÍVEL tem acento no banco) |
+| 2026-04-06 | Combinação não adjacente | `CREME` + `TRATAMENTO` → Perfumaria > Produtos Capilares > Cremes p/ Hidratação |
+| 2026-04-06 | Combinação não adjacente | `DESODORANTE` + `AEROSOL` → Perfumaria > Desodorantes e Colônias > Desodorante Aerosol |
+| 2026-04-06 | Combinação não adjacente | `DESODORANTE` + `SPRAY` → Perfumaria > Desodorantes e Colônias > Desodorante Aerosol |
+| 2026-04-06 | Combinação não adjacente | `SEMENTE` + `GIRASSOL/CHIA/LINHACA/GERGELIM` → Mercearia Salgada > Farináceos > Sementes (Chia, Linhaça, Girassol, etc.) |
+| 2026-04-07 | Categoria | `vela` / `velas` → Bazar Geral > Utilidades Descartáveis > Velas Comum / Citronela / Aromáticas |
+| 2026-04-07 | Categoria | `copo` → Bazar Geral > Utilidades da Cozinha > Copo Individual |
+| 2026-04-07 | Categoria | `tapete` → Têxtil > Cama, Mesa, Banho > Tapetes em Geral |
+| 2026-04-07 | Categoria | `adocante` → Mercearia Doce Light e Diet > Mercearia Doce Light e Diet > Adoçantes |
+| 2026-04-07 | Categoria | `conhaque` → Bebidas > Destilados > Conhaque/Brandy |
+| 2026-04-07 | Categoria | `torrada` / `torradas` → Padaria Industrial > Padaria Industrial > Torradas |
+| 2026-04-07 | Categoria | `cloro` → Limpeza > Limpeza para Roupas > Alvejantes e Cloro |
+| 2026-04-07 | Categoria | `acetona` → Perfumaria > Estética > Removedores de Esmaltes / Acetona |
+| 2026-04-07 | Categoria | `canela` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Categoria | `oregano` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Categoria | `soda caustica` → Limpeza > Limpeza de Banheiro > Limpeza Pesada |
+| 2026-04-07 | Categoria | `bucha banho` (bigrama) → Perfumaria > Higiene Corporal > Esponja de Banho |
+| 2026-04-07 | Categoria | `gel fixador` / `gel capilar` (bigramas) → Perfumaria > Produtos Capilares > Gel Fixador |
+| 2026-04-07 | Categoria | `mamadeira` → Perfumaria > Seção Infantil (nível grupo; acento no banco) |
+| 2026-04-07 | Categoria | `gel` → Perfumaria > Produtos Capilares (nível grupo; standalone ambíguo) |
+| 2026-04-07 | Categoria | `file de peito` → Perecíveis do Autoserviço > Congelados (nível grupo; era AVES, movido para congelados) |
+| 2026-04-07 | Categoria | `caderno` → Bazar Geral > Artigos para Papelaria e Armarinho (nível grupo) |
+| 2026-04-07 | Categoria | `agua oxigenada` → Perfumaria > Farmácia > Outros Fármacos |
+| 2026-04-07 | Combinação não adjacente | `PEIXE` + `POSTAS/POSTA/FILE` → Perecíveis do Autoserviço > Congelados > Peixes Congelado |
+| 2026-04-07 | Combinação não adjacente | `PEIXE` + `INTEIRO` → Açougue > Peixes > Peixe Fresco |
+| 2026-04-07 | Combinação não adjacente | `CACAU` + `PO` → Mercearia Doce > Culinária Doce > Chocolates em Pó |
+| 2026-04-07 | Combinação não adjacente | `AZEITE` + `VIRGEM` → Mercearia Salgada > Azeites > Azeite Extra Virgem |
+| 2026-04-07 | Combinação não adjacente | `VINAGRE` + `MACA` → Mercearia Salgada > Vinagres > Vinagre de Maçã |
+| 2026-04-07 | Combinação não adjacente | `VINAGRE` + `ARROZ` → Mercearia Salgada > Vinagres > Vinagre de Arroz |
+| 2026-04-07 | Combinação não adjacente | `CHOCOLATE` + `BARRA` → Mercearia Doce > Chocolates > Chocolate em Barras |
+| 2026-04-07 | Combinação não adjacente | `NOZ` + `MOSCADA` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Combinação não adjacente | `CERVEJA` + `LATA/LATAO` → Bebidas > Cervejas > Cerveja Lata |
+| 2026-04-07 | Combinação não adjacente | `CERVEJA` + `LONG/NECK` → Bebidas > Cervejas > Cerveja Long Neck |
+| 2026-04-07 | Abreviação | `capil` → capilar |
+| 2026-04-07 | Categoria | `sopao` → Mercearia Salgada > Massas e Sopas > Sopas |
+| 2026-04-07 | Categoria | `shoyu` → Mercearia Salgada > Temperos e Molhos > Molho de Soja (movido de grupo para categoria) |
+| 2026-04-07 | Categoria | `pimenta` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Categoria | `paprica` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Categoria | `lamina` → Perfumaria > Barbearia > Lâminas (Refil) (standalone; bigrama LAMINA BARBEAR já existia) |
+| 2026-04-07 | Categoria | `mexerica` / `tangerina` → Hortifruti > Frutas |
+| 2026-04-07 | Categoria | `cera` → Limpeza > Limpeza de Pisos (nível grupo) |
+| 2026-04-07 | Categoria | `bucha` → Perfumaria > Higiene Corporal (nível grupo; standalone) |
+| 2026-04-07 | Categoria | `escova` → Perfumaria > Higiene Corporal (nível grupo; ESCOVA DENTAL bigrama já cobre o específico) |
+| 2026-04-07 | Categoria | `sacola` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
+| 2026-04-07 | Categoria | `bobina` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
+| 2026-04-07 | Categoria | `palito` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
+| 2026-04-07 | Categoria | `drink` → Bebidas > Destilados (nível grupo) |
+| 2026-04-07 | Categoria | `filtro` → Mercearia Doce > Matinais (nível grupo; filtro de café) |
+| 2026-04-07 | Categoria | `torresmo` → Açougue > Suíno (nível grupo) |
+| 2026-04-07 | Categoria | `reparador` → Perfumaria > Produtos Capilares (nível grupo) |
+| 2026-04-07 | Categoria | `toalha` → Têxtil > Cama, Mesa, Banho (nível grupo) |
+| 2026-04-07 | Categoria | `erva` → Bebidas > Matinais (nível grupo; erva-mate) |
+| 2026-04-07 | Categoria | `flanela` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
+| 2026-04-07 | Categoria | `espuma` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
+| 2026-04-07 | Categoria | `tesoura` → Bazar Geral > Artigos para Papelaria e Armarinho (nível grupo) |
+| 2026-04-07 | Categoria | `colher` → Bazar Geral > Utilidades da Cozinha (nível grupo) |
+| 2026-04-07 | Categoria | `graxa` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
+| 2026-04-07 | Categoria | `cadeado` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
+| 2026-04-07 | Categoria | `extensao` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
+| 2026-04-07 | Categoria | `mangueira` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
+| 2026-04-07 | Combinação não adjacente | `MACARRAO` + `SEMOLA` → Mercearia Salgada > Massas e Sopas > Massa Semola |
+| 2026-04-07 | Combinação não adjacente | `MACARRAO` + `OVOS` → Mercearia Salgada > Massas e Sopas > Massa com Ovos |
+| 2026-04-07 | Combinação não adjacente | `MASSA` + `PASTEL` → Mercearia Salgada > Massas e Sopas > Outras Massas |
+| 2026-04-07 | Combinação não adjacente | `CREME` + `CEBOLA` → Mercearia Salgada > Massas e Sopas > Sopas |
+| 2026-04-07 | Combinação não adjacente | `CALDO` + `KNORR/MAGGI` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
+| 2026-04-07 | Combinação não adjacente | `MOLHO` + `TOMATE` → Mercearia Salgada > Temperos e Molhos > Molhos e Polpas Tomate |
+| 2026-04-07 | Combinação não adjacente | `MOLHO` + `PIMENTA` → Mercearia Salgada > Temperos e Molhos > Molho de Pimenta |
+| 2026-04-07 | Combinação não adjacente | `CREME` + `LEITE` → Mercearia Doce > Culinária Doce > Creme de Leite |
+| 2026-04-07 | Combinação não adjacente | `DOCE` + `LEITE` → Mercearia Doce > Sobremesas e Outros Doces > Doces de Leite |
+| 2026-04-07 | Combinação não adjacente | `TEMPERO` + `SAZON` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
+| 2026-04-07 | Combinação não adjacente | `LEITE` + `PO` → Commodities > Leite > Leite em Pó |
+| 2026-04-07 | Combinação não adjacente | `REPARADOR` + `PONTAS` → Perfumaria > Produtos Capilares (nível grupo) |
+| 2026-04-07 | Categoria | `saca rolha` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades de Cozinha |
+| 2026-04-07 | Categoria | `bobina` → Uso e Consumo > Embalagens e Bobinas Térmicas > Bobinas Térmicas (era Utilidades Descartáveis) |
+| 2026-04-07 | Categoria | `benjamin` → Bazar Geral > Ferramentas e Acessórios > Material Elétrico |
+| 2026-04-07 | Marca | BEATS \| Ambev (adicionada ao seed_fabricantes_marcas.py) |
+| 2026-04-07 | Combinação não adjacente | `FEIJAO` + `CARIOCA/PRETO/BRANCO/CORDA/JALO` → Commodities > Feijão > subtipo |
+| 2026-04-07 | Combinação não adjacente | `ABRIDOR` + `LATA/LATAS/VINHO` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades |
+| 2026-04-07 | Combinação não adjacente | `AFIADOR` + `FACA` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades |
+| 2026-04-07 | Combinação não adjacente | `ABSORVENTE` + `ABAS` → Perfumaria > Absorventes > Absorvente Externo |
+| 2026-04-07 | Combinação não adjacente | `ALICATE` + `CUTICULA` → Perfumaria > Estética > Acessórios Manicure |
+| 2026-04-07 | Combinação não adjacente | `CORTADOR` + `UNHAS` → Perfumaria > Estética > Acessórios Manicure |
+| 2026-04-07 | Combinação não adjacente | `AGUA` + `COCO` → Bebidas > Águas > Água de Coco (cobre marca separando tokens) |
+| 2026-04-07 | Combinação não adjacente | `CAFE` + `SOLUVEL` → Mercearia Doce > Matinais > Café Solúvel (cobre marca separando tokens) |
 
 ---
 

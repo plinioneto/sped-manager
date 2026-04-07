@@ -2,7 +2,10 @@ import re
 from sqlalchemy import func, and_
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.icms_c190 import IcmsC190
+from app.models.itens_fiscal_c170 import ItemFiscal
+from app.models.produto import Produto
 from app.models.participante import Participante
+from app.models.categoria import Departamento
 from app.repositories.base_repo import BaseRepository
 
 # SQLite strftime('%w'): 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
@@ -71,8 +74,10 @@ class VendasRepository(BaseRepository):
     # Métricas globais
     # ------------------------------------------------------------------
 
-    def metricas_globais(self, ano=None, meses=None, dias_semana=None) -> dict:
+    def metricas_globais(self, ano=None, meses=None, dias_semana=None,
+                         departamento_id=None, grupo_id=None, categoria_id=None) -> dict:
         base = self._filtrar(self._base_saida(), ano, meses, dias_semana)
+        base = self._filtro_hierarquia_via_doc(base, departamento_id, grupo_id, categoria_id)
 
         fat = base.with_entities(func.sum(DocumentoFiscal.vl_doc)).scalar() or 0.0
         notas = base.with_entities(func.count(DocumentoFiscal.id)).scalar() or 0
@@ -94,6 +99,7 @@ class VendasRepository(BaseRepository):
                 mes_ant = meses_disp[idx + 1]
                 ano_ant, mes_num_ant = mes_ant[:4], mes_ant[4:]
                 base_ant = self._filtrar(self._base_saida(), ano_ant, [mes_num_ant], dias_semana)
+                base_ant = self._filtro_hierarquia_via_doc(base_ant, departamento_id, grupo_id, categoria_id)
                 fat_ant = base_ant.with_entities(func.sum(DocumentoFiscal.vl_doc)).scalar() or 0.0
                 notas_ant = base_ant.with_entities(func.count(DocumentoFiscal.id)).scalar() or 0
                 ticket_ant = fat_ant / notas_ant if notas_ant else 0.0
@@ -127,9 +133,11 @@ class VendasRepository(BaseRepository):
     # Visão Geral
     # ------------------------------------------------------------------
 
-    def evolucao_mensal(self, dias_semana=None) -> list:
+    def evolucao_mensal(self, dias_semana=None,
+                        departamento_id=None, grupo_id=None, categoria_id=None) -> list:
         """Série mensal completa (sem filtro de período)."""
         q = self._filtrar(self._base_saida(), ano=None, meses=None, dias_semana=dias_semana)
+        q = self._filtro_hierarquia_via_doc(q, departamento_id, grupo_id, categoria_id)
         q = q.with_entities(
             func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
@@ -403,6 +411,39 @@ class VendasRepository(BaseRepository):
             }
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Composição por hierarquia
+    # ------------------------------------------------------------------
+
+    def composicao_por_departamento(self, ano=None, meses=None, dias_semana=None) -> list:
+        """Faturamento por departamento via C190 (saídas) quando há itens C170,
+        senão retorna lista vazia (supermercados não emitem C170 de saída)."""
+        q = (
+            self.session.query(
+                func.coalesce(Departamento.descricao, "Não classificado").label("departamento"),
+                func.sum(ItemFiscal.vl_item).label("valor"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .outerjoin(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Departamento, Departamento.id == Produto.departamento_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "1",
+                DocumentoFiscal.dt_doc.isnot(None),
+            )
+        )
+        q = self._filtrar(q, ano, meses, dias_semana)
+        rows = (
+            q.group_by(func.coalesce(Departamento.descricao, "Não classificado"))
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+        return [{"departamento": r.departamento, "valor": r.valor or 0.0} for r in rows]
 
     # ------------------------------------------------------------------
     # Notas de venda

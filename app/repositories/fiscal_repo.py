@@ -94,7 +94,8 @@ class FiscalRepository(BaseRepository):
     # Visão Geral
     # ------------------------------------------------------------------
 
-    def metricas_visao_geral(self, ano=None, meses=None, cst_icms=None, cfop=None) -> dict:
+    def metricas_visao_geral(self, ano=None, meses=None, cst_icms=None, cfop=None,
+                             departamento_id=None, grupo_id=None, categoria_id=None) -> dict:
         # ICMS Débito (saídas)
         q_deb = self._filtrar(
             self.session.query(func.sum(IcmsC190.vl_icms))
@@ -102,6 +103,7 @@ class FiscalRepository(BaseRepository):
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
             ano, meses, cst_icms, cfop,
         )
+        q_deb = self._filtro_hierarquia_via_doc(q_deb, departamento_id, grupo_id, categoria_id)
         icms_debito = q_deb.scalar() or 0.0
 
         # ICMS Crédito (entradas)
@@ -111,6 +113,7 @@ class FiscalRepository(BaseRepository):
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "0"),
             ano, meses, cst_icms, cfop,
         )
+        q_cred = self._filtro_hierarquia_via_doc(q_cred, departamento_id, grupo_id, categoria_id)
         icms_credito = q_cred.scalar() or 0.0
 
         # Faturamento total (saídas)
@@ -120,6 +123,7 @@ class FiscalRepository(BaseRepository):
             .filter(IcmsC190.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
             ano, meses, cst_icms, cfop,
         )
+        q_fat = self._filtro_hierarquia_via_doc(q_fat, departamento_id, grupo_id, categoria_id)
         faturamento_total = q_fat.scalar() or 0.0
 
         # Faturamento ST (CST 060)
@@ -133,6 +137,7 @@ class FiscalRepository(BaseRepository):
             ),
             ano, meses, None, cfop,  # não filtra por cst aqui
         )
+        q_st = self._filtro_hierarquia_via_doc(q_st, departamento_id, grupo_id, categoria_id)
         faturamento_st = q_st.scalar() or 0.0
 
         # Faturamento tributado (excl 060 e 040) para alíquota efetiva
@@ -146,6 +151,7 @@ class FiscalRepository(BaseRepository):
             ),
             ano, meses, cst_icms, cfop,
         )
+        q_trib = self._filtro_hierarquia_via_doc(q_trib, departamento_id, grupo_id, categoria_id)
         faturamento_tributado = q_trib.scalar() or 0.0
 
         # PIS + COFINS saída (via DocumentoFiscal)
@@ -157,6 +163,7 @@ class FiscalRepository(BaseRepository):
             .filter(DocumentoFiscal.tenant_id == self.tenant_id, DocumentoFiscal.ind_oper == "1"),
             ano, meses,
         )
+        q_pis_cof = self._filtro_hierarquia_via_doc(q_pis_cof, departamento_id, grupo_id, categoria_id)
         pis_cofins = q_pis_cof.first()
         total_pis = (pis_cofins[0] or 0.0) if pis_cofins else 0.0
         total_cofins = (pis_cofins[1] or 0.0) if pis_cofins else 0.0

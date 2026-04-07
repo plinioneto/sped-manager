@@ -116,6 +116,8 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "AZEITE":       "AZEITES",
     "TEMPERO":      "TEMPEROS E MOLHOS",
     "MOLHO":        "TEMPEROS E MOLHOS",
+    "CALDO":        "TEMPEROS E MOLHOS",
+    # SHOYU movido para _VOCAB_CATEGORIA (categoria específica MOLHO DE SOJA)
     "MACARRAO":     "MASSAS E SOPAS",
     "MASSA":        "MASSAS E SOPAS",
     "CONSERVA":     "CONSERVAS E ENLATADOS",
@@ -125,16 +127,20 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "BISCOITO":     "BISCOITO DOCE",
     "MEL":          "MEL E MELADOS",
     "QUEIJO":       "LATICINIOS",
-    # Proteínas
+    # Proteínas e açougue
     "FRANGO":       "AVES",
     "BOVINO":       "BOVINO",
     "SUINO":        "SUINO",
+    "CARNE SUINA":  "SUINO",           # bigrama: "CARNE SUINA BISTECA KG"
+    "FILE PEITO":   "CONGELADOS",      # bigrama: "FILE DE PEITO PERDIGAO" (congelados no supermercado)
+    "PEIXE":        "PEIXES",          # "PEIXE TILAPIA GARCIA FILE 400G"
     # Bebidas
     "REFRIGERANTE": "REFRIGERANTE",
     "CERVEJA":      "CERVEJAS",
     "VINHO":        "VINHO",
     "SUCO":         "SUCOS",
     "AGUA":         "AGUAS",
+    "COQUETEL":     "DESTILADOS",      # coquetel catuaba/ice syn → destilados
     # Commodities
     "ARROZ":        "ARROZ",
     "FEIJAO":       "FEIJAO",
@@ -146,6 +152,62 @@ _VOCAB_TIPO_PRODUTO: dict[str, str] = {
     "LEITE":        "LEITE",
     "CAFE":         "MATINAIS",
     "CHA":          "MATINAIS",
+    "CEREAL MATINAL": "MATINAIS",      # bigrama: "CEREAL MATINAL NESTLE NESCAU"
+    # Bazar geral
+    "BACIA":        "UTILIDADES DA COZINHA",
+    "LIMPADOR":     "LIMPEZA DE CASA",       # "LIMPADOR PERFUMADO UAU / CIF"
+    "LAMPADA":      "FERRAMENTAS E ACESSORIOS",  # LÂMPADAS tem acento no banco
+    "LUVA":         "UTENSILIOS PARA LIMPEZA",   # LUVA LATEX / LUVA LIMPEZA
+    # Frutas secas/oleaginosas — categoria tem acento incomum no banco; usa grupo
+    "CASTANHA":     "FRUTAS SECAS",             # CASTANHA DO PARA, CASTANHA DE CAJU...
+    "AMENDOA":      "FRUTAS SECAS",             # AMENDOA NATURAL / FATIADA
+    "NOZ":          "FRUTAS SECAS",             # NOZ PECAN, NOZ MOSCADA...
+    "NOZES":        "FRUTAS SECAS",
+    # Seção Infantil — "FRALDAS DESCARTÁVEIS PARA BEBÊ" tem acento incomum no banco;
+    # usar grupo evita mismatch por diferença de caractere especial (Ę vs Ê)
+    "FRALDA":       "SECAO INFANTIL",
+    "FRALDINHA":    "SECAO INFANTIL",
+    "MAMADEIRA":    "SECAO INFANTIL",
+    # Limpeza — tokens genéricos (bigramas específicos em _VOCAB_CATEGORIA têm prioridade)
+    "CERA":         "LIMPEZA DE PISOS",         # CERA LIQUIDA bigrama já cobre o específico
+    # Higiene — ESCOVA DENTAL bigrama já cobre o específico; standalone → higiene corporal
+    "BUCHA":        "HIGIENE CORPORAL",
+    "ESCOVA":       "HIGIENE CORPORAL",
+    # Bazar — descartáveis
+    "SACOLA":       "UTILIDADES DESCARTAVEIS",
+    # BOBINA movido para _VOCAB_CATEGORIA (categoria BOBINAS TERMICAS)
+    "PALITO":       "UTILIDADES DESCARTAVEIS",  # palito de dente / churrasco
+    # Bebidas
+    "DRINK":        "DESTILADOS",               # drink pronto / coquetel
+    # Matinais
+    "FILTRO":       "MATINAIS",                 # filtro de papel para café
+    "ERVA":         "MATINAIS",                 # erva-mate
+    # Açougue
+    "TORRESMO":     "SUINO",
+    # Capilares
+    "REPARADOR":    "PRODUTOS CAPILARES",       # reparador de pontas
+    # Têxtil
+    "TOALHA":       "CAMA, MESA, BANHO",
+    # Utensílios de limpeza
+    "FLANELA":      "UTENSILIOS PARA LIMPEZA",
+    "ESPUMA":       "UTENSILIOS PARA LIMPEZA",  # esponja de espuma
+    # Papelaria
+    "CADERNO":      "ARTIGOS PARA PAPELARIA E ARMARINHO",
+    "TESOURA":      "ARTIGOS PARA PAPELARIA E ARMARINHO",
+    # Utilidades da cozinha
+    "COLHER":       "UTILIDADES DA COZINHA",
+    # Ferramentas e elétricos
+    "GRAXA":        "FERRAMENTAS E ACESSORIOS",
+    "CADEADO":      "FERRAMENTAS E ACESSORIOS",
+    "EXTENSAO":     "FERRAMENTAS E ACESSORIOS",
+    "MANGUEIRA":    "FERRAMENTAS E ACESSORIOS",
+    # Papelaria
+    "CADERNO":      "ARTIGOS PARA PAPELARIA E ARMARINHO",
+    # Higiene corporal — HASTE FLEXÍVEL tem acento no banco; usa grupo
+    "HASTE FLEXIVEL":  "HIGIENE CORPORAL",
+    "HASTES FLEXIVEIS":"HIGIENE CORPORAL",
+    # Produtos capilares — GEL é ambíguo mas no contexto supermercado é capilar
+    "GEL":          "PRODUTOS CAPILARES",
 }
 
 # Vocabulário de hortifruti: produto → grupo canônico (nome exato no banco)
@@ -172,7 +234,7 @@ _VOCAB_HORTIFRUTI: dict[str, str] = {
     "MELANCIA": "FRUTAS", "MELAO": "FRUTAS", "UVA": "FRUTAS",
     "MORANGO": "FRUTAS", "PERA": "FRUTAS", "MANGA": "FRUTAS",
     "GOIABA": "FRUTAS", "MARACUJA": "FRUTAS", "COCO": "FRUTAS",
-    "ABACATE": "FRUTAS", "KIWI": "FRUTAS",
+    "ABACATE": "FRUTAS", "KIWI": "FRUTAS", "MEXERICA": "FRUTAS", "TANGERINA": "FRUTAS",
     # Ovos
     "OVO": "OVOS", "OVOS": "OVOS",
 }
@@ -195,11 +257,14 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ LIMPEZA DE COZINHA ═══════════════════════════════════════════
     "DETERGENTE":       ("DETERGENTES LIQUIDOS E GEL",   None),
     "ESPONJA":          ("ESPONJAS",                     None),
-    "ESPONJA ACO":      ("ESPONJAS",                     None),
+    # ESPONJA ACO → vai para UTENSILIOS PARA LIMPEZA (categoria específica), não LIMPEZA DE COZINHA
+    "ESPONJA ACO":      ("ESPONJA DE ACO E SINTETICA",   "UTENSILIOS PARA LIMPEZA"),
     "DESENGORDURANTE":  ("DESENGORDURANTES",             None),
     "SAPONACEO":        ("SAPONACEOS PO",                None),
     # ══ LIMPEZA DE CASA ══════════════════════════════════════════════
-    "DESINFETANTE":     ("DESINFETANTES ATE 500ML",      None),
+    # DESINFETANTES ATE 500ML está em LIMPEZA DE BANHEIRO (não LIMPEZA DE CASA)
+    "DESINFETANTE":     ("DESINFETANTES ATE 500ML",      "LIMPEZA DE BANHEIRO"),
+    "ALCOOL":           ("ALCOOL",                       "LIMPEZA DE CASA"),
     "MULTIUSO":         ("MULTIUSO",                     None),
     "LIMPA VIDRO":      ("LIMPA VIDROS",                 None),
     "LIMPA VIDROS":     ("LIMPA VIDROS",                 None),
@@ -227,7 +292,7 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "PRE FRITA":        ("BATATA CONGELADA",             "CONGELADOS"),
     # ══ LATICÍNIOS ═══════════════════════════════════════════════════
     "IOGURTE":          ("IOGURTES TRADICIONAL",         "LATICINIOS"),
-    "PETIT SUISSE":     ("IOGURTES INFANTIS",            "LATICINIOS"),
+    "PETIT SUISSE":     ("PETIT SUISSE",                  "LATICINIOS"),  # categoria real no banco
     "REQUEIJAO":        ("REQUEIJAO",                    "LATICINIOS"),
     "MANTEIGA":         ("MANTEIGA",                     "LATICINIOS"),
     "MARGARINA":        ("MARGARINA E CREME VEGETAL",    "LATICINIOS"),
@@ -308,9 +373,11 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "CHIMARRAO":        ("CHIMARRAO E TERERE",           None),
     "TERERE":           ("CHIMARRAO E TERERE",           None),
     # ══ MERCEARIA DOCE — BISCOITOS ═══════════════════════════════════
-    "BISCOITO RECHEADO":("BISCOITO RECHEADO",            None),
-    "BISCOITO MAIZENA": ("BISCOITO MAIZENA",             None),
-    "BISCOITO MARIA":   ("BISCOITO MARIA",               None),
+    "BISCOITO RECHEADO":    ("BISCOITO RECHEADO",            None),
+    "BISCOITO MAIZENA":     ("BISCOITO MAIZENA",             None),
+    "BISCOITO MARIA":       ("BISCOITO MARIA",               None),
+    "BISCOITO AMANTEIGADO": ("BISCOITO AMENTEIGADO",         "BISCOITO DOCE"),  # bridge grafia popular → DB
+    "CLUB SOCIAL":          ("AGUA E SAL",                   "BISCOITO SALGADO"),
     "WAFER":            ("WAFER",                        "BISCOITO DOCE"),
     "ROSQUINHA":        ("ROSQUINHAS E SEQUILHOS",       None),
     "SEQUILHO":         ("ROSQUINHAS E SEQUILHOS",       None),
@@ -321,6 +388,12 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "CHOCOLATE BARRA":  ("CHOCOLATE EM BARRAS",          None),
     "BOMBOM":           ("BOMBONS PACOTE",               None),
     # ══ MERCEARIA DOCE — CULINÁRIA ═══════════════════════════════════
+    # ══ COMMODITIES — AÇÚCAR (tipos específicos) ═════════════════════════
+    "ACUCAR MASCAVO":   ("ACUCAR MASCAVO",               "ACUCAR"),
+    "ACUCAR REFINADO":  ("ACUCAR REFINADO",              "ACUCAR"),
+    "ACUCAR CRISTAL":   ("ACUCAR CRISTAL",               "ACUCAR"),
+    "ACUCAR DEMERARA":  ("ACUCAR MASCAVO",               "ACUCAR"),   # sem categoria própria, mais próxima
+    # ══ MERCEARIA DOCE — CULINÁRIA ═══════════════════════════════════════
     "LEITE CONDENSADO": ("LEITE CONDENSADO",             None),
     "COCO RALADO":      ("COCO RALADO",                  None),
     "LEITE DE COCO":    ("LEITE DE COCO",                None),
@@ -369,10 +442,12 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "MAIONESE":         ("MAIONESE",                     None),
     "MOLHO DE PIMENTA": ("MOLHO DE PIMENTA",             None),
     "MOLHO DE SOJA":    ("MOLHO DE SOJA",                None),
+    "SHOYU":            ("MOLHO DE SOJA",                "TEMPEROS E MOLHOS"),
     "MOLHO INGLES":     ("MOLHO INGLES E OUTROS",        None),
     "CALDO TABLETE":    ("CALDO TABLETE E PO",           None),
-    # ══ MERCEARIA SALGADA — MASSAS ═══════════════════════════════════
+    # ══ MERCEARIA SALGADA — MASSAS E SOPAS ══════════════════════════
     "MACARRAO INSTANTANEO": ("MACARRAO INSTANTANEO",     None),
+    "SOPAO":                ("SOPAS",                    "MASSAS E SOPAS"),
     # ══ MERCEARIA SALGADA — AZEITES ══════════════════════════════════
     "AZEITE EXTRA VIRGEM":  ("AZEITE EXTRA VIRGEM",      None),
     # ══ MERCEARIA SALGADA — VINAGRES ═════════════════════════════════
@@ -410,19 +485,64 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ ABSORVENTES ══════════════════════════════════════════════════
     "ABSORVENTE":       ("ABSORVENTE EXTERNO",           "ABSORVENTES"),
     # ══ SEÇÃO INFANTIL ═══════════════════════════════════════════════
-    "FRALDA":           ("FRALDAS DESCARTÁVEIS PARA BEBĘ", "SECAO INFANTIL"),
+    # FRALDA: "FRALDAS DESCARTÁVEIS PARA BEBÊ" tem char especial no banco (Ê)
+    # → movido para _VOCAB_TIPO_PRODUTO (grupo SECAO INFANTIL) para evitar mismatch
     "LENCO UMEDECIDO":  ("LENCOS UMEDECIDOS",            "SECAO INFANTIL"),
     # ══ APERITIVOS ═══════════════════════════════════════════════════
     "APERITIVO":          ("APERITIVOS EM GERAL",      "EMPORIO GRANEL"),
     # ══ PAPELARIA ════════════════════════════════════════════════════
     "APONTADOR":          ("APONTADORES EM GERAL",     "ARTIGOS PARA PAPELARIA E ARMARINHO"),
+    "CANETA":             ("CANETAS EM GERAL",         "ARTIGOS PARA PAPELARIA E ARMARINHO"),
+    "MARCADOR":           ("CANETAS EM GERAL",         "ARTIGOS PARA PAPELARIA E ARMARINHO"),  # marcador permanente
     # ══ CAPILARES — ESPECÍFICOS ══════════════════════════════════════
     "ATIVADOR DE CACHOS": ("CREME PARA PENTEAR",       "PRODUTOS CAPILARES"),
     # ══ MERCEARIA DOCE — CEREAIS ═════════════════════════════════════
     "AVEIA":              ("CEREAIS",                  "MATINAIS"),
+    "MINGAU":             ("CEREAIS",                  "MATINAIS"),
+    # ══ CULINÁRIA DOCE — COMPLEMENTOS ════════════════════════════════
+    # Bigramas para CORANTE evitar conflito com "CORANTE" de limpeza (_VOCAB_TIPO_PRODUTO)
+    # ══ CAPILARES — BIGRAMAS (expansões de abreviações) ═════════════
+    # SHAMPOO e CREME PENTEAR já declarados acima — não duplicar
+    "CREME TRATAMENTO":    ("CREMES P/ HIDRATACAO",      "PRODUTOS CAPILARES"),  # resultado da expansão CREME TRAT
+    "MASCARA CAPILAR":     ("CREMES P/ HIDRATACAO",      "PRODUTOS CAPILARES"),  # resultado da expansão MASC CAP
+    "CREME ALISANTE":      ("ALISANTE E RELAXAMENTO",    "PRODUTOS CAPILARES"),
+    # ══ HIGIENE BUCAL ═════════════════════════════════════════════════
+    # ANTISSÉPTICO BUCAL tem acento no banco → match via _VOCAB_TIPO_PRODUTO → grupo HIGIENE BUCAL
+    # "ENXAGUANTE" fica apenas em _VOCAB_TIPO_PRODUTO (sem duplicata aqui)
+    # ══ HIDRATANTES ═══════════════════════════════════════════════════
+    "HIDRATANTE":          ("HIDRATANTES CORPORAL",      "CREMES HIDRATANTES"),
+    # ══ BAZAR — FERRAMENTAS E ELÉTRICOS ══════════════════════════════
+    "PILHA":               ("PILHAS E BATERIAS",         "FERRAMENTAS E ACESSORIOS"),
+    # LÂMPADAS tem acento no banco → match via _VOCAB_TIPO_PRODUTO → grupo FERRAMENTAS E ACESSORIOS
+    # ══ LIMPEZA — BANHEIRO ════════════════════════════════════════════
+    "PEDRA SANIT":         ("DESODORIZADOR SANITARIO",   "LIMPEZA DE BANHEIRO"),
+    # ══ MERCEARIA SALGADA ─ TEMPEROS ═════════════════════════════════
+    "CUP NOODLES":         ("MACARRAO INSTANTANEO",      "MASSAS E SOPAS"),
+    "CEREAL MATINAL":      ("CEREAIS",                   "MATINAIS"),
+    "COLORIFICO":          ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS"),
+    # ══ CULINÁRIA DOCE — COMPLEMENTOS ════════════════════════════════
+    "CORANTE ALIMENTICIO": ("COMPLEMENTOS",            "CULINARIA DOCE"),
+    "CORANTE ALIMENTAR":   ("COMPLEMENTOS",            "CULINARIA DOCE"),
+    "ANILINA":             ("COMPLEMENTOS",            "CULINARIA DOCE"),
+    "ESSENCIA":            ("COMPLEMENTOS",            "CULINARIA DOCE"),
+    # ══ PERFUMARIA — FARMÁCIA ═════════════════════════════════════════
+    "AGUA OXIGENADA":      ("OUTROS FARMACOS",         "FARMACIA"),
+    "PRESERVATIVO":        ("PRESERVATIVOS",           "FARMACIA"),
+    # ══ PERECÍVEIS — FRIAMBRERIA ══════════════════════════════════════
+    "BANHA":               ("BANHAS E GORDUDAS VEGETAIS", "FRIAMBRERIA"),  # typo proposital: nome exato do banco
+    "BACON":               ("DEFUMADOS DA FRIAMBRERIA", "FRIAMBRERIA"),
+    # ══ PADARIA ═══════════════════════════════════════════════════════
+    "PAO DE FORMA":        ("PAO DE FORMA COMUM",       "PADARIA INDUSTRIAL"),
+    # ══ BAZAR — UTILIDADES DA COZINHA ════════════════════════════════
+    "SACA ROLHA":          ("OUTRAS UTILIDADES DE COZINHA", "UTILIDADES DA COZINHA"),
+    # ══ USO E CONSUMO — EMBALAGENS ═══════════════════════════════════
+    "BOBINA":              ("BOBINAS TERMICAS",             "EMBALAGENS E BOBINAS TERMICAS"),
+    # ══ BAZAR — MATERIAL ELÉTRICO ════════════════════════════════════
+    "BENJAMIN":            ("MATERIAL ELETRICO",            "FERRAMENTAS E ACESSORIOS"),
     # ══ BARBEARIA ════════════════════════════════════════════════════
     "APARELHO DE BARBEAR": ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),
     "APARELHO BARBEAR":    ("APARELHOS DESCARTÁVEIS",    "BARBEARIA"),
+    "LAMINA":              ("LAMINAS (REFIL)",            "BARBEARIA"),   # standalone
     "LAMINA BARBEAR":      ("LAMINAS (REFIL)",            "BARBEARIA"),
     "CREME BARBEAR":       ("CREMES E LOCŐES P/BARBEAR", "BARBEARIA"),
     # ══ ESTÉTICA ═════════════════════════════════════════════════════
@@ -437,11 +557,27 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     # ══ UTENSÍLIOS LIMPEZA ═══════════════════════════════════════════
     "VASSOURA":         ("VASSOURAS",                    None),
     "RODO":             ("RODOS",                        None),
+    # ══ FERRAMENTAS — COLAS E ADESIVOS ═══════════════════════════════
+    # COLA BRANCA vai para papelaria; demais (Loctite, Super Bonder, etc.) para ferramentas
+    "COLA BRANCA":      ("COLAS E FITA ADESIVA",         "ARTIGOS PARA PAPELARIA E ARMARINHO"),
+    "COLA":             ("COLAS E ADESIVOS",             "FERRAMENTAS E ACESSORIOS"),
     # ══ AÇOUGUE ══════════════════════════════════════════════════════
     "LINGUICA":         ("LINGUICA GRANEL ATENDIMENTO",  None),
     "SALSICHA":         ("SALSICHA GRANEL ATENDIMENTO",  None),
     # ══ NUTRIÇÃO INFANTIL ════════════════════════════════════════════
     "PAPINHA":          ("PAPINHAS",                     None),
+    # ══ MERCEARIA SALGADA — BISCOITO SALGADO ════════════════════════
+    "SALPET":             ("SALPET",                     "BISCOITO SALGADO"),
+    # ══ TEMPEROS ESPECÍFICOS ══════════════════════════════════════════
+    "COMINHO":            ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS"),
+    "PIMENTA":            ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS"),  # pimenta do reino / calabresa
+    "PAPRICA":            ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS"),
+    # ══ MERCEARIA DOCE — GULOSEIMAS ══════════════════════════════════
+    "PACOCA":             ("DOCES DE AMENDOIM",          "GULOSEIMAS"),
+    "PACOQUINHA":         ("DOCES DE AMENDOIM",          "GULOSEIMAS"),
+    "PACOQUITA":          ("DOCES DE AMENDOIM",          "GULOSEIMAS"),
+    # ══ UTILIDADES DA COZINHA — BAZAR ════════════════════════════════
+    "PENEIRA":            ("ESCORREDORES E PENEIRAS",    "UTILIDADES DA COZINHA"),
     # ══ TABACARIA ════════════════════════════════════════════════════
     "CIGARRO":          ("CIGARRO EM GERAL",             None),
     # ══ PET SHOP ═════════════════════════════════════════════════════
@@ -450,12 +586,224 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "CARVAO":           ("CARVAO",                       None),
     # ══ PADARIA ══════════════════════════════════════════════════════
     "PAO FRANCES":      ("PAO FRANCES",                  None),
-    "PAO DE FORMA":     ("PAO DE FORMA COMUM",           None),
+    # PAO DE FORMA já declarado acima com grupo_pref="PADARIA INDUSTRIAL" — não duplicar
+    # ══ BEBIDAS — VINHO (complementar) ═══════════════════════════════
+    "VINHO ROSE":       ("VINHO ROSE",                   None),
     # ══ TÊXTIL — CALÇADOS ════════════════════════════════════════════
     "SANDALIA HAVAIANA":("SANDALIA E CHINELO",           "CALCADOS"),
     "SANDALIA":         ("SANDALIA E CHINELO",           "CALCADOS"),
     "CHINELO":          ("SANDALIA E CHINELO",           "CALCADOS"),
     "HAVAIANA":         ("SANDALIA E CHINELO",           "CALCADOS"),
+    # ══ UTILIDADES DESCARTÁVEIS — VELAS ══════════════════════════════
+    "VELA":             ("VELAS COMUM / CITRONELA / AROMÁTICAS", None),
+    "VELAS":            ("VELAS COMUM / CITRONELA / AROMÁTICAS", None),
+    # ══ UTENSÍLIOS DA COZINHA ════════════════════════════════════════
+    "COPO":             ("COPO INDIVIDUAL",              "UTILIDADES DA COZINHA"),
+    # ══ CAMA MESA BANHO ══════════════════════════════════════════════
+    "TAPETE":           ("TAPETES EM GERAL",             "CAMA, MESA, BANHO"),
+    # ══ MERCEARIA DOCE LIGHT E DIET ══════════════════════════════════
+    "ADOCANTE":         ("ADOCANTES",                   "MERCEARIA DOCE LIGHT E DIET"),
+    # ══ BEBIDAS — DESTILADOS ═════════════════════════════════════════
+    "CONHAQUE":         ("CONHAQUE/BRANDY",              "DESTILADOS"),
+    # ══ PADARIA INDUSTRIAL ═══════════════════════════════════════════
+    "TORRADA":          ("TORRADAS",                    "PADARIA INDUSTRIAL"),
+    "TORRADAS":         ("TORRADAS",                    "PADARIA INDUSTRIAL"),
+    # ══ LIMPEZA PARA ROUPAS — CLORO ══════════════════════════════════
+    "CLORO":            ("ALVEJANTES E CLORO",           "LIMPEZA PARA ROUPAS"),
+    # ══ ESTÉTICA — ACETONA ════════════════════════════════════════════
+    "ACETONA":          ("REMOVEDORES DE ESMALTES / ACETONA", "ESTETICA"),
+    # ══ TEMPEROS ESPECÍFICOS ══════════════════════════════════════════
+    "CANELA":           ("TEMPEROS PRONTO EM PO/SACHE", "TEMPEROS E MOLHOS"),
+    "OREGANO":          ("TEMPEROS PRONTO EM PO/SACHE", "TEMPEROS E MOLHOS"),
+    # ══ LIMPEZA DE BANHEIRO — LIMPEZA PESADA ══════════════════════════
+    "SODA CAUSTICA":    ("LIMPEZA PESADA",              "LIMPEZA DE BANHEIRO"),
+    # ══ HIGIENE CORPORAL — BUCHA DE BANHO ════════════════════════════
+    "BUCHA BANHO":      ("ESPONJA DE BANHO",            "HIGIENE CORPORAL"),
+    # ══ CAPILARES — GEL ══════════════════════════════════════════════
+    "GEL FIXADOR":      ("GEL FIXADOR",                 "PRODUTOS CAPILARES"),
+    "GEL CAPILAR":      ("GEL FIXADOR",                 "PRODUTOS CAPILARES"),
+}
+
+# Combinações de palavras NÃO adjacentes que definem uma categoria.
+# Usado para resolver ambiguidades onde o produto específico traz dois tokens
+# que podem estar separados por marca/nome, ex: "COCO ANCHIETA RALADO".
+# Verificado APÓS _VOCAB_CATEGORIA (bigramas adjacentes) e ANTES de _VOCAB_HORTIFRUTI.
+# Chave: frozenset de tokens que TODOS devem estar presentes na descrição.
+# Valor: (nome_categoria, grupo_preferido|None)
+_VOCAB_COMBINACAO: dict[frozenset, tuple[str, str | None, str]] = {
+    # Tupla: (nome_para_match, grupo_preferido|None, nivel)
+    # nivel = "cat" → chama _match_por_categoria_nome
+    # nivel = "grp" → chama _match_por_grupo_nome (quando só existe grupo, sem categoria)
+
+    # ── Tipo 1: token hortifruti + modificador → produto industrializado ──────
+    # Fruta seca / desidratada
+    frozenset({"BANANA", "PASSA"}):        ("UVA PASSA",                   "FRUTAS SECAS",         "cat"),  # banana passa cai em frutas secas
+    frozenset({"COCO", "RALADO"}):         ("COCO RALADO",                 None,                   "cat"),  # COCO ANCHIETA RALADO
+    # Temperos desidratados — token hortifruti ganharia LEGUMES sem combinação
+    frozenset({"ALHO", "PO"}):             ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # ALHO PO KITANO
+    frozenset({"ALHO", "GRANULADO"}):      ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # ALHO GRANULADO
+    frozenset({"ALHO", "DESIDRATADO"}):    ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # ALHO DESIDRATADO
+    frozenset({"CEBOLA", "FLOCOS"}):       ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # CEBOLA YOKI FLOCOS
+    frozenset({"CEBOLA", "DESIDRATADA"}):  ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # CEBOLA DESIDRATADA
+    frozenset({"CEBOLA", "PO"}):           ("CALDO TABLETE E PO",          "TEMPEROS E MOLHOS",    "cat"),  # CEBOLA PO
+    frozenset({"TOMATE", "SECO"}):         ("OUTRAS CONSERVAS",            "CONSERVAS E ENLATADOS","cat"),
+    # Salgadinho de batata — token BATATA ganharia LEGUMES sem combinação
+    frozenset({"BATATA", "CHIPS"}):        ("BATATA FRITA",                "SALGADINHO",           "cat"),
+    frozenset({"BATATA", "SNACK"}):        ("SALGADINHOS SABORES",         "SALGADINHO",           "cat"),
+
+    # ── Tipo 2: marca quebra bigrama adjacente já correto no _VOCAB_CATEGORIA ─
+    # (evita que o token base ganhe a categoria genérica do grupo)
+    frozenset({"LEITE", "COCO"}):          ("LEITE DE COCO",               "CULINARIA DOCE",       "cat"),  # LEITE SOCOCO COCO 200ML
+    frozenset({"OLEO", "COCO"}):           ("OLEO DE COCO",                "OLEO",                 "cat"),  # OLEO COPRA COCO 500ML
+    frozenset({"FARINHA", "MANDIOCA"}):    ("FARINHA DE MANDIOCA",         "FARINACEOS",           "cat"),  # FARINHA YOKI MANDIOCA 1KG
+    frozenset({"FARINHA", "TRIGO"}):       ("FARINHA DE TRIGO",            None,                   "grp"),  # FARINHA DONA BENTA TRIGO 1KG — grupo, não categoria
+
+    # ── Tipo 3: subtipo de açúcar separado pela marca ─────────────────────────
+    # "ACUCAR NATIVE MASCAVO 1KG" — NATIVE separa os tokens, bigrama adjacente não funciona
+    frozenset({"ACUCAR", "MASCAVO"}):      ("ACUCAR MASCAVO",              "ACUCAR",               "cat"),
+    frozenset({"ACUCAR", "REFINADO"}):     ("ACUCAR REFINADO",             "ACUCAR",               "cat"),
+    frozenset({"ACUCAR", "CRISTAL"}):      ("ACUCAR CRISTAL",              "ACUCAR",               "cat"),
+    frozenset({"ACUCAR", "DEMERARA"}):     ("ACUCAR MASCAVO",              "ACUCAR",               "cat"),  # sem categoria própria
+
+    # ── Tipo 4: combinações que identificam subcategoria específica ───────────
+    frozenset({"PESSEGO", "CALDA"}):       ("COMPOTAS DE FRUTAS",          "SOBREMESAS E OUTROS DOCES", "cat"),  # PESSEGO CALDA FORNO DE MINAS
+    frozenset({"PO", "DESCOLORANTE"}):     ("TINTURA / DESCOLORANTES PARA CABELO", "PRODUTOS CAPILARES", "cat"),  # PO DESCOLORANTE WELLA
+
+    # ── Tipo 5: fruta seca/desidratada ────────────────────────────────────────
+    frozenset({"AMEIXA", "SECA"}):         ("FRUTAS SECAS / CRISTALIZADAS","FRUTAS SECAS",             "cat"),  # AMEIXA SECA SUNSWEET
+
+    # ── Tipo 6: biscoitos — token de subtipo separado pela marca ─────────────
+    frozenset({"SEQUILHO", "LEITE"}):      ("ROSQUINHAS E SEQUILHOS",      "BISCOITO DOCE",            "cat"),  # SEQUILHO BELLA LEITE 400G
+    frozenset({"BISCOITO", "AGUA"}):       ("AGUA E SAL",                  "BISCOITO SALGADO",         "cat"),  # BISCOITO X AGUA E SAL
+    frozenset({"BISCOITO", "MAIZENA"}):    ("BISCOITO MAIZENA",            "BISCOITO DOCE",            "cat"),  # BISCOITO BAUDUCCO MAIZENA
+    frozenset({"BISCOITO", "RECHEADO"}):   ("BISCOITO RECHEADO",           "BISCOITO DOCE",            "cat"),  # BISCOITO TRAKINAS RECHEADO
+    frozenset({"BISCOITO", "CRACKER"}):    ("CREAM CRACKER",               "BISCOITO SALGADO",         "cat"),  # BISCOITO X CRACKER
+    frozenset({"BISCOITO", "AMANTEIGADO"}):("BISCOITO AMENTEIGADO",        "BISCOITO DOCE",            "cat"),  # BISCOITO X AMANTEIGADO
+
+    # ── Tipo 7: outros ────────────────────────────────────────────────────────
+    frozenset({"BANANA", "CHIPS"}):        ("SNACKS",                      "SALGADINHO",               "cat"),  # BANANA CHIPS NATURAL
+    frozenset({"BARRA", "CEREAL"}):        ("CEREAIS EM BARRA",            "MERCEARIA DOCE LIGHT E DIET","cat"), # BARRA NUTRY CEREAL
+    frozenset({"BICARBONATO", "SODIO"}):   ("TEMPEROS PRONTO EM PO/SACHE", "TEMPEROS E MOLHOS",        "cat"),  # BICARBONATO SODIO ARM & HAMMER
+
+    # ── Tipo 8: banha/gordura suína ───────────────────────────────────────────
+    frozenset({"BANHA", "SUINA"}):         ("BANHAS E GORDUDAS VEGETAIS",  "FRIAMBRERIA",              "cat"),  # BANHA AURORA SUINA 500G
+    frozenset({"GORDURA", "SUINA"}):       ("BANHAS E GORDUDAS VEGETAIS",  "FRIAMBRERIA",              "cat"),  # GORDURA SUINA SADIA 500G
+
+    # ── Tipo 9: limpeza e utilidades ──────────────────────────────────────────
+    frozenset({"SABAO", "COCO"}):          ("SABAO EM BARRA E PASTA",      "LIMPEZA PARA ROUPAS",      "cat"),  # SABAO BARRA COCO BRILHANTE
+    frozenset({"BALDE", "PLASTICO"}):      ("BALDES DE PLASTICO",          "UTILIDADES DA COZINHA",    "cat"),  # BALDE PLASTICO 10L
+
+    # ── Tipo 10: padaria e frios ──────────────────────────────────────────────
+    frozenset({"PAO", "BATATA"}):          ("PAES ESPECIAIS",              "PANIFICACAO PRODUCAO PROPRIA", "cat"),  # PAO DE BATATA / PAO BATATA RECHEADO
+    frozenset({"BACON", "CUBOS"}):         ("DEFUMADOS DA FRIAMBRERIA",    "FRIAMBRERIA",              "cat"),  # BACON AURORA CUBOS 100G
+    frozenset({"BACON", "DEFUMADO"}):      ("DEFUMADOS DA FRIAMBRERIA",    "FRIAMBRERIA",              "cat"),  # BACON DEFUMADO SADIA
+    # ── Tipo 16: congelados — proteína congelada vs fresca/atendimento ───────
+    frozenset({"LINGUICA", "CONGELADA"}):  ("LINGUICA CONGELADA",          "CONGELADOS",               "cat"),  # LINGUICA AURORA CONGELADA 500G
+    frozenset({"LINGUICA", "CONGELADO"}):  ("LINGUICA CONGELADA",          "CONGELADOS",               "cat"),  # LINGUICA FRIGORIFICA CONGELADO
+
+    # ── Tipo 11: temperos — pimenta separada pela marca ───────────────────────
+    frozenset({"PIMENTA", "REINO"}):       ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",         "cat"),  # PIMENTA DO REINO INCOREG 10G
+    frozenset({"PIMENTA", "CALABRESA"}):   ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",         "cat"),  # PIMENTA CALABRESA INCOREG 8G
+    frozenset({"PIMENTA", "MALAGUETA"}):   ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",         "cat"),  # PIMENTA MALAGUETA INCOREG
+    frozenset({"PIMENTA", "COMINHO"}):     ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",         "cat"),  # PIMENTA C/ COMINHO INCOREG
+
+    # ── Tipo 12: lixo e limpeza ───────────────────────────────────────────────
+    frozenset({"LIXO", "SACO"}):           ("SACOS PARA LIXO",            "UTENSILIOS PARA LIMPEZA",   "cat"),  # LIXO FIX LIXO ALMOFADA SACO 15L
+    frozenset({"LIMPADOR", "PERFUME"}):    ("MULTIUSO",                   "LIMPEZA DE CASA",            "cat"),  # LIMPADOR PERFUMADO UAU / AGRADABLE
+
+    # ── Tipo 13: capilares — marca separa tokens ──────────────────────────────
+    frozenset({"CREME", "TRATAMENTO"}):   ("CREMES P/ HIDRATACAO",        "PRODUTOS CAPILARES",         "cat"),  # CREME ELSEVE TRATAMENTO 450G
+    # ── Tipo 14: desodorante por subtipo ─────────────────────────────────────
+    frozenset({"DESODORANTE", "AEROSOL"}):("DESODORANTE AEROSOL",         "DESODORANTES E COLONIAS",    "cat"),  # DES REXONA AEROSOL 150ML
+    frozenset({"DESODORANTE", "SPRAY"}):  ("DESODORANTE AEROSOL",         "DESODORANTES E COLONIAS",    "cat"),  # DES DOVE SPRAY 150ML
+    # ── Tipo 15: sementes alimentícias — SEMENTE + nome define produto industrial
+    frozenset({"SEMENTE", "GIRASSOL"}):   ("SEMENTES (CHIA, LINHACA, GIRASSOL, ETC.)", "FARINACEOS",   "cat"),  # SEMENTE DE GIRASSOL YOKI 100G
+    frozenset({"SEMENTE", "CHIA"}):       ("SEMENTES (CHIA, LINHACA, GIRASSOL, ETC.)", "FARINACEOS",   "cat"),  # SEMENTE CHIA YOKI
+    frozenset({"SEMENTE", "LINHACA"}):    ("SEMENTES (CHIA, LINHACA, GIRASSOL, ETC.)", "FARINACEOS",   "cat"),  # SEMENTE LINHACA DOURADA
+    frozenset({"SEMENTE", "GERGELIM"}):   ("SEMENTES (CHIA, LINHACA, GIRASSOL, ETC.)", "FARINACEOS",   "cat"),  # SEMENTE GERGELIM
+
+    # ── Tipo 17: peixe + modificador define fresco vs congelado ──────────────
+    frozenset({"PEIXE", "POSTAS"}):       ("PEIXES CONGELADO",         "CONGELADOS",            "cat"),  # PEIXE MERLUZA POSTAS 800G
+    frozenset({"PEIXE", "POSTA"}):        ("PEIXES CONGELADO",         "CONGELADOS",            "cat"),  # PEIXE TILAPIA POSTA 1KG
+    frozenset({"PEIXE", "FILE"}):         ("PEIXES CONGELADO",         "CONGELADOS",            "cat"),  # PEIXE FILE TILAPIA 400G
+    frozenset({"PEIXE", "INTEIRO"}):      ("PEIXE FRESCO",             "PEIXES",                "cat"),  # PEIXE INTEIRO KG (açougue)
+
+    # ── Tipo 18: cacau em pó → culinária doce (não chocolates de barra) ──────
+    frozenset({"CACAU", "PO"}):           ("CHOCOLATES EM PO",         "CULINARIA DOCE",        "cat"),  # CACAU PO GAROTO 200G
+
+    # ── Tipo 19: azeite — marca separa AZEITE ... VIRGEM ─────────────────────
+    frozenset({"AZEITE", "VIRGEM"}):      ("AZEITE EXTRA VIRGEM",      "AZEITES",               "cat"),  # AZEITE GALLO EXTRA VIRGEM 500ML
+
+    # ── Tipo 20: vinagres com modificador separado por marca ──────────────────
+    frozenset({"VINAGRE", "MACA"}):       ("VINAGRE DE MACA",          "VINAGRES",              "cat"),  # VINAGRE MACA HEINZ 500ML
+    frozenset({"VINAGRE", "ARROZ"}):      ("VINAGRE DE ARROZ",         "VINAGRES",              "cat"),  # VINAGRE ARROZ SUSHI
+
+    # ── Tipo 21: chocolate em barra — marca separa CHOCOLATE ... BARRA ───────
+    frozenset({"CHOCOLATE", "BARRA"}):    ("CHOCOLATE EM BARRAS",      "CHOCOLATES",            "cat"),  # CHOCOLATE LACTA BARRA 170G
+
+    # ── Tipo 22: noz moscada — NOZ sozinho iria para FRUTAS SECAS ────────────
+    frozenset({"NOZ", "MOSCADA"}):        ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",   "cat"),  # NOZ MOSCADA INCOREG 15G
+
+    # ── Tipo 23: cervejas — marca/volume separa subtipo ──────────────────────
+    frozenset({"CERVEJA", "LATA"}):       ("CERVEJA LATA",             "CERVEJAS",              "cat"),  # CERVEJA SKOL LATA 350ML
+    frozenset({"CERVEJA", "LATAO"}):      ("CERVEJA LATA",             "CERVEJAS",              "cat"),  # CERVEJA BRAHMA LATAO 473ML
+    frozenset({"CERVEJA", "LONG"}):       ("CERVEJA LONG NECK",        "CERVEJAS",              "cat"),  # CERVEJA HEINEKEN LONG NECK
+    frozenset({"CERVEJA", "NECK"}):       ("CERVEJA LONG NECK",        "CERVEJAS",              "cat"),  # CERVEJA CORONA LONG NECK 330ML
+
+    # ── Tipo 24: massas — tipo separado por marca ─────────────────────────────
+    frozenset({"MACARRAO", "SEMOLA"}):    ("MASSA SEMOLA",             "MASSAS E SOPAS",        "cat"),  # MACARRAO BARILLA SEMOLA 500G
+    frozenset({"MACARRAO", "OVOS"}):      ("MASSA COM OVOS",           "MASSAS E SOPAS",        "cat"),  # MACARRAO RENATA OVOS 500G
+    frozenset({"MASSA", "PASTEL"}):       ("OUTRAS MASSAS",            "MASSAS E SOPAS",        "cat"),  # MASSA AROSA PASTEL 500G
+
+    # ── Tipo 25: sopas — creme de cebola / tempero de sopa ───────────────────
+    frozenset({"CREME", "CEBOLA"}):       ("SOPAS",                    "MASSAS E SOPAS",        "cat"),  # CREME CEBOLA KNORR 60G
+
+    # ── Tipo 26: caldos de marca (token CALDO + marca específica) ────────────
+    frozenset({"CALDO", "KNORR"}):        ("CALDO TABLETE E PO",       "TEMPEROS E MOLHOS",     "cat"),  # CALDO KNORR GALINHA 57G
+    frozenset({"CALDO", "MAGGI"}):        ("CALDO TABLETE E PO",       "TEMPEROS E MOLHOS",     "cat"),  # CALDO MAGGI CARNE 37G
+
+    # ── Tipo 27: molhos — marca separa MOLHO do tipo ─────────────────────────
+    frozenset({"MOLHO", "TOMATE"}):       ("MOLHOS E POLPAS TOMATE",   "TEMPEROS E MOLHOS",     "cat"),  # MOLHO AURORA TOMATE 340G
+    frozenset({"MOLHO", "PIMENTA"}):      ("MOLHO DE PIMENTA",         "TEMPEROS E MOLHOS",     "cat"),  # MOLHO TABASCO PIMENTA 60ML
+
+    # ── Tipo 28: laticínios — marca separa tokens ─────────────────────────────
+    frozenset({"CREME", "LEITE"}):        ("CREME DE LEITE",           "CULINARIA DOCE",        "cat"),  # CREME NESTLÉ LEITE 200G
+    frozenset({"DOCE", "LEITE"}):         ("DOCES DE LEITE",           "SOBREMESAS E OUTROS DOCES", "cat"),  # DOCE VIGOR LEITE 400G
+
+    # ── Tipo 29: temperos com marca ───────────────────────────────────────────
+    frozenset({"TEMPERO", "SAZON"}):      ("TEMPEROS PRONTO EM PO/SACHE","TEMPEROS E MOLHOS",   "cat"),  # TEMPERO SAZON FRANGO 60G
+
+    # ── Tipo 30: leite em pó — marca separa LEITE e PO ───────────────────────
+    frozenset({"LEITE", "PO"}):           ("LEITE EM PO",              "LEITE",                 "cat"),  # LEITE NINHO PO 400G
+
+    # ── Tipo 31: capilares — reparador de pontas ──────────────────────────────
+    frozenset({"REPARADOR", "PONTAS"}):   ("PRODUTOS CAPILARES",       None,                    "grp"),  # REPARADOR ELVIVE PONTAS 200ML
+
+    # ── Tipo 32: feijão — subtipo separado por marca ──────────────────────────
+    frozenset({"FEIJAO", "CARIOCA"}):     ("FEIJAO CARIOCA",           "FEIJAO",                "cat"),  # FEIJAO CAMIL CARIOCA 1KG
+    frozenset({"FEIJAO", "PRETO"}):       ("FEIJAO PRETO",             "FEIJAO",                "cat"),  # FEIJAO CAMIL PRETO 1KG
+    frozenset({"FEIJAO", "BRANCO"}):      ("FEIJAO BRANCO",            "FEIJAO",                "cat"),  # FEIJAO BRANCO 1KG
+    frozenset({"FEIJAO", "CORDA"}):       ("FEIJAO DE CORDA",          "FEIJAO",                "cat"),  # FEIJAO DE CORDA 1KG
+    frozenset({"FEIJAO", "JALO"}):        ("FEIJAO JALO",              "FEIJAO",                "cat"),  # FEIJAO JALO 1KG
+
+    # ── Tipo 33: utensílios — abridor separado do objeto ──────────────────────
+    frozenset({"ABRIDOR", "LATA"}):       ("OUTRAS UTILIDADES DE COZINHA", "UTILIDADES DA COZINHA", "cat"),
+    frozenset({"ABRIDOR", "LATAS"}):      ("OUTRAS UTILIDADES DE COZINHA", "UTILIDADES DA COZINHA", "cat"),
+    frozenset({"ABRIDOR", "VINHO"}):      ("OUTRAS UTILIDADES DE COZINHA", "UTILIDADES DA COZINHA", "cat"),  # saca-rolha
+    frozenset({"AFIADOR", "FACA"}):       ("OUTRAS UTILIDADES DE COZINHA", "UTILIDADES DA COZINHA", "cat"),
+
+    # ── Tipo 34: absorvente com abas ──────────────────────────────────────────
+    frozenset({"ABSORVENTE", "ABAS"}):    ("ABSORVENTE EXTERNO",       "ABSORVENTES",           "cat"),
+
+    # ── Tipo 35: estética — manicure ──────────────────────────────────────────
+    frozenset({"ALICATE", "CUTICULA"}):   ("ACESSORIOS MANICURE",      "ESTETICA",              "cat"),
+    frozenset({"CORTADOR", "UNHAS"}):     ("ACESSORIOS MANICURE",      "ESTETICA",              "cat"),
+
+    # ── Tipo 36: água de coco — marca separa AGUA e COCO ─────────────────────
+    frozenset({"AGUA", "COCO"}):          ("AGUA DE COCO",             "AGUAS",                 "cat"),  # AGUA SOCOCO COCO 1L
+
+    # ── Tipo 37: café solúvel — marca separa CAFE e SOLUVEL ───────────────────
+    frozenset({"CAFE", "SOLUVEL"}):       ("CAFE SOLUVEL",             "MATINAIS",              "cat"),  # CAFE NESCAFE SOLUVEL 200G
 }
 
 
@@ -533,7 +881,18 @@ def categorizar(
                 return _match_por_categoria_nome(cat_nome, session, score=0.98,
                                                  grupo_preferido=grp_pref)
 
-    # 0a. Vocabulário de tipo de produto (evita conflitos como MACA → FRUTAS em VINAGRE DE MACA)
+    # 0a. Combinações não adjacentes (prioridade alta: resolve antes dos vocabs de grupo).
+    #     Cobre casos como "COCO ANCHIETA RALADO" e "FARINHA YOKI MANDIOCA 1KG"
+    #     onde a marca separa os tokens que definem a categoria.
+    tokens_set = set(palavras)
+    for combinacao, (cat_nome, grp_pref, nivel) in _VOCAB_COMBINACAO.items():
+        if combinacao.issubset(tokens_set):
+            if nivel == "grp":
+                return _match_por_grupo_nome(cat_nome, session, score=0.97)
+            return _match_por_categoria_nome(cat_nome, session, score=0.97,
+                                             grupo_preferido=grp_pref)
+
+    # 0b. Vocabulário de tipo de produto (evita conflitos como MACA → FRUTAS em VINAGRE DE MACA)
     #     Bigramas primeiro (ex: "FARINHA DE TRIGO" > "FARINHA")
     for i in range(len(palavras) - 1):
         bigrama = f"{palavras[i]} {palavras[i+1]}"
@@ -543,7 +902,7 @@ def categorizar(
         if token in _VOCAB_TIPO_PRODUTO:
             return _match_por_grupo_nome(_VOCAB_TIPO_PRODUTO[token], session, score=0.95)
 
-    # 0b. Vocabulário de hortifruti (bigramas primeiro: BATATA DOCE > BATATA)
+    # 0c. Vocabulário de hortifruti (bigramas primeiro: BATATA DOCE > BATATA)
     for i in range(len(palavras) - 1):
         bigrama = f"{palavras[i]} {palavras[i+1]}"
         if bigrama in _VOCAB_HORTIFRUTI:

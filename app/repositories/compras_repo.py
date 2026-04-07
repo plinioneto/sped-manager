@@ -4,6 +4,7 @@ from app.models.documento_fiscal import DocumentoFiscal
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
 from app.models.participante import Participante
+from app.models.categoria import Departamento, Grupo, Categoria
 from app.repositories.base_repo import BaseRepository
 
 
@@ -181,7 +182,8 @@ class ComprasRepository(BaseRepository):
     # Agrupamentos
     # ------------------------------------------------------------------
 
-    def agrupar_por_fornecedor(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None) -> list:
+    def agrupar_por_fornecedor(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None,
+                               departamento_id=None, grupo_id=None, categoria_id=None) -> list:
         q = (
             self.session.query(
                 DocumentoFiscal.cod_part,
@@ -204,6 +206,7 @@ class ComprasRepository(BaseRepository):
             )
         )
         q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        q = self._filtro_hierarquia_via_doc(q, departamento_id, grupo_id, categoria_id)
         return (
             q.group_by(DocumentoFiscal.cod_part, Participante.nome, Participante.cnpj)
             .order_by(func.sum(DocumentoFiscal.vl_doc).desc())
@@ -320,6 +323,164 @@ class ComprasRepository(BaseRepository):
                 Participante.nome,
             )
             .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            .all()
+        )
+
+    # ------------------------------------------------------------------
+    # Agrupamento por classificação mercadológica
+    # ------------------------------------------------------------------
+
+    def _base_itens_entrada(self, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None):
+        """Base compartilhada para queries de agrupamento hierárquico."""
+        q = (
+            self.session.query(
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .outerjoin(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+            )
+        )
+        return self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+
+    def agrupar_por_departamento(self, ano=None, meses=None, fornecedor=None,
+                                  num_nota=None, produto=None) -> list:
+        """Valor de compras agrupado por departamento (inclui Não classificado)."""
+        q = (
+            self.session.query(
+                func.coalesce(Departamento.descricao, "Não classificado").label("nome"),
+                Produto.departamento_id,
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .outerjoin(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Departamento, Departamento.id == Produto.departamento_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        return (
+            q.group_by(
+                func.coalesce(Departamento.descricao, "Não classificado"),
+                Produto.departamento_id,
+            )
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+
+    def agrupar_por_grupo(self, departamento_id, ano=None, meses=None, fornecedor=None,
+                           num_nota=None, produto=None) -> list:
+        """Valor de compras agrupado por grupo, filtrado por departamento."""
+        q = (
+            self.session.query(
+                func.coalesce(Grupo.descricao, "Não classificado").label("nome"),
+                Produto.grupo_id,
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .join(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Grupo, Grupo.id == Produto.grupo_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+                Produto.departamento_id == departamento_id,
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        return (
+            q.group_by(
+                func.coalesce(Grupo.descricao, "Não classificado"),
+                Produto.grupo_id,
+            )
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+
+    def agrupar_por_categoria(self, grupo_id, ano=None, meses=None, fornecedor=None,
+                               num_nota=None, produto=None) -> list:
+        """Valor de compras agrupado por categoria, filtrado por grupo."""
+        q = (
+            self.session.query(
+                func.coalesce(Categoria.descricao, "Não classificado").label("nome"),
+                Produto.categoria_id,
+                func.sum(ItemFiscal.vl_item).label("valor"),
+                func.count(ItemFiscal.id).label("qtd_itens"),
+                func.count(ItemFiscal.cod_item.distinct()).label("qtd_skus"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .join(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .outerjoin(Categoria, Categoria.id == Produto.categoria_id)
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+                Produto.grupo_id == grupo_id,
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        return (
+            q.group_by(
+                func.coalesce(Categoria.descricao, "Não classificado"),
+                Produto.categoria_id,
+            )
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
+            .all()
+        )
+
+    def agrupar_por_produto_categoria(self, categoria_id, ano=None, meses=None,
+                                       fornecedor=None, num_nota=None, produto=None) -> list:
+        """Produtos de uma categoria específica com valores de compra."""
+        q = (
+            self.session.query(
+                ItemFiscal.cod_item,
+                Produto.descr_item,
+                Produto.descricao_padrao,
+                Produto.unid_inv,
+                func.sum(ItemFiscal.vl_item).label("vl_total"),
+                func.sum(ItemFiscal.qtd).label("qtd_total"),
+                func.count(DocumentoFiscal.id.distinct()).label("qtd_notas"),
+            )
+            .join(DocumentoFiscal, ItemFiscal.documento_id == DocumentoFiscal.id)
+            .join(
+                Produto,
+                (Produto.tenant_id == self.tenant_id)
+                & (Produto.cod_item == ItemFiscal.cod_item),
+            )
+            .filter(
+                ItemFiscal.tenant_id == self.tenant_id,
+                DocumentoFiscal.ind_oper == "0",
+                Produto.categoria_id == categoria_id,
+            )
+        )
+        q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
+        return (
+            q.group_by(ItemFiscal.cod_item, Produto.descr_item, Produto.descricao_padrao, Produto.unid_inv)
+            .order_by(func.sum(ItemFiscal.vl_item).desc())
             .all()
         )
 
