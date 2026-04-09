@@ -99,7 +99,7 @@ DADOS: list[tuple[str, list[str]]] = [
     ("Fini",                       ["Fini"]),
 
     # ── Cervejas — especiais / adicionais ────────────────────────────────────
-    ("Coca-Cola FEMSA",            ["Therezópolis"]),
+    ("Coca-Cola FEMSA",            ["Kuat", "Therezópolis"]),
     ("Cervejaria Cidade Imperial", ["Império", "Puro Malte Pilsen"]),
     ("Cervejaria Brüder",          ["BG"]),
     ("Hijos de Rivera",            ["Estrella Galicia"]),

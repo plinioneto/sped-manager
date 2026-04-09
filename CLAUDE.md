@@ -348,6 +348,14 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 | Data | Tipo | Entrada |
 |------|------|---------|
+| 2026-04-09 | Abreviação | `grf`, `gf`, `gfa` → garrafa |
+| 2026-04-09 | Abreviação | `guar` → guarana |
+| 2026-04-09 | Abreviação | `parbo` → parbolizado |
+| 2026-04-09 | Combinação | `{DESODORANTE, ROLLON}` → Perfumaria > Desodorantes e Colônias > Desodorante Rollon |
+| 2026-04-09 | Combinação | `{DESODORANTE, CREME}` → Perfumaria > Desodorantes e Colônias > Desodorante Creme |
+| 2026-04-09 | Combinação | `{OLEO, CAPILAR}` → Perfumaria > Produtos Capilares > Cremes p/ Hidratação |
+| 2026-04-09 | Combinação | `{SAL, GROSSO}` → Commodities > Sal > Sal Grosso |
+| 2026-04-09 | Marca | KUAT \| COCA-COLA FEMSA |
 | 2026-04-09 | Abreviação | `conf` → confeito |
 | 2026-04-09 | Fabricante | FINI |
 | 2026-04-09 | Fabricante | CERVEJARIA CIDADE IMPERIAL |

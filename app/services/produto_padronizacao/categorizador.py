@@ -804,6 +804,16 @@ _VOCAB_COMBINACAO: dict[frozenset, tuple[str, str | None, str]] = {
 
     # ── Tipo 37: café solúvel — marca separa CAFE e SOLUVEL ───────────────────
     frozenset({"CAFE", "SOLUVEL"}):       ("CAFE SOLUVEL",             "MATINAIS",              "cat"),  # CAFE NESCAFE SOLUVEL 200G
+
+    # ── Tipo 38: desodorante por subtipo (marca separa DESODORANTE do tipo) ───
+    frozenset({"DESODORANTE", "ROLLON"}): ("DESODORANTE ROLLON",       "DESODORANTES E COLONIAS","cat"),  # DESODORANTE DOVE ROLLON 50ML
+    frozenset({"DESODORANTE", "CREME"}):  ("DESODORANTE CREME",        "DESODORANTES E COLONIAS","cat"),  # DESODORANTE REXONA CREME 58G
+
+    # ── Tipo 39: óleo capilar — OLEO sozinho iria para óleo alimentício ───────
+    frozenset({"OLEO", "CAPILAR"}):       ("CREMES P/ HIDRATACAO",     "PRODUTOS CAPILARES",    "cat"),  # OLEO CAPILAR ELSEVE 100ML
+
+    # ── Tipo 40: sal grosso — SAL sozinho vai para o grupo genérico ───────────
+    frozenset({"SAL", "GROSSO"}):         ("SAL GROSSO",               "SAL",                   "cat"),  # SAL GROSSO LEBRE 1KG
 }
 
 
