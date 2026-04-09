@@ -329,7 +329,7 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 
 #### Abreviações
 <!-- formato: abrev → expansão -->
-conf -> confeito
+
 #### Categorias
 <!-- formato: keyword → Departamento > Grupo > Categoria -->
 
@@ -338,16 +338,27 @@ conf -> confeito
 
 #### Marcas
 <!-- formato: Nome | Fabricante | alias1, alias2, ... -->
-Fini | Fini | fini
+
 #### Fabricantes
 <!-- formato: Nome | alias1, alias2, ... -->
-Fini| fini
+
 ---
 
 ### ✅ Histórico de adições aplicadas
 
 | Data | Tipo | Entrada |
 |------|------|---------|
+| 2026-04-09 | Abreviação | `conf` → confeito |
+| 2026-04-09 | Fabricante | FINI |
+| 2026-04-09 | Fabricante | CERVEJARIA CIDADE IMPERIAL |
+| 2026-04-09 | Fabricante | CERVEJARIA BRUDER |
+| 2026-04-09 | Fabricante | HIJOS DE RIVERA |
+| 2026-04-09 | Marca | FINI \| FINI (aliases já no identificador.py) |
+| 2026-04-09 | Marca | THEREZOPOLIS \| COCA-COLA FEMSA \| THEREZOP |
+| 2026-04-09 | Marca | IMPERIO \| CERVEJARIA CIDADE IMPERIAL |
+| 2026-04-09 | Marca | PURO MALTE PILSEN \| CERVEJARIA CIDADE IMPERIAL \| PURO MALTE |
+| 2026-04-09 | Marca | BG \| CERVEJARIA BRUDER \| BAIXA GASTRONOMIA |
+| 2026-04-09 | Marca | ESTRELLA GALICIA \| HIJOS DE RIVERA \| ESTRELLA |
 | 2026-04-02 | Abreviação | `amac` → amaciante |
 | 2026-04-02 | Abreviação | `acai` → açaí |
 | 2026-04-02 | Abreviação | `ap barbear` → aparelho de barbear |

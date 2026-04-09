@@ -54,6 +54,7 @@ ABREVIACOES: dict[str, str] = {
     "FILE":         "FILE",
     "MAC":          "MACARRAO",
     "CHOC":         "CHOCOLATE",
+    "CONF":         "CONFEITO",
     "APERIT":       "APERITIVO",
     "CAFE":         "CAFE",
     "TEMP":         "TEMPERO",

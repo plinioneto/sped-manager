@@ -95,6 +95,15 @@ DADOS: list[tuple[str, list[str]]] = [
     ("Duvel Moortgat",       ["Duvel", "Vedett", "La Chouffe", "Liefmans"]),
     ("Abbaye de Scourmont",  ["Chimay"]),
 
+    # ── Confeitaria / balas ──────────────────────────────────────────────────
+    ("Fini",                       ["Fini"]),
+
+    # ── Cervejas — especiais / adicionais ────────────────────────────────────
+    ("Coca-Cola FEMSA",            ["Therezópolis"]),
+    ("Cervejaria Cidade Imperial", ["Império", "Puro Malte Pilsen"]),
+    ("Cervejaria Brüder",          ["BG"]),
+    ("Hijos de Rivera",            ["Estrella Galicia"]),
+
     # ── Cervejas — artesanais brasileiras ────────────────────────────────────
     ("Cervejaria Backer",    ["Backer", "Leopoldina"]),
     ("Cervejaria Krug Bier", ["Krug Bier"]),

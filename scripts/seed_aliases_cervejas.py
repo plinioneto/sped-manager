@@ -129,6 +129,13 @@ ALIASES_CERVEJAS: dict[str, list[str]] = {
     "2 CABECAS":           ["2 CABECAS", "DOIS CABECAS"],
     "DAMA BIER":           ["DAMA BIER", "DAMA"],
     "WAY BEER":            ["WAY BEER"],
+
+    # ── ESPECIAIS / ADICIONADOS VIA FILA ─────────────────────────────────────
+    "THEREZOPOLIS":        ["THEREZOPOLIS", "THEREZOP"],
+    "IMPERIO":             ["IMPERIO"],
+    "PURO MALTE PILSEN":   ["PURO MALTE"],
+    "BG":                  ["BG", "BAIXA GASTRONOMIA"],  # ← CRÍTICO: nome completo da marca
+    "ESTRELLA GALICIA":    ["ESTRELLA GALICIA", "ESTRELLA"],
 }
 
 
