@@ -115,53 +115,96 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Tokens desconhecidos: pipeline salva no banco (tabela `tokens_desconhecidos`) tokens ≥4 chars não reconhecidos por nenhum dicionário; acessíveis na aba "Tokens Desconhecidos" do admin, ordenados por frequência; uso esperado: alimentar novas entradas na fila do CLAUDE.md
 - scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
 
+## Diagnóstico de Arquitetura (2026-05-12)
+
+### Pontos fortes
+- Padrão repository correto e consistente — `tenant_id` filtrado em toda query de leitura
+- bcrypt para senhas — escolha correta
+- Parser bronze/silver bem desenhado — upserts, separação de responsabilidades, tratamento de encoding
+- Isolamento multi-tenant arquiteturalmente sólido
+- Catálogo EAN global — herança de classificação entre tenants entrega valor real
+- O pipeline de padronização é investimento justificado: habilita navegação hierárquica no produto E é a base técnica para o modelo de dados anônimos para indústrias (IRI/Nielsen)
+
+### Problemas identificados
+
+#### Críticos (bloqueiam produção)
+1. **Migrações via try/except** — `run_migrations()` engole silenciosamente qualquer erro. No SQLite funciona porque o único erro esperado é "coluna já existe". No PostgreSQL, erros reais (permissão, tipo incompatível, lock de tabela) também seriam ignorados. Substituir por **Alembic**.
+2. **Gerenciamento de sessões inconsistente** — páginas usam `next(get_session())` + `db.close()` manual em try/finally espalhados. Se uma exceção ocorrer antes do `close()`, a sessão vaza. Trocar por context manager (`with get_db() as db:`).
+3. **Segurança mínima ausente** — `ADMIN_PASSWORD` tem fallback hardcoded `"admin123"`, URL do admin é adivinhável, sem rate limiting. Baixo risco enquanto local; crítico antes do deploy.
+
+#### Qualidade e manutenibilidade
+4. **Regras do categorizador em código** — cada nova entrada (abreviação, categoria, combinação) exige edição de arquivo Python + deploy. Com ~200 regras acumuladas, o custo cresce indefinidamente. Solução: mover para tabelas editáveis no banco, gerenciáveis pelo painel admin.
+5. **`08_admin_revisao.py` tem 1.392 linhas** — uma página fazendo revisão individual, lote, marcas, tokens, clientes, upload e grupos. Ponto crítico de manutenção.
+6. **Sem testes** — 9.000 linhas, zero testes. Qualquer refatoração do pipeline ou do parser é uma aposta cega.
+
+#### Limitação de produto
+7. **Gestão de vendas incompleta sem XML** — EFD de supermercado tem C170 (itens) apenas para entradas. Saídas (varejo) viram C190: resumo fiscal sem produto ou quantidade. A página `01_gestao_vendas.py` mostra faturamento e impostos, não vendas de produto. **NFC-e XML é pré-requisito para o módulo funcionar**.
+
+---
+
+## Stack futura
+
+O Streamlit foi a escolha certa para validar. O teto é baixo para produção: sem controle de estado real, sem componentes customizáveis, dificuldade com multi-usuário e performance limitada em queries pesadas.
+
+**Destino:**
+- **Backend:** FastAPI — preserva todo o código Python existente; só adiciona camada de rotas em cima dos services e repositories atuais
+- **Frontend:** React + [Tremor](https://tremor.so) — biblioteca de componentes feita para dashboards analíticos (charts, KPI cards, tabelas, filtros prontos)
+- **Auth:** JWT com FastAPI — substitui `session_state` por tokens Bearer padrão de mercado
+
+**O que migra sem tocar:** `app/models/`, `app/repositories/`, `app/services/`, `app/parser/`, `app/utils/`
+**O que é reescrito:** `app/pages/` (só a camada UI — o menor custo de reescrita possível)
+
+---
+
 ## Pendente
 
-### 🔴 Alta prioridade — bloqueiam uso com clientes reais
+### 🔴 Fase 1 — Deploy com produto funcional (prioridade máxima)
 
-- [ ] **Autenticação com senha criptografada** — hoje qualquer pessoa com o CNPJ entra; pré-requisito para qualquer deploy
-- [ ] **Login por código curto**: coluna `codigo_acesso` (String, unique, nullable) na tabela `tenants`; tela de login tenta código curto primeiro, depois CNPJ; geração automática no cadastro ou definida pelo admin
-- [ ] **Migração para PostgreSQL** — troca só o `.env`; necessário antes do deploy
-- [ ] **Deploy no Streamlit Cloud**
+Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto perfeito sem usuários.
 
-### 🟠 Etapa 2 — Multi-loja nas páginas de gestão (pré-requisito: Etapa 1 concluída ✅)
+- [x] **Import XML NFC-e/NF-e** — `app/parser/xml_parser.py` implementado; suporta NFC-e (mod 65, saída) e NF-e (mod 55, entrada/saída); valida CNPJ, deduplica por chv_nfe, upsert Produto/Participante/ItemFiscal/IcmsC190; suporta ZIP com múltiplos XMLs; `06_dados.py` com aba "Upload XML"
+- [ ] **Alembic** — substituir `run_migrations()` pelo padrão correto de versionamento de schema; necessário antes de qualquer uso sério do PostgreSQL
+- [ ] **Context manager de sessão** — trocar `next(get_session())` + `db.close()` manual por `with get_db() as db:` em todas as páginas e services
+- [ ] **Segurança mínima** — remover fallback `"admin123"`, obrigar `ADMIN_PASSWORD` no `.env`, obscurecer ou proteger URL do admin
+- [ ] **Deploy** — Streamlit Cloud + Supabase (PostgreSQL); configurar secrets, remover PRAGMAs SQLite do caminho de migração, testar com dados reais
+- [ ] **Definir tipo de cliente foco** — fiscal (contador/escritório contábil) ou gestão (dono de loja); escopo das primeiras demos
 
-Permitir que donos de grupos vejam dados consolidados de todas as lojas e filtrem por loja nas páginas de gestão. Requer:
+### 🟠 Fase 2 — Qualidade interna (com usuários iniciais)
 
-- **`app/repositories/base_repo.py`** — aceitar `tenant_ids: list[int]`; manter `self.tenant_id` para backwards compat em métodos de escrita
-- **8 repositories** — trocar `== self.tenant_id` por `.in_(self.tenant_ids)` em todos os filtros de leitura; `compras_repo.py` tem helper `_aplicar_filtros_doc` com assinatura a mudar; `estoque_repo.py` e `inventario_repo.py` têm JOINs com tupla Python → converter para `and_()` explícito
-- **`app/main.py`** — após login, se tenant tiver `grupo_id`: carregar todas as lojas do grupo em `st.session_state.tenant_ids` e `lojas_disponiveis`; sempre inicializar `active_tenant_ids = tenant_ids[:]`
-- **`app/components/sidebar.py`** — exibir `grupo_nome` no topo; quando 2+ lojas: `st.sidebar.multiselect` que atualiza `active_tenant_ids` e chama `st.rerun()`; logout limpa todas as novas chaves
-- **Páginas 00–05** — usar `active_tenant_ids` em vez de `tenant_id` único; tabelas de listagem ganham coluna "Loja" quando multi-store; `06_dados.py` não muda (upload sempre single-tenant)
-- Extras nas páginas: `00_inicio.py` label "Consolidado — N lojas"; query direta em `ArquivoImportado.tenant_id` → `.in_()`; `05_produtos.py` query direta em `Produto.tenant_id` → `.in_()`
+- [ ] **Regras do categorizador no banco** — tabelas `regras_abreviacao` e `regras_categorizacao` editáveis pelo painel admin; elimina o ciclo "escreve no CLAUDE.md → aplica fila → deploy"; regras viram dados, não código
+- [ ] **Dividir `08_admin_revisao.py`** — 1.392 linhas fazendo coisas demais; extrair lógica para services; separar UI em módulos por domínio (produtos, marcas, clientes, tokens)
+- [ ] **Testes de unidade** — parser silver (arquivo EFD de amostra fixo como fixture) + `processar_descricao` com casos de entrada conhecidos; 20–30 testes já dão segurança para refatorar o pipeline
+- [ ] **Padrão de cores global** — paleta de 5–6 cores em `utils/theme.py` aplicada em todas as páginas (já existe o arquivo, falta consistência)
+- [ ] **Multi-loja (Etapa 2)** — ver especificação técnica detalhada abaixo; só faz sentido após ter clientes de grupo empresarial reais
 
-Compatibilidade garantida: tenant sem grupo funciona idêntico ao atual (`active_tenant_ids = [tenant.id]`).
+### 🟠 Fase 3 — Migração FastAPI + React
 
-### 🟠 Etapa 3 — Gestão Macro→Micro (Depto > Grupo > Cat > Produto)
+O Streamlit foi a escolha certa para validar. O teto é baixo para produção: sem controle de estado real, sem componentes customizáveis, dificuldade com multi-usuário e performance limitada.
 
-Infraestrutura criada (2026-04-06): `app/components/filtro_hierarquia.py` + helpers em `base_repo.py` (`_filtro_hierarquia_via_doc`, `_filtro_hierarquia_via_item`, `_filtro_hierarquia_por_produto`). Página Início já integrada. **Limitação descoberta: supermercados não emitem C170 de saída → gráfico de composição por departamento de vendas só funcionará após importação XML.**
+Stack destino definida: FastAPI (backend) + React + Tremor (frontend) + JWT (auth). Ver seção "Stack futura" acima.
 
-Fases pendentes:
-- **Fase 2 (Compras):** `compras_repo.py` — `agrupar_por_departamento()`, `agrupar_por_grupo()`, `agrupar_por_categoria()`; `02_compras.py` — nova seção/aba de drill-down hierárquico
-- **Fase 3 (Fiscal):** `fiscal_repo.py` — carga tributária por departamento/grupo; `03_gestao_fiscal.py`
-- **Fase 4 (Vendas):** depende da importação XML para ter granularidade de produto nas saídas
-- **Fase 5 (Inventário):** `estoque_repo.py` / `inventario_repo.py` — saldo por departamento/grupo
-- **Fase 6 (Produtos):** unificar filtros parciais das abas 2 e 3 com `filtro_hierarquia.py`
+Ordem dentro da fase:
+1. FastAPI com rotas principais (compras, fiscal, produtos, vendas)
+2. Auth JWT substituindo `session_state` do Streamlit
+3. Frontend React + Tremor replicando páginas uma a uma
+4. Desligar Streamlit quando paridade funcional estiver completa
 
-### 🟡 Média prioridade — funcionalidades novas de valor
+O que migra sem tocar: `app/models/`, `app/repositories/`, `app/services/`, `app/parser/`, `app/utils/`
+O que é reescrito: `app/pages/` (só a camada UI — menor custo possível de reescrita)
 
-- [ ] **Importação de NF-e XML** como fonte independente de dados (arquitetura decidida — ver seção abaixo); **pré-requisito para Fase 4 da gestão macro→micro** (composição de vendas por departamento)
-- [ ] **Página `07_configuracoes.py`** — dados do tenant, gestão de usuários, código de acesso; escopo ainda a definir
-- [ ] **Padrão de cores** — todas as páginas usam cores diferentes; definir paleta de 5–6 cores e aplicar globalmente via constantes em `utils/` ou tema Streamlit
+### 🟡 Fase 4 — Features que só fazem sentido com escala
 
-### 🟢 Baixa prioridade — qualidade e escala
+- [ ] **Dados anônimos para indústrias** — modelo IRI/Nielsen; requer ~50–100 lojas para anonimização estatística válida + contrato explícito com cada cliente autorizando uso secundário dos dados; a pipeline atual já é o investimento certo para isso
+- [ ] **Modelo supervisionado de categorização** — TF-IDF + classificador simples (Naive Bayes ou Regressão Logística via scikit-learn) após ~500 revisões manuais acumuladas (`origem_padronizacao = 'manual'`); plugar em `categorizador.py` antes do Jaccard fallback; aumenta cobertura de ~70% para ~90%+
+- [ ] **Embeddings para produtos similares** — detectar duplicatas entre tenants, sugerir classificação por similaridade; custo alto de infraestrutura (~400MB de modelo), só justifica com volume alto; pós-MVP
+- [ ] **Importação NF-e XML** (B2B, notas de saída entre empresas) — complementa NFC-e; mesma arquitetura do parser XML
 
-- [x] **Catálogo global de produtos via EAN** — implementado: `catalogo_produtos` (global, sem tenant_id); silver.py faz lookup por EAN antes de rodar a pipeline; backfill popula o catálogo com produtos já classificados; `scripts/backfill_catalogo_ean.py` com flags `--dry-run` e `--tenant`
-- [ ] **Modelo supervisionado para categorização** — quando houver ~300–500 produtos revisados manualmente (`origem_padronizacao = 'manual'`), treinar um classificador simples (TF-IDF + Naive Bayes ou Regressão Logística via `scikit-learn`) usando as descrições padronizadas como entrada e `categoria_id` como rótulo. Plugar em `categorizador.py` como novo passo após `_VOCAB_CATEGORIA` e antes do Jaccard fallback — só ativa quando score dos dicionários for zero. Aumentaria cobertura de ~70% para ~90%+ sem manutenção de dicionários, generalizando para marcas regionais e abreviações nunca vistas. Pré-requisito: volume mínimo de revisões manuais acumuladas.
-- [ ] **Embeddings para produtos similares** — transformar descrições em vetores numéricos (ex: `sentence-transformers`) para detectar que `REFRIG COCA COLA PET 2L` e `COCA COLA REFRIGERANTE GARRAFA 2L` são o mesmo produto. Valor prático: (1) detectar duplicatas no cadastro entre tenants diferentes, (2) sugerir classificação por similaridade ("94% similar a produto já classificado como Refrigerantes"), (3) base para catálogo EAN sem código de barras. Custo alto de infraestrutura (~400MB de modelo); só justifica com múltiplos tenants e volume alto. Pós-MVP.
+### 🟢 Qualidade / backlog
+
 - [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
-- [ ] **README prático** (agora): como rodar localmente, configurar `.env`, rodar `init_db` e `backfill`, importar EFD, usar o painel admin. 2–3 páginas, baixo custo, útil para onboarding.
-- [ ] **Documentação técnica completa** (pós-estabilização): fazer após autenticação + deploy estarem prontos, quando o sistema tiver forma definitiva. Diagramas de arquitetura, fluxos, especificação dos models e pipeline.
+- [ ] **README prático** — como rodar localmente, configurar `.env`, rodar `init_db` e `backfill`, importar EFD, usar painel admin
+- [ ] **Documentação técnica completa** — após autenticação + deploy prontos; diagramas de arquitetura, fluxos, especificação dos models e pipeline
+- [ ] **Gestão Macro→Micro nas demais páginas** — infraestrutura criada (2026-04-06) e integrada no Início; pendente: Compras (Fase 2), Fiscal (Fase 3), Vendas (depende XML), Inventário (Fase 5), Produtos (Fase 6)
 
 ### ✅ Concluído (histórico)
 

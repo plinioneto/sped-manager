@@ -15,6 +15,7 @@ from app.models.efd_raw import EfdRaw
 from app.parser.renomeador import processar_renomeacao
 from app.parser.bronze import BronzeProcessor
 from app.parser.silver import SilverProcessor
+from app.parser.xml_parser import XmlParser
 
 if not st.session_state.get("tenant_id"):
     st.switch_page("main.py")
@@ -42,39 +43,62 @@ def executar_delecao(arq_id: int):
         if not arq:
             return
 
-        try:
-            dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
-            dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
-        except Exception:
-            dt_ini = dt_fin = None
+        is_xml = arq.nome_padronizado.startswith("XML_")
 
-        if dt_ini and dt_fin:
-            doc_ids = [
-                row.id for row in db.query(DocumentoFiscal.id).filter(
-                    DocumentoFiscal.tenant_id == tenant_id,
-                    DocumentoFiscal.dt_doc >= dt_ini,
-                    DocumentoFiscal.dt_doc <= dt_fin,
-                ).all()
-            ]
-            if doc_ids:
+        if is_xml:
+            # Deleção por chv_nfe — remove só o documento específico
+            # nome_padronizado = "XML_{chv_nfe}.xml"
+            chv_nfe = arq.nome_padronizado[4:]          # remove "XML_"
+            if chv_nfe.endswith(".xml"):
+                chv_nfe = chv_nfe[:-4]
+
+            doc = db.query(DocumentoFiscal).filter(
+                DocumentoFiscal.tenant_id == tenant_id,
+                DocumentoFiscal.chv_nfe   == chv_nfe,
+            ).first()
+            if doc:
                 db.query(IcmsC190).filter(
-                    IcmsC190.documento_id.in_(doc_ids)
+                    IcmsC190.documento_id == doc.id
                 ).delete(synchronize_session=False)
                 db.query(ItemFiscal).filter(
-                    ItemFiscal.documento_id.in_(doc_ids)
+                    ItemFiscal.documento_id == doc.id
                 ).delete(synchronize_session=False)
-                db.query(DocumentoFiscal).filter(
-                    DocumentoFiscal.id.in_(doc_ids)
-                ).delete(synchronize_session=False)
+                db.delete(doc)
+        else:
+            # Deleção EFD — por intervalo de datas (comportamento original)
+            try:
+                dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
+                dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
+            except Exception:
+                dt_ini = dt_fin = None
 
-        db.query(EfdRaw).filter(
-            EfdRaw.tenant_id == tenant_id,
-            EfdRaw.file_path == arq.nome_padronizado,
-        ).delete(synchronize_session=False)
+            if dt_ini and dt_fin:
+                doc_ids = [
+                    row.id for row in db.query(DocumentoFiscal.id).filter(
+                        DocumentoFiscal.tenant_id == tenant_id,
+                        DocumentoFiscal.dt_doc >= dt_ini,
+                        DocumentoFiscal.dt_doc <= dt_fin,
+                    ).all()
+                ]
+                if doc_ids:
+                    db.query(IcmsC190).filter(
+                        IcmsC190.documento_id.in_(doc_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(ItemFiscal).filter(
+                        ItemFiscal.documento_id.in_(doc_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(DocumentoFiscal).filter(
+                        DocumentoFiscal.id.in_(doc_ids)
+                    ).delete(synchronize_session=False)
 
-        caminho = os.path.join("storage", "arquivos", arq.nome_padronizado)
-        if os.path.exists(caminho):
-            os.remove(caminho)
+            db.query(EfdRaw).filter(
+                EfdRaw.tenant_id == tenant_id,
+                EfdRaw.file_path == arq.nome_padronizado,
+            ).delete(synchronize_session=False)
+
+            caminho = os.path.join("storage", "arquivos", arq.nome_padronizado)
+            if os.path.exists(caminho):
+                os.remove(caminho)
 
         db.delete(arq)
         db.commit()
@@ -104,7 +128,7 @@ def dialog_confirmar_delecao(arq):
 st.title("Dados")
 st.divider()
 
-tab_upload, tab_historico = st.tabs(["Upload", "Histórico"])
+tab_upload, tab_xml, tab_historico = st.tabs(["Upload EFD", "Upload XML", "Histórico"])
 
 # ===========================================================================
 # ABA: UPLOAD
@@ -268,6 +292,172 @@ with tab_upload:
                         st.warning(f"{r['arquivo']} — já importado anteriormente")
                     else:
                         st.error(f"{r['arquivo']} — erro: {r.get('erro', '')}")
+
+# ===========================================================================
+# ABA: UPLOAD XML
+# ===========================================================================
+
+with tab_xml:
+    st.caption(
+        "Importe NFC-e (vendas ao consumidor) ou NF-e de entrada (compras de fornecedores). "
+        "Aceita arquivos `.xml` individuais ou um `.zip` com vários XMLs."
+    )
+
+    arquivos_xml = st.file_uploader(
+        "Selecione arquivos XML ou ZIP",
+        type=["xml", "zip"],
+        accept_multiple_files=True,
+        help="NFC-e (mod 65) ou NF-e (mod 55) — o CNPJ do arquivo deve corresponder ao seu cadastro",
+        key="xml_uploader",
+    )
+
+    if arquivos_xml:
+        tenant_cnpj = st.session_state.get("tenant_cnpj", "")
+
+        # ── Preview ──────────────────────────────────────────────────────────
+        st.subheader(f"{len(arquivos_xml)} arquivo(s) selecionado(s)")
+        st.divider()
+
+        lotes: list[dict] = []   # {"nome", "conteudo", "tipo": "xml"|"zip", "meta": [...]}
+        tem_erro = False
+
+        for arq in arquivos_xml:
+            conteudo = arq.read()
+            nome_lower = arq.name.lower()
+
+            if nome_lower.endswith(".zip"):
+                # Preview do ZIP: lista quantos XMLs tem dentro
+                import zipfile as _zf
+                try:
+                    with _zf.ZipFile(__import__("io").BytesIO(conteudo)) as zf:
+                        xml_internos = [n for n in zf.namelist() if n.lower().endswith(".xml")]
+                    with st.expander(f"📦 {arq.name} — {len(xml_internos)} XML(s) dentro"):
+                        st.info(f"O arquivo ZIP contém **{len(xml_internos)}** XML(s) para processar.")
+                        if xml_internos:
+                            st.caption(" · ".join(xml_internos[:10]) + (" ..." if len(xml_internos) > 10 else ""))
+                    lotes.append({"nome": arq.name, "conteudo": conteudo, "tipo": "zip"})
+                except Exception as e:
+                    st.error(f"{arq.name}: ZIP inválido — {e}")
+                    tem_erro = True
+
+            else:
+                # Preview do XML individual
+                meta = XmlParser.extrair_metadados(conteudo)
+                if not meta.get("valido"):
+                    st.error(f"{arq.name}: {meta.get('erro', 'XML inválido')}")
+                    tem_erro = True
+                    continue
+
+                # Alerta de CNPJ divergente no preview
+                cnpj_tenant = __import__("re").sub(r"\D", "", tenant_cnpj or "")
+                cnpj_relevante = meta["cnpj_emit"] if meta["ind_oper"] == "1" else meta["cnpj_dest"]
+                cnpj_ok = (not cnpj_relevante) or (cnpj_relevante == cnpj_tenant)
+
+                with st.expander(
+                    f"{'✅' if cnpj_ok else '⚠️'} {arq.name} — {meta['tipo']} · {meta['dt_emissao']} · {meta['num_itens']} itens",
+                    expanded=not cnpj_ok,
+                ):
+                    c1, c2, c3 = st.columns(3)
+                    c1.info(f"**Tipo:** {meta['tipo']}")
+                    c1.info(f"**Número/Série:** {meta['num_doc']}/{meta['serie']}")
+                    c2.info(f"**Emitente:** {meta['nome_emit'] or '—'}")
+                    c2.info(f"**CNPJ emit.:** {meta['cnpj_emit'] or '—'}")
+                    c3.info(f"**Data emissão:** {meta['dt_emissao']}")
+                    c3.info(f"**Itens:** {meta['num_itens']}")
+                    if not cnpj_ok:
+                        st.warning(
+                            f"O CNPJ do XML (`{cnpj_relevante}`) não corresponde ao seu cadastro (`{cnpj_tenant}`). "
+                            "Este arquivo será rejeitado durante o processamento."
+                        )
+
+                lotes.append({"nome": arq.name, "conteudo": conteudo, "tipo": "xml"})
+
+        st.divider()
+
+        if lotes and st.button("Confirmar e processar todos", type="primary", use_container_width=True, key="btn_xml"):
+
+            db = next(get_session())
+            resumo = {"concluido": 0, "duplicata": 0, "cnpj_divergente": 0, "invalido": 0,
+                      "documentos": 0, "itens": 0, "produtos_criados": 0}
+            detalhes = []
+
+            parser = XmlParser(db, tenant_id, tenant_cnpj)
+
+            for lote in lotes:
+                if lote["tipo"] == "zip":
+                    with st.spinner(f"Processando ZIP {lote['nome']}..."):
+                        resultados = XmlParser.processar_zip(
+                            lote["conteudo"], lote["nome"], db, tenant_id, tenant_cnpj
+                        )
+                else:
+                    with st.spinner(f"Processando {lote['nome']}..."):
+                        resultado = parser.processar(lote["conteudo"], lote["nome"])
+                        resultados = [{**resultado, "arquivo": lote["nome"]}]
+
+                for r in resultados:
+                    status = r.get("status", "invalido")
+                    resumo[status] = resumo.get(status, 0) + 1
+                    resumo["documentos"]      += r.get("documentos", 0)
+                    resumo["itens"]           += r.get("itens", 0)
+                    resumo["produtos_criados"] += r.get("produtos_criados", 0)
+
+                    # Registra no ArquivoImportado (apenas arquivos concluídos)
+                    if status == "concluido":
+                        chv = r.get("chv_nfe", "")
+                        # Busca data do documento recém-criado para periodo_ini/fin
+                        doc_obj = db.query(DocumentoFiscal).filter(
+                            DocumentoFiscal.tenant_id == tenant_id,
+                            DocumentoFiscal.chv_nfe   == chv,
+                        ).first()
+                        dt_str = (
+                            doc_obj.dt_doc.strftime("%Y%m%d")
+                            if doc_obj and doc_obj.dt_doc else
+                            datetime.utcnow().strftime("%Y%m%d")
+                        )
+                        nome_pad = f"XML_{chv}.xml"
+                        # Evita duplicar registro de ArquivoImportado
+                        ja_existe = db.query(ArquivoImportado).filter(
+                            ArquivoImportado.tenant_id      == tenant_id,
+                            ArquivoImportado.nome_padronizado == nome_pad,
+                        ).first()
+                        if not ja_existe:
+                            db.add(ArquivoImportado(
+                                tenant_id        = tenant_id,
+                                nome_original    = r.get("arquivo", lote["nome"]),
+                                nome_padronizado = nome_pad,
+                                cnpj             = __import__("re").sub(r"\D", "", tenant_cnpj or ""),
+                                periodo_ini      = dt_str,
+                                periodo_fin      = dt_str,
+                                status           = "concluido",
+                                processado_em    = datetime.utcnow(),
+                            ))
+                        db.commit()
+
+                    detalhes.append(r)
+
+            db.close()
+
+            # ── Resumo final ─────────────────────────────────────────────────
+            st.divider()
+            st.subheader("Resumo da importação XML")
+
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Documentos importados", resumo["documentos"])
+            col2.metric("Itens processados",     resumo["itens"])
+            col3.metric("Produtos novos",         resumo["produtos_criados"])
+            col4.metric("Duplicatas ignoradas",   resumo["duplicata"])
+
+            if resumo["cnpj_divergente"] > 0:
+                st.warning(f"**{resumo['cnpj_divergente']}** arquivo(s) rejeitado(s) por CNPJ divergente.")
+            if resumo["invalido"] > 0:
+                st.error(f"**{resumo['invalido']}** arquivo(s) com erro de parsing.")
+
+            # Detalhamento por arquivo (erros e avisos)
+            erros = [d for d in detalhes if d.get("status") not in ("concluido", "duplicata")]
+            if erros:
+                with st.expander("Ver detalhes dos erros"):
+                    for d in erros:
+                        st.error(f"**{d.get('arquivo', '?')}** — {d.get('status')}: {d.get('erro', '')}")
 
 # ===========================================================================
 # ABA: HISTÓRICO
