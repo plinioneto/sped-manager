@@ -170,14 +170,15 @@ class XmlParser:
         resultado = parser.processar(conteudo_bytes, "NFC001.xml")
     """
 
-    def __init__(self, session: Session, tenant_id: int, tenant_cnpj: str):
+    def __init__(self, session: Session, tenant_id: int, tenant_cnpj: str, skip_padronizacao: bool = False):
         self.session = session
         self.tenant_id = tenant_id
         self.tenant_cnpj = _limpar_cnpj(tenant_cnpj)
+        self.skip_padronizacao = skip_padronizacao
 
     # ── Ponto de entrada — arquivo único ──────────────────────────────────────
 
-    def processar(self, conteudo: bytes, nome_arquivo: str) -> dict:
+    def processar(self, conteudo: bytes, nome_arquivo: str, auto_commit: bool = True) -> dict:
         """
         Processa um único XML.
 
@@ -185,6 +186,9 @@ class XmlParser:
           status: "concluido" | "duplicata" | "cnpj_divergente" | "invalido"
           documentos, itens, produtos_criados — preenchidos em caso de sucesso
           erro — mensagem em caso de falha
+
+        auto_commit=False: não faz commit (use para importação em lote; o chamador
+        deve fazer session.commit() periodicamente).
         """
         try:
             root = _parse_xml(conteudo)
@@ -225,7 +229,8 @@ class XmlParser:
         doc = self._criar_documento(inf_nfe, chv_nfe, mod, ind_oper)
         agg, prod_criados = self._processar_itens(inf_nfe, chv_nfe, doc, mod, ind_oper)
         self._derivar_c190(chv_nfe, doc.id, agg)
-        self.session.commit()
+        if auto_commit:
+            self.session.commit()
 
         total_itens = sum(v["qtd_itens"] for v in agg.values())
         return {
@@ -659,7 +664,7 @@ class XmlParser:
 
     def _aplicar_padronizacao(self, produto: Produto, descr_item: str) -> None:
         """Enriquece produto com pipeline de padronização (falha silenciosa)."""
-        if not _PADRONIZACAO_DISPONIVEL or not descr_item:
+        if self.skip_padronizacao or not _PADRONIZACAO_DISPONIVEL or not descr_item:
             return
         try:
             resultado = processar_descricao(descr_item, session=self.session)
