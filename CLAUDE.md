@@ -114,6 +114,7 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 - Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo; PRESTOBARBA é alias de GILLETTE (P&G)
 - Tokens desconhecidos: pipeline salva no banco (tabela `tokens_desconhecidos`) tokens ≥4 chars não reconhecidos por nenhum dicionário; acessíveis na aba "Tokens Desconhecidos" do admin, ordenados por frequência; uso esperado: alimentar novas entradas na fila do CLAUDE.md
 - scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
+- scripts/importar_xmls_pasta.py: importação em lote de NFC-e/NF-e XML via raw SQL (executemany); ~3000 arq/s; estrutura esperada: `PASTA/CAIXA0X/ANO/MES/Transmitidos/*.xml`; uso: `python scripts/importar_xmls_pasta.py --pasta "..." --cnpj CNPJ --ano 2025`; flags: `--mes 01`, `--dry-run`; ignora Contingencia e ErroTransmissao; dedup por chave no nome do arquivo; rode backfill_padronizacao.py depois para classificar os produtos importados
 
 ## Diagnóstico de Arquitetura (2026-05-12)
 
