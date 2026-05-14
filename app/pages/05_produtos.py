@@ -4,7 +4,7 @@ from sqlalchemy import func
 
 import app.models
 from app.components.sidebar import render_sidebar
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.produto import Produto
 from app.models.marca import Marca
 from app.models.fabricante import Fabricante
@@ -22,17 +22,13 @@ tenant_id = st.session_state.tenant_id
 st.title("Produtos")
 st.divider()
 
-db = next(get_session())
-
-try:
+with get_db() as db:
     produtos = (
         db.query(Produto)
         .filter(Produto.tenant_id == tenant_id)
         .order_by(Produto.descr_item)
         .all()
     )
-finally:
-    db.close()
 
 if not produtos:
     st.info("Nenhum produto cadastrado. Importe um arquivo EFD para popular o cadastro.")
@@ -133,13 +129,10 @@ with aba_padronizacao:
     grps  = sorted({p.grupo_id for p in produtos if p.grupo_id})
 
     # Carrega nomes para os filtros
-    db3 = next(get_session())
-    try:
+    with get_db() as db3:
         dep_nomes = {d.id: d.descricao for d in db3.query(Departamento).all()}
         grp_nomes = {g.id: g.descricao for g in db3.query(Grupo).all()}
         mrc_nomes = {m.id: m.nome for m in db3.query(Marca).all()}
-    finally:
-        db3.close()
 
     dep_opcoes = ["Todos"] + [dep_nomes[d] for d in deps if d in dep_nomes]
     dep_sel    = pf2.selectbox("Departamento", dep_opcoes, key="dep_sel_pad")
@@ -208,8 +201,7 @@ with aba_padronizacao:
 
 with aba_inteligencia:
 
-    db4 = next(get_session())
-    try:
+    with get_db() as db4:
         # Agrega por produto: qtd total comprada, valor total, nº de fornecedores, tributos
         itens_agg = (
             db4.query(
@@ -239,9 +231,6 @@ with aba_inteligencia:
             .all()
         )
         forn_map = {r.cod_item: r.n_fornecedores for r in forn_por_produto}
-
-    finally:
-        db4.close()
 
     # Constrói mapa produto para nome/marca/categoria
     prod_map = {p.cod_item: p for p in produtos}

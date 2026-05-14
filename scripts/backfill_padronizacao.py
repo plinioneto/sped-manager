@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.produto import Produto
 from app.models.marca import Marca
 from app.services.produto_padronizacao import processar_descricao
@@ -32,12 +32,10 @@ def main():
     parser.add_argument("--tenant", type=int, default=None, help="Limita ao tenant ID informado")
     args = parser.parse_args()
 
-    db = next(get_session())
+    with get_db() as db:
+        # Carrega marcas do banco no índice antes de processar
+        carregar_marcas_do_banco(db)
 
-    # Carrega marcas do banco no índice antes de processar
-    carregar_marcas_do_banco(db)
-
-    try:
         q = db.query(Produto)
 
         if args.tenant:
@@ -107,9 +105,6 @@ def main():
                 print(f"  [ERRO] {produto.cod_item} — {e}")
 
         db.commit()
-
-    finally:
-        db.close()
 
     print()
     print("-" * 40)

@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import app.models
 from app.components.sidebar import render_sidebar
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.repositories.fiscal_repo import FiscalRepository, _parse_aliq
 from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
@@ -86,14 +86,11 @@ def formatar_mes_curto(yyyymm: str) -> str:
 # Dados iniciais e filtros
 # ---------------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo = FiscalRepository(db, tenant_id)
     meses_raw = repo.meses_disponiveis()
     csts_raw = repo.csts_disponiveis()
     cfops_raw = repo.cfops_disponiveis()
-finally:
-    db.close()
 
 st.title("Gestão Fiscal")
 st.divider()
@@ -134,8 +131,7 @@ filtros = dict(ano=ano_filtro, meses=meses_filtro, cst_icms=sel_cst or None, cfo
 # Metricas globais com delta
 # ---------------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo = FiscalRepository(db, tenant_id)
     metricas = repo.metricas_visao_geral(**filtros)
 
@@ -158,8 +154,6 @@ try:
             delta_st = metricas["pct_st"] - m_ant["pct_st"]
             delta_pis_cof = (metricas["total_pis"] + metricas["total_cofins"]) - (m_ant["total_pis"] + m_ant["total_cofins"])
             delta_fat = metricas["faturamento_total"] - m_ant["faturamento_total"]
-finally:
-    db.close()
 
 st.divider()
 
@@ -218,13 +212,10 @@ aba_geral, aba_icms, aba_st, aba_pis, aba_diag = st.tabs([
 
 with aba_geral:
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = FiscalRepository(db, tenant_id)
         evolucao = repo.evolucao_mensal_tributos(**filtros)
         composicao = repo.composicao_tributaria(**filtros)
-    finally:
-        db.close()
 
     # --- Evolucao Mensal ---
     if evolucao:
@@ -305,14 +296,11 @@ with aba_geral:
 
 with aba_icms:
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = FiscalRepository(db, tenant_id)
         dist_cst = repo.distribuicao_por_cst(**filtros)
         analise_aliq = repo.analise_por_aliquota(**filtros)
         detalhe = repo.detalhe_c190(**filtros)
-    finally:
-        db.close()
 
     # --- Distribuicao por CST ---
     if dist_cst:
@@ -458,14 +446,11 @@ with aba_icms:
 
 with aba_st:
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = FiscalRepository(db, tenant_id)
         m_st = repo.metricas_st(ano=ano_filtro, meses=meses_filtro)
         top_st = repo.top_produtos_st_entrada(ano=ano_filtro, meses=meses_filtro, limit=20)
         evo_st = repo.evolucao_st_vs_proprio(ano=ano_filtro, meses=meses_filtro)
-    finally:
-        db.close()
 
     # --- Cards ST ---
     cs1, cs2, cs3 = st.columns(3)
@@ -562,13 +547,10 @@ with aba_st:
 
 with aba_pis:
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = FiscalRepository(db, tenant_id)
         m_pis = repo.metricas_pis_cofins(ano=ano_filtro, meses=meses_filtro)
         evo_pis = repo.evolucao_pis_cofins(ano=ano_filtro, meses=meses_filtro)
-    finally:
-        db.close()
 
     # --- Cards ---
     cp1, cp2, cp3, cp4 = st.columns(4)
@@ -639,14 +621,11 @@ with aba_pis:
 
 with aba_diag:
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = FiscalRepository(db, tenant_id)
         alertas = repo.alertas_cst_inconsistente(ano=ano_filtro, meses=meses_filtro)
         sem_cst = repo.produtos_sem_cst(ano=ano_filtro, meses=meses_filtro)
         concentracao = repo.concentracao_tributaria(ano=ano_filtro, meses=meses_filtro, limit=20)
-    finally:
-        db.close()
 
     # --- Alertas de inconsistencia ---
     st.subheader("Alertas de Inconsistencia")

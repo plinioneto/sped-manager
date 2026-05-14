@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 import app.models
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR
 from app.repositories.inventario_repo import InventarioRepository
 from app.repositories.estoque_repo import EstoqueRepository
@@ -55,13 +55,10 @@ aba_v, aba_h, aba_k = st.tabs([
 with aba_v:
 
     # Carrega fonte e métricas (sem filtro de busca)
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo_v = EstoqueVirtualRepository(db, st.session_state.tenant_id)
         fonte_info = repo_v.fonte_estoque_inicial()
         metricas_v = repo_v.metricas_virtual()
-    finally:
-        db.close()
 
     # Banner informativo de fonte
     data_fmt = (
@@ -115,12 +112,9 @@ with aba_v:
     )
 
     # Carrega tabela com filtro
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo_v = EstoqueVirtualRepository(db, st.session_state.tenant_id)
         saldos_v = repo_v.saldo_virtual(busca_v or None)
-    finally:
-        db.close()
 
     if not saldos_v:
         st.info("Nenhum produto encontrado.")
@@ -154,24 +148,18 @@ with aba_v:
 # ─── ABA 2: INVENTÁRIO (BLOCO H) ──────────────────────────────────────────────
 
 with aba_h:
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = InventarioRepository(db, st.session_state.tenant_id)
         inventarios = repo.datas_disponiveis()
-    finally:
-        db.close()
 
     if not inventarios:
         st.info("Nenhum inventário encontrado. Importe um arquivo EFD que contenha o Bloco H.")
     else:
         mais_recente = inventarios[0]
 
-        db = next(get_session())
-        try:
+        with get_db() as db:
             repo = InventarioRepository(db, st.session_state.tenant_id)
             total_itens_rec = repo.total_itens(mais_recente.id)
-        finally:
-            db.close()
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Inventários importados", len(inventarios))
@@ -188,12 +176,9 @@ with aba_h:
         selecionado_label = st.selectbox("Selecionar inventário", list(opcoes.keys()))
         inventario_id = opcoes[selecionado_label]
 
-        db = next(get_session())
-        try:
+        with get_db() as db:
             repo = InventarioRepository(db, st.session_state.tenant_id)
             itens = repo.listar_itens(inventario_id)
-        finally:
-            db.close()
 
         if not itens:
             st.info("Este inventário não possui itens registrados.")
@@ -234,24 +219,18 @@ with aba_h:
 # ─── ABA 3: SALDO K200 ────────────────────────────────────────────────────────
 
 with aba_k:
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = EstoqueRepository(db, st.session_state.tenant_id)
         datas_k200 = repo.datas_disponiveis()
-    finally:
-        db.close()
 
     if not datas_k200:
         st.info("Nenhum saldo de estoque encontrado. Importe um arquivo EFD que contenha o Bloco K.")
     else:
         data_mais_recente = datas_k200[0].dt_est
 
-        db = next(get_session())
-        try:
+        with get_db() as db:
             repo = EstoqueRepository(db, st.session_state.tenant_id)
             metricas = repo.metricas_k200(dt_est=data_mais_recente)
-        finally:
-            db.close()
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Saldo mais recente", data_mais_recente.strftime("%d/%m/%Y"))
@@ -272,12 +251,9 @@ with aba_k:
                 key="busca_k200",
             )
 
-        db = next(get_session())
-        try:
+        with get_db() as db:
             repo = EstoqueRepository(db, st.session_state.tenant_id)
             saldos = repo.saldo_por_data(dt_selecionada, busca or None)
-        finally:
-            db.close()
 
         if not saldos:
             st.info("Nenhum item encontrado para os filtros selecionados.")

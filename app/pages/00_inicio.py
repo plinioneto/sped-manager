@@ -8,7 +8,7 @@ from app.components.filtro_hierarquia import render_filtro_hierarquia
 from app.repositories.vendas_repo import VendasRepository
 from app.repositories.fiscal_repo import FiscalRepository
 from app.repositories.compras_repo import ComprasRepository
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 from app.models.arquivo_importado import ArquivoImportado
 
@@ -21,11 +21,8 @@ render_sidebar()
 tenant_id = st.session_state.tenant_id
 
 # Filtro de hierarquia na sidebar
-_db_hier = next(get_session())
-try:
+with get_db() as _db_hier:
     filtro_h = render_filtro_hierarquia(_db_hier, key_prefix="inicio")
-finally:
-    _db_hier.close()
 
 h_params = {
     "departamento_id": filtro_h["departamento_id"],
@@ -61,8 +58,7 @@ def fmt_mes(m):
 # Carga de dados
 # ------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo_v = VendasRepository(db, tenant_id)
     repo_f = FiscalRepository(db, tenant_id)
     repo_c = ComprasRepository(db, tenant_id)
@@ -107,8 +103,6 @@ try:
         .order_by(ArquivoImportado.processado_em.desc())
         .first()
     )
-finally:
-    db.close()
 
 # ------------------------------------------------------------------
 # Cabeçalho

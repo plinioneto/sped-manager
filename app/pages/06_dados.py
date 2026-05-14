@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import func
 import app.models
 from app.components.sidebar import render_sidebar
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.documento_fiscal import DocumentoFiscal
 from app.models.produto import Produto
 from app.models.itens_fiscal_c170 import ItemFiscal
@@ -32,80 +32,78 @@ brt = timezone(timedelta(hours=-3))
 
 
 def executar_delecao(arq_id: int):
-    db = next(get_session())
-    try:
-        arq = db.query(ArquivoImportado).filter(
-            ArquivoImportado.id == arq_id,
-            ArquivoImportado.tenant_id == tenant_id,
-        ).first()
-
-        if not arq:
-            return
-
-        is_xml = arq.nome_padronizado.startswith("XML_")
-
-        if is_xml:
-            # Deleção por chv_nfe — remove só o documento específico
-            # nome_padronizado = "XML_{chv_nfe}.xml"
-            chv_nfe = arq.nome_padronizado[4:]          # remove "XML_"
-            if chv_nfe.endswith(".xml"):
-                chv_nfe = chv_nfe[:-4]
-
-            doc = db.query(DocumentoFiscal).filter(
-                DocumentoFiscal.tenant_id == tenant_id,
-                DocumentoFiscal.chv_nfe   == chv_nfe,
+    with get_db() as db:
+        try:
+            arq = db.query(ArquivoImportado).filter(
+                ArquivoImportado.id == arq_id,
+                ArquivoImportado.tenant_id == tenant_id,
             ).first()
-            if doc:
-                db.query(IcmsC190).filter(
-                    IcmsC190.documento_id == doc.id
-                ).delete(synchronize_session=False)
-                db.query(ItemFiscal).filter(
-                    ItemFiscal.documento_id == doc.id
-                ).delete(synchronize_session=False)
-                db.delete(doc)
-        else:
-            # Deleção EFD — por intervalo de datas (comportamento original)
-            try:
-                dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
-                dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
-            except Exception:
-                dt_ini = dt_fin = None
 
-            if dt_ini and dt_fin:
-                doc_ids = [
-                    row.id for row in db.query(DocumentoFiscal.id).filter(
-                        DocumentoFiscal.tenant_id == tenant_id,
-                        DocumentoFiscal.dt_doc >= dt_ini,
-                        DocumentoFiscal.dt_doc <= dt_fin,
-                    ).all()
-                ]
-                if doc_ids:
+            if not arq:
+                return
+
+            is_xml = arq.nome_padronizado.startswith("XML_")
+
+            if is_xml:
+                # Deleção por chv_nfe — remove só o documento específico
+                # nome_padronizado = "XML_{chv_nfe}.xml"
+                chv_nfe = arq.nome_padronizado[4:]          # remove "XML_"
+                if chv_nfe.endswith(".xml"):
+                    chv_nfe = chv_nfe[:-4]
+
+                doc = db.query(DocumentoFiscal).filter(
+                    DocumentoFiscal.tenant_id == tenant_id,
+                    DocumentoFiscal.chv_nfe   == chv_nfe,
+                ).first()
+                if doc:
                     db.query(IcmsC190).filter(
-                        IcmsC190.documento_id.in_(doc_ids)
+                        IcmsC190.documento_id == doc.id
                     ).delete(synchronize_session=False)
                     db.query(ItemFiscal).filter(
-                        ItemFiscal.documento_id.in_(doc_ids)
+                        ItemFiscal.documento_id == doc.id
                     ).delete(synchronize_session=False)
-                    db.query(DocumentoFiscal).filter(
-                        DocumentoFiscal.id.in_(doc_ids)
-                    ).delete(synchronize_session=False)
+                    db.delete(doc)
+            else:
+                # Deleção EFD — por intervalo de datas (comportamento original)
+                try:
+                    dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
+                    dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
+                except Exception:
+                    dt_ini = dt_fin = None
 
-            db.query(EfdRaw).filter(
-                EfdRaw.tenant_id == tenant_id,
-                EfdRaw.file_path == arq.nome_padronizado,
-            ).delete(synchronize_session=False)
+                if dt_ini and dt_fin:
+                    doc_ids = [
+                        row.id for row in db.query(DocumentoFiscal.id).filter(
+                            DocumentoFiscal.tenant_id == tenant_id,
+                            DocumentoFiscal.dt_doc >= dt_ini,
+                            DocumentoFiscal.dt_doc <= dt_fin,
+                        ).all()
+                    ]
+                    if doc_ids:
+                        db.query(IcmsC190).filter(
+                            IcmsC190.documento_id.in_(doc_ids)
+                        ).delete(synchronize_session=False)
+                        db.query(ItemFiscal).filter(
+                            ItemFiscal.documento_id.in_(doc_ids)
+                        ).delete(synchronize_session=False)
+                        db.query(DocumentoFiscal).filter(
+                            DocumentoFiscal.id.in_(doc_ids)
+                        ).delete(synchronize_session=False)
 
-            caminho = os.path.join("storage", "arquivos", arq.nome_padronizado)
-            if os.path.exists(caminho):
-                os.remove(caminho)
+                db.query(EfdRaw).filter(
+                    EfdRaw.tenant_id == tenant_id,
+                    EfdRaw.file_path == arq.nome_padronizado,
+                ).delete(synchronize_session=False)
 
-        db.delete(arq)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+                caminho = os.path.join("storage", "arquivos", arq.nome_padronizado)
+                if os.path.exists(caminho):
+                    os.remove(caminho)
+
+            db.delete(arq)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
 
 @st.dialog("Confirmar exclusão")
@@ -175,85 +173,85 @@ with tab_upload:
         if not erro:
             if st.button("Confirmar e processar todos", type="primary", use_container_width=True):
 
-                db = next(get_session())
                 resultados = []
 
-                for metadados in metadados_lista:
-                    bronze = BronzeProcessor(db, st.session_state.tenant_id)
+                with get_db() as db:
+                    for metadados in metadados_lista:
+                        bronze = BronzeProcessor(db, st.session_state.tenant_id)
 
-                    if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
-                        resultados.append({
-                            "arquivo": metadados['novo_nome'],
-                            "status": "ignorado",
-                            "linhas": 0
-                        })
-                        continue
-
-                    # etapa 1 — salva arquivo renomeado
-                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                    with open(caminho, "w", encoding="latin-1") as f:
-                        f.write(metadados['conteudo'])
-
-                    registro = ArquivoImportado(
-                        tenant_id=st.session_state.tenant_id,
-                        nome_original=metadados['nome_original'],
-                        nome_padronizado=metadados['novo_nome'],
-                        cnpj=metadados['cnpj'],
-                        periodo_ini=metadados['periodo_ini'],
-                        periodo_fin=metadados['periodo_fin'],
-                        status="processando"
-                    )
-                    db.add(registro)
-                    db.commit()
-
-                    # etapa 2 — bronze
-                    with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
-                        try:
-                            resultado_bronze = bronze.ingerir(
-                                metadados['conteudo'],
-                                metadados['novo_nome']
-                            )
-                            registro.status = "bronze_concluido"
-                            db.commit()
-                        except Exception as e:
-                            registro.status = "erro"
-                            registro.erro_msg = str(e)
-                            db.commit()
+                        if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
                             resultados.append({
                                 "arquivo": metadados['novo_nome'],
-                                "status": "erro",
-                                "erro": str(e)
+                                "status": "ignorado",
+                                "linhas": 0
                             })
                             continue
 
-                    # etapa 3 — silver
-                    with st.spinner(f"Silver: {metadados['novo_nome']}..."):
-                        try:
-                            silver = SilverProcessor(db, st.session_state.tenant_id)
-                            resultado_silver = silver.processar(metadados['novo_nome'])
+                        # etapa 1 — salva arquivo renomeado
+                        caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                        with open(caminho, "w", encoding="latin-1") as f:
+                            f.write(metadados['conteudo'])
 
-                            registro.status = "concluido"
-                            registro.processado_em = datetime.utcnow()
-                            db.commit()
+                        registro = ArquivoImportado(
+                            tenant_id=st.session_state.tenant_id,
+                            nome_original=metadados['nome_original'],
+                            nome_padronizado=metadados['novo_nome'],
+                            cnpj=metadados['cnpj'],
+                            periodo_ini=metadados['periodo_ini'],
+                            periodo_fin=metadados['periodo_fin'],
+                            status="processando"
+                        )
+                        db.add(registro)
+                        db.commit()
 
-                            resultados.append({
-                                "arquivo": metadados['novo_nome'],
-                                "status": "concluido",
-                                "linhas_bronze": resultado_bronze['linhas'],
-                                "documentos": resultado_silver['documentos'],
-                                "itens": resultado_silver['itens'],
-                                "produtos_criados": resultado_silver['produtos_criados'],
-                                "produtos_atualizados": resultado_silver['produtos_atualizados'],
-                            })
-                        except Exception as e:
-                            registro.status = "erro"
-                            registro.erro_msg = str(e)
-                            db.commit()
-                            resultados.append({
-                                "arquivo": metadados['novo_nome'],
-                                "status": "erro",
-                                "erro": str(e)
-                            })
+                        # etapa 2 — bronze
+                        with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
+                            try:
+                                resultado_bronze = bronze.ingerir(
+                                    metadados['conteudo'],
+                                    metadados['novo_nome']
+                                )
+                                registro.status = "bronze_concluido"
+                                db.commit()
+                            except Exception as e:
+                                registro.status = "erro"
+                                registro.erro_msg = str(e)
+                                db.commit()
+                                resultados.append({
+                                    "arquivo": metadados['novo_nome'],
+                                    "status": "erro",
+                                    "erro": str(e)
+                                })
+                                continue
+
+                        # etapa 3 — silver
+                        with st.spinner(f"Silver: {metadados['novo_nome']}..."):
+                            try:
+                                silver = SilverProcessor(db, st.session_state.tenant_id)
+                                resultado_silver = silver.processar(metadados['novo_nome'])
+
+                                registro.status = "concluido"
+                                registro.processado_em = datetime.utcnow()
+                                db.commit()
+
+                                resultados.append({
+                                    "arquivo": metadados['novo_nome'],
+                                    "status": "concluido",
+                                    "linhas_bronze": resultado_bronze['linhas'],
+                                    "documentos": resultado_silver['documentos'],
+                                    "itens": resultado_silver['itens'],
+                                    "produtos_criados": resultado_silver['produtos_criados'],
+                                    "produtos_atualizados": resultado_silver['produtos_atualizados'],
+                                })
+                            except Exception as e:
+                                registro.status = "erro"
+                                registro.erro_msg = str(e)
+                                db.commit()
+                                resultados.append({
+                                    "arquivo": metadados['novo_nome'],
+                                    "status": "erro",
+                                    "erro": str(e)
+                                })
 
                 # resumo final
                 st.divider()
@@ -297,61 +295,58 @@ with tab_upload:
 # ===========================================================================
 
 with tab_historico:
-    db = next(get_session())
+    with get_db() as db:
+        total_notas = db.query(func.count(DocumentoFiscal.id)).filter(
+            DocumentoFiscal.tenant_id == tenant_id
+        ).scalar() or 0
 
-    total_notas = db.query(func.count(DocumentoFiscal.id)).filter(
-        DocumentoFiscal.tenant_id == tenant_id
-    ).scalar() or 0
+        total_produtos = db.query(func.count(Produto.id)).filter(
+            Produto.tenant_id == tenant_id
+        ).scalar() or 0
 
-    total_produtos = db.query(func.count(Produto.id)).filter(
-        Produto.tenant_id == tenant_id
-    ).scalar() or 0
+        valor_total = db.query(func.sum(DocumentoFiscal.vl_doc)).filter(
+            DocumentoFiscal.tenant_id == tenant_id
+        ).scalar() or 0.0
 
-    valor_total = db.query(func.sum(DocumentoFiscal.vl_doc)).filter(
-        DocumentoFiscal.tenant_id == tenant_id
-    ).scalar() or 0.0
+        total_itens = db.query(func.count(ItemFiscal.id)).filter(
+            ItemFiscal.tenant_id == tenant_id
+        ).scalar() or 0
 
-    total_itens = db.query(func.count(ItemFiscal.id)).filter(
-        ItemFiscal.tenant_id == tenant_id
-    ).scalar() or 0
+        ultima_data = db.query(func.max(DocumentoFiscal.dt_doc)).filter(
+            DocumentoFiscal.tenant_id == tenant_id
+        ).scalar()
 
-    ultima_data = db.query(func.max(DocumentoFiscal.dt_doc)).filter(
-        DocumentoFiscal.tenant_id == tenant_id
-    ).scalar()
+        todos_arquivos = (
+            db.query(ArquivoImportado)
+            .filter(ArquivoImportado.tenant_id == tenant_id)
+            .order_by(ArquivoImportado.criado_em.desc())
+            .all()
+        )
 
-    todos_arquivos = (
-        db.query(ArquivoImportado)
-        .filter(ArquivoImportado.tenant_id == tenant_id)
-        .order_by(ArquivoImportado.criado_em.desc())
-        .all()
-    )
+        metricas_por_arquivo = {}
+        for arq in todos_arquivos:
+            try:
+                dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
+                dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
+            except Exception:
+                dt_ini = dt_fin = None
 
-    metricas_por_arquivo = {}
-    for arq in todos_arquivos:
-        try:
-            dt_ini = datetime.strptime(arq.periodo_ini, "%Y%m%d")
-            dt_fin = datetime.strptime(arq.periodo_fin, "%Y%m%d")
-        except Exception:
-            dt_ini = dt_fin = None
+            if dt_ini and dt_fin:
+                notas = db.query(func.count(DocumentoFiscal.id)).filter(
+                    DocumentoFiscal.tenant_id == tenant_id,
+                    DocumentoFiscal.dt_doc >= dt_ini,
+                    DocumentoFiscal.dt_doc <= dt_fin,
+                ).scalar() or 0
+                valor = db.query(func.sum(DocumentoFiscal.vl_doc)).filter(
+                    DocumentoFiscal.tenant_id == tenant_id,
+                    DocumentoFiscal.dt_doc >= dt_ini,
+                    DocumentoFiscal.dt_doc <= dt_fin,
+                ).scalar() or 0.0
+            else:
+                notas = 0
+                valor = 0.0
 
-        if dt_ini and dt_fin:
-            notas = db.query(func.count(DocumentoFiscal.id)).filter(
-                DocumentoFiscal.tenant_id == tenant_id,
-                DocumentoFiscal.dt_doc >= dt_ini,
-                DocumentoFiscal.dt_doc <= dt_fin,
-            ).scalar() or 0
-            valor = db.query(func.sum(DocumentoFiscal.vl_doc)).filter(
-                DocumentoFiscal.tenant_id == tenant_id,
-                DocumentoFiscal.dt_doc >= dt_ini,
-                DocumentoFiscal.dt_doc <= dt_fin,
-            ).scalar() or 0.0
-        else:
-            notas = 0
-            valor = 0.0
-
-        metricas_por_arquivo[arq.id] = {"notas": notas, "valor": valor}
-
-    db.close()
+            metricas_por_arquivo[arq.id] = {"notas": notas, "valor": valor}
 
     # --- alertas ---
     arquivos_problema = [a for a in todos_arquivos if a.status in ("erro", "pendente")]

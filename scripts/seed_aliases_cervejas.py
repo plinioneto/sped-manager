@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.marca import Marca
 
 
@@ -140,58 +140,56 @@ ALIASES_CERVEJAS: dict[str, list[str]] = {
 
 
 def main():
-    db = next(get_session())
     atualizadas = 0
     categoria_atualizadas = 0
     nao_encontradas: list[str] = []
 
-    try:
-        for marca_nome, novos_aliases in ALIASES_CERVEJAS.items():
-            nome_norm = normalizar(marca_nome)
-            marca_obj = db.query(Marca).filter(Marca.nome == nome_norm).first()
+    with get_db() as db:
+        try:
+            for marca_nome, novos_aliases in ALIASES_CERVEJAS.items():
+                nome_norm = normalizar(marca_nome)
+                marca_obj = db.query(Marca).filter(Marca.nome == nome_norm).first()
 
-            if not marca_obj:
-                nao_encontradas.append(nome_norm)
-                continue
+                if not marca_obj:
+                    nao_encontradas.append(nome_norm)
+                    continue
 
-            changed = False
+                changed = False
 
-            # ── Atualiza categoria ──────────────────────────────────────────
-            if marca_obj.categoria != "bebidas":
-                marca_obj.categoria = "bebidas"
-                changed = True
-                categoria_atualizadas += 1
+                # ── Atualiza categoria ──────────────────────────────────────────
+                if marca_obj.categoria != "bebidas":
+                    marca_obj.categoria = "bebidas"
+                    changed = True
+                    categoria_atualizadas += 1
 
-            # ── Mescla aliases ──────────────────────────────────────────────
-            existentes: list[str] = []
-            if marca_obj.aliases:
-                try:
-                    existentes = json.loads(marca_obj.aliases)
-                except (ValueError, TypeError):
-                    existentes = []
+                # ── Mescla aliases ──────────────────────────────────────────────
+                existentes: list[str] = []
+                if marca_obj.aliases:
+                    try:
+                        existentes = json.loads(marca_obj.aliases)
+                    except (ValueError, TypeError):
+                        existentes = []
 
-            existentes_upper = {a.upper() for a in existentes}
-            adicionados = [a for a in novos_aliases if a.upper() not in existentes_upper]
+                existentes_upper = {a.upper() for a in existentes}
+                adicionados = [a for a in novos_aliases if a.upper() not in existentes_upper]
 
-            if adicionados:
-                merged = existentes + adicionados
-                marca_obj.aliases = json.dumps(merged, ensure_ascii=False)
-                changed = True
-                print(f"  [+] {nome_norm:<30} aliases: {adicionados}")
-            else:
-                print(f"  [=] {nome_norm:<30} aliases já ok")
+                if adicionados:
+                    merged = existentes + adicionados
+                    marca_obj.aliases = json.dumps(merged, ensure_ascii=False)
+                    changed = True
+                    print(f"  [+] {nome_norm:<30} aliases: {adicionados}")
+                else:
+                    print(f"  [=] {nome_norm:<30} aliases já ok")
 
-            if changed:
-                atualizadas += 1
+                if changed:
+                    atualizadas += 1
 
-        db.commit()
+            db.commit()
 
-    except Exception as e:
-        db.rollback()
-        print(f"\n[ERRO] {e}")
-        raise
-    finally:
-        db.close()
+        except Exception as e:
+            db.rollback()
+            print(f"\n[ERRO] {e}")
+            raise
 
     print("-" * 50)
     print(f"Concluído!")

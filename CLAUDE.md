@@ -129,9 +129,9 @@ MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
 ### Problemas identificados
 
 #### Críticos (bloqueiam produção)
-1. **Migrações via try/except** — `run_migrations()` engole silenciosamente qualquer erro. No SQLite funciona porque o único erro esperado é "coluna já existe". No PostgreSQL, erros reais (permissão, tipo incompatível, lock de tabela) também seriam ignorados. Substituir por **Alembic**.
-2. **Gerenciamento de sessões inconsistente** — páginas usam `next(get_session())` + `db.close()` manual em try/finally espalhados. Se uma exceção ocorrer antes do `close()`, a sessão vaza. Trocar por context manager (`with get_db() as db:`).
-3. **Segurança mínima ausente** — `ADMIN_PASSWORD` tem fallback hardcoded `"admin123"`, URL do admin é adivinhável, sem rate limiting. Baixo risco enquanto local; crítico antes do deploy.
+1. ~~**Migrações via try/except**~~ — ✅ resolvido: Alembic configurado (`alembic/`), `run_migrations()` substituída por `upgrade_db()` via API Python; migração inicial gerada e aplicada como baseline.
+2. ~~**Gerenciamento de sessões inconsistente**~~ — ✅ resolvido: `get_db()` context manager adicionado em `app/utils/db.py`; todas as páginas, scripts e `main.py` migrados para `with get_db() as db:`.
+3. ~~**Segurança mínima ausente**~~ — ✅ resolvido: fallback `"admin123"` removido; `ADMIN_PASSWORD` obrigatório no `.env`; app para com erro claro se não configurado.
 
 #### Qualidade e manutenibilidade
 4. **Regras do categorizador em código** — cada nova entrada (abreviação, categoria, combinação) exige edição de arquivo Python + deploy. Com ~200 regras acumuladas, o custo cresce indefinidamente. Solução: mover para tabelas editáveis no banco, gerenciáveis pelo painel admin.
@@ -164,9 +164,9 @@ O Streamlit foi a escolha certa para validar. O teto é baixo para produção: s
 Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto perfeito sem usuários.
 
 - [x] **Import XML NFC-e/NF-e** — `app/parser/xml_parser.py` implementado; suporta NFC-e (mod 65, saída) e NF-e (mod 55, entrada/saída); valida CNPJ, deduplica por chv_nfe, upsert Produto/Participante/ItemFiscal/IcmsC190; suporta ZIP com múltiplos XMLs; `06_dados.py` com aba "Upload XML"
-- [ ] **Alembic** — substituir `run_migrations()` pelo padrão correto de versionamento de schema; necessário antes de qualquer uso sério do PostgreSQL
-- [ ] **Context manager de sessão** — trocar `next(get_session())` + `db.close()` manual por `with get_db() as db:` em todas as páginas e services
-- [ ] **Segurança mínima** — remover fallback `"admin123"`, obrigar `ADMIN_PASSWORD` no `.env`, obscurecer ou proteger URL do admin
+- [x] **Alembic** — `run_migrations()` substituída por `upgrade_db()` (API Python); `alembic/` configurado com `env.py` lendo `DATABASE_URL` do `.env`; migração inicial `8f8fc05b0864` gerada e marcada como baseline; `render_as_batch=True` para compatibilidade SQLite
+- [x] **Context manager de sessão** — `get_db()` adicionado em `app/utils/db.py`; todos os arquivos migrados para `with get_db() as db:` (13 arquivos: 8 páginas, main.py, 4 scripts)
+- [x] **Segurança mínima** — fallback `"admin123"` removido de `08_admin_revisao.py`; `ADMIN_PASSWORD` obrigatório no `.env`; app para com `st.error()` + `st.stop()` se não configurado
 - [ ] **Deploy** — Streamlit Cloud + Supabase (PostgreSQL); configurar secrets, remover PRAGMAs SQLite do caminho de migração, testar com dados reais
 - [ ] **Definir tipo de cliente foco** — fiscal (contador/escritório contábil) ou gestão (dono de loja); escopo das primeiras demos
 

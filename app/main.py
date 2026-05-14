@@ -1,11 +1,8 @@
 import streamlit as st
-from app.utils.db import get_session, engine, run_migrations
-from app.models.base import Base
+from app.utils.db import get_db, upgrade_db
 import app.models
 
-# Criar tabelas no banco caso não existam
-Base.metadata.create_all(bind=engine)
-run_migrations()
+upgrade_db()
 
 # Config da página
 st.set_page_config(
@@ -50,12 +47,9 @@ if not st.session_state.tenant_id:
         entrar = st.form_submit_button("Entrar")
 
     if entrar:
-        db = next(get_session())
         from app.services.tenant_service import TenantService
-        try:
+        with get_db() as db:
             tenant = TenantService(db).autenticar(identificador, senha)
-        finally:
-            db.close()
 
         if tenant:
             st.session_state.tenant_id = tenant.id

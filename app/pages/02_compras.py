@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import app.models
 from app.components.sidebar import render_sidebar
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.utils.formatters import formatar_cnpj
 from app.repositories.compras_repo import ComprasRepository
 from app.models.categoria import Departamento, Grupo, Categoria
@@ -127,12 +127,9 @@ st.divider()
 # Filtro Row 1 — Período + Loja (placeholder multi-store)
 # ---------------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo_init = ComprasRepository(db, tenant_id)
     meses_raw = repo_init.meses_disponiveis()
-finally:
-    db.close()
 
 anos_raw = sorted({m[:4] for m in meses_raw}, reverse=True)
 meses_num_raw = sorted({m[4:] for m in meses_raw})
@@ -170,8 +167,7 @@ meses_filtro = sel_meses if sel_meses else None
 # Filtro Row 2 — Hierarquia cascateada (Departamento > Grupo > Categoria)
 # ---------------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     deptos = db.query(Departamento).order_by(Departamento.descricao).all()
     opcoes_depto = {d.descricao: d.id for d in deptos}
 
@@ -215,8 +211,6 @@ try:
             cat_index = cat_opts.index(stored_cat) if stored_cat in cat_opts else 0
             sel_cat_nome = col_c.selectbox("Categoria", cat_opts, index=cat_index, key="compras_cat")
             categoria_id = opcoes_cat.get(sel_cat_nome)
-finally:
-    db.close()
 
 filtros = dict(ano=ano_filtro, meses=meses_filtro, fornecedor=None, num_nota=None, produto=None)
 hier = dict(departamento_id=departamento_id, grupo_id=grupo_id, categoria_id=categoria_id)
@@ -238,8 +232,7 @@ st.divider()
 # Carregamento principal de dados
 # ---------------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo = ComprasRepository(db, tenant_id)
 
     metricas = repo.metricas_globais(**filtros)
@@ -281,9 +274,6 @@ try:
             delta_forn = metricas["total_fornecedores"] - m_ant["total_fornecedores"]
             delta_valor = metricas["valor_total_compras"] - m_ant["valor_total_compras"]
             delta_itens = metricas["total_itens_comprados"] - m_ant["total_itens_comprados"]
-
-finally:
-    db.close()
 
 # Totais do nível hierárquico
 if nivel_tipo == "produto":
@@ -733,12 +723,9 @@ with aba_notas:
     # --- Notas de Entrada ---
     st.subheader("Notas de Entrada")
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = ComprasRepository(db, tenant_id)
         notas = repo.listar_notas(**filtros_det)
-    finally:
-        db.close()
 
     if not notas:
         st.info("Nenhuma nota de entrada encontrada para os filtros selecionados.")
@@ -779,12 +766,9 @@ with aba_notas:
     st.divider()
     st.subheader("Itens Comprados")
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = ComprasRepository(db, tenant_id)
         itens_rows = repo.listar_itens(**filtros_det)
-    finally:
-        db.close()
 
     if not itens_rows:
         st.info("Nenhum item encontrado para os filtros selecionados.")

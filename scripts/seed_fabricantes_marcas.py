@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.fabricante import Fabricante
 from app.models.marca import Marca
 
@@ -129,55 +129,52 @@ def normalizar(texto: str) -> str:
 # ── Seed ──────────────────────────────────────────────────────────────────────
 
 def main():
-    db = next(get_session())
-
     inseridos_fabs  = 0
     ignorados_fabs  = 0
     inseridas_marcas = 0
     ignoradas_marcas = 0
 
-    try:
-        for fab_original, marcas_lista in DADOS:
-            fab_nome = normalizar(fab_original)
+    with get_db() as db:
+        try:
+            for fab_original, marcas_lista in DADOS:
+                fab_nome = normalizar(fab_original)
 
-            # Fabricante — cria se não existir
-            fab_obj = db.query(Fabricante).filter(Fabricante.nome == fab_nome).first()
-            if not fab_obj:
-                fab_obj = Fabricante(nome=fab_nome, ativo=True)
-                db.add(fab_obj)
-                db.flush()
-                inseridos_fabs += 1
-                print(f"  [FAB +] {fab_nome}")
-            else:
-                ignorados_fabs += 1
-                print(f"  [FAB =] {fab_nome} (já existe)")
+                # Fabricante — cria se não existir
+                fab_obj = db.query(Fabricante).filter(Fabricante.nome == fab_nome).first()
+                if not fab_obj:
+                    fab_obj = Fabricante(nome=fab_nome, ativo=True)
+                    db.add(fab_obj)
+                    db.flush()
+                    inseridos_fabs += 1
+                    print(f"  [FAB +] {fab_nome}")
+                else:
+                    ignorados_fabs += 1
+                    print(f"  [FAB =] {fab_nome} (já existe)")
 
-            # Marcas
-            for mrc_original in marcas_lista:
-                mrc_nome = normalizar(mrc_original)
-                if not mrc_nome:
-                    continue
-                existing = db.query(Marca).filter(Marca.nome == mrc_nome).first()
-                if existing:
-                    ignoradas_marcas += 1
-                    continue
-                mrc_obj = Marca(
-                    nome=mrc_nome,
-                    fabricante_id=fab_obj.id,
-                    ativo=True,
-                )
-                db.add(mrc_obj)
-                inseridas_marcas += 1
-                print(f"      [MRC +] {mrc_nome}")
+                # Marcas
+                for mrc_original in marcas_lista:
+                    mrc_nome = normalizar(mrc_original)
+                    if not mrc_nome:
+                        continue
+                    existing = db.query(Marca).filter(Marca.nome == mrc_nome).first()
+                    if existing:
+                        ignoradas_marcas += 1
+                        continue
+                    mrc_obj = Marca(
+                        nome=mrc_nome,
+                        fabricante_id=fab_obj.id,
+                        ativo=True,
+                    )
+                    db.add(mrc_obj)
+                    inseridas_marcas += 1
+                    print(f"      [MRC +] {mrc_nome}")
 
-        db.commit()
+            db.commit()
 
-    except Exception as e:
-        db.rollback()
-        print(f"\n[ERRO] {e}")
-        raise
-    finally:
-        db.close()
+        except Exception as e:
+            db.rollback()
+            print(f"\n[ERRO] {e}")
+            raise
 
     print("-" * 37)
     print("Concluido!")

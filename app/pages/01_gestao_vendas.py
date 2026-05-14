@@ -5,7 +5,7 @@ import pandas as pd
 
 from app.components.sidebar import render_sidebar
 from app.repositories.vendas_repo import VendasRepository, DIA_SEMANA_MAP
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.utils.formatters import formatar_cnpj
 from app.utils.theme import AZUL, VERDE, VERMELHO, AMBAR, COLOR_SEQ
 
@@ -83,12 +83,9 @@ def fmt_brl_int(v):
 # ------------------------------------------------------------------
 
 tenant_id = st.session_state.tenant_id
-db = next(get_session())
-try:
+with get_db() as db:
     repo = VendasRepository(db, tenant_id)
     meses = repo.meses_disponiveis()
-finally:
-    db.close()
 
 # ------------------------------------------------------------------
 # Filtros
@@ -123,14 +120,11 @@ with col_f3:
 # Carrega dados globais (usados nos cards e em múltiplas abas)
 # ------------------------------------------------------------------
 
-db = next(get_session())
-try:
+with get_db() as db:
     repo = VendasRepository(db, tenant_id)
     metricas = repo.metricas_globais(ano_filtro, meses_filtro, dias_filtro)
     evolucao = repo.evolucao_mensal(dias_filtro)
     dia_semana_data = repo.faturamento_por_dia_semana(ano_filtro, meses_filtro, dias_filtro)
-finally:
-    db.close()
 
 # ------------------------------------------------------------------
 # Cards de métricas
@@ -264,13 +258,10 @@ with tab1:
 
 # ==================== ABA 2: RITMO DE VENDAS ====================
 with tab2:
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = VendasRepository(db, tenant_id)
         heatmap_data = repo.heatmap_dia_mes()
         ticket_data = repo.distribuicao_ticket(ano_filtro, meses_filtro, dias_filtro)
-    finally:
-        db.close()
 
     col_h, col_b = st.columns([3, 2])
 
@@ -374,13 +365,10 @@ with tab2:
 
 # ==================== ABA 3: MIX COMERCIAL ====================
 with tab3:
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = VendasRepository(db, tenant_id)
         cfop_data = repo.distribuicao_cfop(ano_filtro, meses_filtro, dias_filtro)
         cfop_evol = repo.evolucao_cfop_mensal(cfops_top=3)
-    finally:
-        db.close()
 
     if cfop_data:
         grupos: dict = {}
@@ -452,13 +440,10 @@ with tab3:
 
 # ==================== ABA 4: CLIENTES B2B ====================
 with tab4:
-    db = next(get_session())
-    try:
+    with get_db() as db:
         repo = VendasRepository(db, tenant_id)
         clientes = repo.ranking_clientes(ano_filtro, meses_filtro, dias_filtro)
         top_clientes_evol = repo.evolucao_top_clientes(limit=5)
-    finally:
-        db.close()
 
     total_notas_geral = metricas["total_notas"]
     total_b2b_notas = sum(c["qtd_notas"] for c in clientes)

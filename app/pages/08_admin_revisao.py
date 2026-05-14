@@ -15,9 +15,7 @@ from datetime import datetime, timezone, timedelta
 
 import streamlit as st
 
-from app.utils.db import get_session, run_migrations
-
-run_migrations()
+from app.utils.db import get_db
 from app.models.produto import Produto
 from app.models.tenant import Tenant
 from app.models.categoria import Departamento, Grupo, Categoria
@@ -45,7 +43,10 @@ st.markdown("""
 
 # ── Auth admin ────────────────────────────────────────────────────────────────
 
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    st.error("ADMIN_PASSWORD não definido no .env. Configure antes de usar o painel admin.")
+    st.stop()
 
 if "admin_auth" not in st.session_state:
     st.session_state.admin_auth = False
@@ -82,15 +83,12 @@ with aba_revisao:
 
     @st.cache_data(ttl=60)
     def _stats():
-        db = next(get_session())
-        try:
+        with get_db() as db:
             total   = db.query(Produto).count()
             sem_cat = db.query(Produto).filter(Produto.categoria_id.is_(None)).count()
             revisao = db.query(Produto).filter(Produto.revisao_necessaria == True).count()
             com_cat = total - sem_cat
             return {"total": total, "sem_cat": sem_cat, "revisao": revisao, "com_cat": com_cat}
-        finally:
-            db.close()
 
 
     # Origens que indicam revisão humana concluída — nunca reaparecem na fila
@@ -152,223 +150,212 @@ with aba_revisao:
 
     # ── Filtros ───────────────────────────────────────────────────────────────
 
-    db = next(get_session())
-    try:
+    with get_db() as db:
         tenants      = [t.nome for t in db.query(Tenant).order_by(Tenant.nome).all()]
         departamentos = db.query(Departamento).order_by(Departamento.descricao).all()
-    except Exception:
-        db.close()
-        raise
 
-    col_f1, col_f2 = st.columns([2, 3])
-    with col_f1:
-        filtro_tenant = st.selectbox("Cliente", ["Todos"] + tenants, key="filtro_tenant")
-    with col_f2:
-        modo = st.radio(
-            "Filtrar por",
-            ["Sem categoria + revisão", "Sem categoria", "Revisão necessária"],
-            horizontal=True,
-        )
-
-    # Filtro por departamento / grupo (sugestão do pipeline)
-    col_f3, col_f4 = st.columns(2)
-    dep_nomes_filtro = ["Todos os departamentos"] + [d.descricao for d in departamentos]
-    with col_f3:
-        filtro_dep_nome = st.selectbox("Departamento (sugestão pipeline)", dep_nomes_filtro, key="filtro_dep")
-
-    filtro_dep_id = None
-    filtro_grp_id = None
-    if filtro_dep_nome != "Todos os departamentos":
-        dep_obj_filtro = next((d for d in departamentos if d.descricao == filtro_dep_nome), None)
-        if dep_obj_filtro:
-            filtro_dep_id = dep_obj_filtro.id
-            grupos_filtro = (
-                db.query(Grupo)
-                .filter(Grupo.departamento_id == filtro_dep_id)
-                .order_by(Grupo.descricao)
-                .all()
+        col_f1, col_f2 = st.columns([2, 3])
+        with col_f1:
+            filtro_tenant = st.selectbox("Cliente", ["Todos"] + tenants, key="filtro_tenant")
+        with col_f2:
+            modo = st.radio(
+                "Filtrar por",
+                ["Sem categoria + revisão", "Sem categoria", "Revisão necessária"],
+                horizontal=True,
             )
-            grp_nomes_filtro = ["Todos os grupos"] + [g.descricao for g in grupos_filtro]
-            with col_f4:
-                filtro_grp_nome = st.selectbox("Grupo", grp_nomes_filtro, key="filtro_grp")
-            if filtro_grp_nome != "Todos os grupos":
-                grp_obj_filtro = next((g for g in grupos_filtro if g.descricao == filtro_grp_nome), None)
-                if grp_obj_filtro:
-                    filtro_grp_id = grp_obj_filtro.id
-    else:
-        with col_f4:
-            st.selectbox("Grupo", ["— selecione um departamento primeiro —"],
-                         disabled=True, key="filtro_grp")
 
-    apenas_sem_cat = (modo == "Sem categoria")
-    apenas_revisao = (modo == "Revisão necessária")
-    filtro_t       = None if filtro_tenant == "Todos" else filtro_tenant
+        # Filtro por departamento / grupo (sugestão do pipeline)
+        col_f3, col_f4 = st.columns(2)
+        dep_nomes_filtro = ["Todos os departamentos"] + [d.descricao for d in departamentos]
+        with col_f3:
+            filtro_dep_nome = st.selectbox("Departamento (sugestão pipeline)", dep_nomes_filtro, key="filtro_dep")
 
-    # Resetar índice ao trocar filtros
-    filtro_key = (filtro_t, modo, filtro_dep_id, filtro_grp_id)
-    if st.session_state.get("_ultimo_filtro") != filtro_key:
-        st.session_state.rev_idx = 0
-        st.session_state["_ultimo_filtro"] = filtro_key
-
-    pendentes = _pendentes(db, filtro_t, apenas_sem_cat, apenas_revisao,
-                           filtro_dep_id, filtro_grp_id)
-
-    if not pendentes:
-        st.success("Nenhum produto pendente de revisão com os filtros selecionados.")
-        db.close()
-        st.stop()
-
-    st.caption(f"{len(pendentes)} produtos pendentes (limite 200 por consulta)")
-    st.divider()
-
-    # ── Revisão um a um ───────────────────────────────────────────────────────
-
-    if "rev_idx" not in st.session_state:
-        st.session_state.rev_idx = 0
-
-    if st.session_state.rev_idx >= len(pendentes):
-        st.session_state.rev_idx = 0
-
-    produto, tenant = pendentes[st.session_state.rev_idx]
-
-    progresso = st.session_state.rev_idx / len(pendentes)
-    st.progress(progresso, text=f"Produto {st.session_state.rev_idx + 1} de {len(pendentes)}")
-
-    col_info, col_form = st.columns([2, 3])
-
-    with col_info:
-        st.subheader("Produto")
-        st.markdown(f"**Cliente:** {tenant.nome}")
-        st.markdown(f"**Código:** `{produto.cod_item}`")
-        st.markdown("**Descrição original:**")
-        st.code(produto.descr_item, language=None)
-
-        try:
-            resultado = processar_descricao(produto.descr_item, session=db)
-            st.markdown("**Descrição padronizada:**")
-            st.code(resultado.descricao_padrao, language=None)
-            col_a, col_b = st.columns(2)
-            col_a.markdown(f"**Marca:** {resultado.marca or '—'}")
-            col_a.markdown(f"**Fabricante:** {resultado.fabricante or '—'}")
-            col_b.markdown(f"**Embalagem:** {resultado.tipo_embalagem or '—'}")
-            col_b.markdown(f"**Qtd/Unid:** {resultado.peso_volume_valor or ''} {resultado.peso_volume_unidade or '—'}")
-            if resultado.grupo_nome:
-                st.info(f"Pipeline sugeriu: **{resultado.departamento_nome}** → **{resultado.grupo_nome}**  (score: {resultado.score_categoria:.0%})")
-        except Exception:
-            pass
-
-    with col_form:
-        st.subheader("Classificação")
-
-        dep_opcoes = {d.descricao: d for d in departamentos}
-        dep_nomes  = ["— selecione —"] + sorted(dep_opcoes.keys())
-
-        dep_sugerido = getattr(resultado, "departamento_nome", None) if "resultado" in dir() else None
-        dep_idx = dep_nomes.index(dep_sugerido) if dep_sugerido and dep_sugerido in dep_nomes else 0
-
-        dep_sel = st.selectbox("Departamento", dep_nomes, index=dep_idx, key=f"dep_{produto.id}")
-
-        grp_sel_id  = None
-        grp_sel_obj = None
-        cat_sel_id  = None
-
-        if dep_sel != "— selecione —":
-            dep_obj = dep_opcoes[dep_sel]
-            grupos  = (
-                db.query(Grupo)
-                .filter(Grupo.departamento_id == dep_obj.id)
-                .order_by(Grupo.descricao)
-                .all()
-            )
-            grp_opcoes = {g.descricao: g for g in grupos}
-            grp_nomes  = ["— selecione —"] + list(grp_opcoes.keys())
-
-            grp_sugerido = getattr(resultado, "grupo_nome", None) if "resultado" in dir() else None
-            grp_idx = grp_nomes.index(grp_sugerido) if grp_sugerido and grp_sugerido in grp_nomes else 0
-
-            grp_sel = st.selectbox("Grupo", grp_nomes, index=grp_idx, key=f"grp_{produto.id}")
-
-            if grp_sel != "— selecione —":
-                grp_sel_obj = grp_opcoes[grp_sel]
-                categorias  = (
-                    db.query(Categoria)
-                    .filter(Categoria.grupo_id == grp_sel_obj.id)
-                    .order_by(Categoria.descricao)
+        filtro_dep_id = None
+        filtro_grp_id = None
+        if filtro_dep_nome != "Todos os departamentos":
+            dep_obj_filtro = next((d for d in departamentos if d.descricao == filtro_dep_nome), None)
+            if dep_obj_filtro:
+                filtro_dep_id = dep_obj_filtro.id
+                grupos_filtro = (
+                    db.query(Grupo)
+                    .filter(Grupo.departamento_id == filtro_dep_id)
+                    .order_by(Grupo.descricao)
                     .all()
                 )
-                cat_opcoes = {c.descricao: c for c in categorias}
-                cat_nomes  = ["— selecione —"] + list(cat_opcoes.keys())
+                grp_nomes_filtro = ["Todos os grupos"] + [g.descricao for g in grupos_filtro]
+                with col_f4:
+                    filtro_grp_nome = st.selectbox("Grupo", grp_nomes_filtro, key="filtro_grp")
+                if filtro_grp_nome != "Todos os grupos":
+                    grp_obj_filtro = next((g for g in grupos_filtro if g.descricao == filtro_grp_nome), None)
+                    if grp_obj_filtro:
+                        filtro_grp_id = grp_obj_filtro.id
+        else:
+            with col_f4:
+                st.selectbox("Grupo", ["— selecione um departamento primeiro —"],
+                             disabled=True, key="filtro_grp")
 
-                cat_sel = st.selectbox("Categoria", cat_nomes, key=f"cat_{produto.id}")
-                if cat_sel != "— selecione —":
-                    cat_sel_id = cat_opcoes[cat_sel].id
+        apenas_sem_cat = (modo == "Sem categoria")
+        apenas_revisao = (modo == "Revisão necessária")
+        filtro_t       = None if filtro_tenant == "Todos" else filtro_tenant
 
-        st.write("")
+        # Resetar índice ao trocar filtros
+        filtro_key = (filtro_t, modo, filtro_dep_id, filtro_grp_id)
+        if st.session_state.get("_ultimo_filtro") != filtro_key:
+            st.session_state.rev_idx = 0
+            st.session_state["_ultimo_filtro"] = filtro_key
 
-        col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+        pendentes = _pendentes(db, filtro_t, apenas_sem_cat, apenas_revisao,
+                               filtro_dep_id, filtro_grp_id)
 
-        with col_b1:
-            if st.button("Aprovar", type="primary", use_container_width=True,
-                         disabled=(grp_sel_obj is None)):
-                _salvar_classificacao(
-                    db, produto.id,
-                    cat_id=cat_sel_id,
-                    grp_id=grp_sel_obj.id if grp_sel_obj else None,
-                    dep_id=dep_opcoes[dep_sel].id if dep_sel != "— selecione —" else None,
-                    descarta=False,
+        if not pendentes:
+            st.success("Nenhum produto pendente de revisão com os filtros selecionados.")
+            st.stop()
+
+        st.caption(f"{len(pendentes)} produtos pendentes (limite 200 por consulta)")
+        st.divider()
+
+        # ── Revisão um a um ───────────────────────────────────────────────────────
+
+        if "rev_idx" not in st.session_state:
+            st.session_state.rev_idx = 0
+
+        if st.session_state.rev_idx >= len(pendentes):
+            st.session_state.rev_idx = 0
+
+        produto, tenant = pendentes[st.session_state.rev_idx]
+
+        progresso = st.session_state.rev_idx / len(pendentes)
+        st.progress(progresso, text=f"Produto {st.session_state.rev_idx + 1} de {len(pendentes)}")
+
+        col_info, col_form = st.columns([2, 3])
+
+        with col_info:
+            st.subheader("Produto")
+            st.markdown(f"**Cliente:** {tenant.nome}")
+            st.markdown(f"**Código:** `{produto.cod_item}`")
+            st.markdown("**Descrição original:**")
+            st.code(produto.descr_item, language=None)
+
+            try:
+                resultado = processar_descricao(produto.descr_item, session=db)
+                st.markdown("**Descrição padronizada:**")
+                st.code(resultado.descricao_padrao, language=None)
+                col_a, col_b = st.columns(2)
+                col_a.markdown(f"**Marca:** {resultado.marca or '—'}")
+                col_a.markdown(f"**Fabricante:** {resultado.fabricante or '—'}")
+                col_b.markdown(f"**Embalagem:** {resultado.tipo_embalagem or '—'}")
+                col_b.markdown(f"**Qtd/Unid:** {resultado.peso_volume_valor or ''} {resultado.peso_volume_unidade or '—'}")
+                if resultado.grupo_nome:
+                    st.info(f"Pipeline sugeriu: **{resultado.departamento_nome}** → **{resultado.grupo_nome}**  (score: {resultado.score_categoria:.0%})")
+            except Exception:
+                pass
+
+        with col_form:
+            st.subheader("Classificação")
+
+            dep_opcoes = {d.descricao: d for d in departamentos}
+            dep_nomes  = ["— selecione —"] + sorted(dep_opcoes.keys())
+
+            dep_sugerido = getattr(resultado, "departamento_nome", None) if "resultado" in dir() else None
+            dep_idx = dep_nomes.index(dep_sugerido) if dep_sugerido and dep_sugerido in dep_nomes else 0
+
+            dep_sel = st.selectbox("Departamento", dep_nomes, index=dep_idx, key=f"dep_{produto.id}")
+
+            grp_sel_id  = None
+            grp_sel_obj = None
+            cat_sel_id  = None
+
+            if dep_sel != "— selecione —":
+                dep_obj = dep_opcoes[dep_sel]
+                grupos  = (
+                    db.query(Grupo)
+                    .filter(Grupo.departamento_id == dep_obj.id)
+                    .order_by(Grupo.descricao)
+                    .all()
                 )
-                _stats.clear()
-                st.session_state.rev_idx += 1
-                db.close()
-                st.rerun()
+                grp_opcoes = {g.descricao: g for g in grupos}
+                grp_nomes  = ["— selecione —"] + list(grp_opcoes.keys())
 
-        with col_b2:
-            if st.button("Pular", use_container_width=True):
-                st.session_state.rev_idx += 1
-                db.close()
-                st.rerun()
+                grp_sugerido = getattr(resultado, "grupo_nome", None) if "resultado" in dir() else None
+                grp_idx = grp_nomes.index(grp_sugerido) if grp_sugerido and grp_sugerido in grp_nomes else 0
 
-        with col_b3:
-            if st.button("Sem categoria", use_container_width=True,
-                         help="Marca como revisado mas sem categoria"):
-                _salvar_classificacao(db, produto.id, None, None, None, descarta=True)
-                _stats.clear()
-                st.session_state.rev_idx += 1
-                db.close()
-                st.rerun()
+                grp_sel = st.selectbox("Grupo", grp_nomes, index=grp_idx, key=f"grp_{produto.id}")
 
-        with col_b4:
-            if st.button("Sair", use_container_width=True):
-                db.close()
-                st.session_state.admin_auth = False
-                st.rerun()
+                if grp_sel != "— selecione —":
+                    grp_sel_obj = grp_opcoes[grp_sel]
+                    categorias  = (
+                        db.query(Categoria)
+                        .filter(Categoria.grupo_id == grp_sel_obj.id)
+                        .order_by(Categoria.descricao)
+                        .all()
+                    )
+                    cat_opcoes = {c.descricao: c for c in categorias}
+                    cat_nomes  = ["— selecione —"] + list(cat_opcoes.keys())
 
-    # ── Tabela de pendentes ───────────────────────────────────────────────────
+                    cat_sel = st.selectbox("Categoria", cat_nomes, key=f"cat_{produto.id}")
+                    if cat_sel != "— selecione —":
+                        cat_sel_id = cat_opcoes[cat_sel].id
 
-    st.divider()
-    with st.expander(f"Ver todos os {len(pendentes)} pendentes"):
-        import pandas as pd
-        rows = []
-        for p, t in pendentes:
-            rows.append({
-                "Cliente":     t.nome,
-                "Código":      p.cod_item,
-                "Descrição":   p.descr_item,
-                "Padronizada": p.descricao_padrao or "",
-                "Score pad.":  float(p.score_padronizacao or 0),
-                "Score cat.":  float(p.score_categoria or 0),
-            })
-        st.dataframe(
-            pd.DataFrame(rows),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Score pad.": st.column_config.ProgressColumn(format="%.0%", min_value=0, max_value=1),
-                "Score cat.": st.column_config.ProgressColumn(format="%.0%", min_value=0, max_value=1),
-            }
-        )
+            st.write("")
 
-    db.close()
+            col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+
+            with col_b1:
+                if st.button("Aprovar", type="primary", use_container_width=True,
+                             disabled=(grp_sel_obj is None)):
+                    _salvar_classificacao(
+                        db, produto.id,
+                        cat_id=cat_sel_id,
+                        grp_id=grp_sel_obj.id if grp_sel_obj else None,
+                        dep_id=dep_opcoes[dep_sel].id if dep_sel != "— selecione —" else None,
+                        descarta=False,
+                    )
+                    _stats.clear()
+                    st.session_state.rev_idx += 1
+                    st.rerun()
+
+            with col_b2:
+                if st.button("Pular", use_container_width=True):
+                    st.session_state.rev_idx += 1
+                    st.rerun()
+
+            with col_b3:
+                if st.button("Sem categoria", use_container_width=True,
+                             help="Marca como revisado mas sem categoria"):
+                    _salvar_classificacao(db, produto.id, None, None, None, descarta=True)
+                    _stats.clear()
+                    st.session_state.rev_idx += 1
+                    st.rerun()
+
+            with col_b4:
+                if st.button("Sair", use_container_width=True):
+                    st.session_state.admin_auth = False
+                    st.rerun()
+
+        # ── Tabela de pendentes ───────────────────────────────────────────────────
+
+        st.divider()
+        with st.expander(f"Ver todos os {len(pendentes)} pendentes"):
+            import pandas as pd
+            rows = []
+            for p, t in pendentes:
+                rows.append({
+                    "Cliente":     t.nome,
+                    "Código":      p.cod_item,
+                    "Descrição":   p.descr_item,
+                    "Padronizada": p.descricao_padrao or "",
+                    "Score pad.":  float(p.score_padronizacao or 0),
+                    "Score cat.":  float(p.score_categoria or 0),
+                })
+            st.dataframe(
+                pd.DataFrame(rows),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Score pad.": st.column_config.ProgressColumn(format="%.0%", min_value=0, max_value=1),
+                    "Score cat.": st.column_config.ProgressColumn(format="%.0%", min_value=0, max_value=1),
+                }
+            )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABA 2 — Revisão em Lote
@@ -382,8 +369,7 @@ with aba_batch:
         "Selecione os produtos corretos e aprove todos de uma vez."
     )
 
-    db_batch = next(get_session())
-    try:
+    with get_db() as db_batch:
         # ── Filtros ──────────────────────────────────────────────────────────
         tenants_batch = [t.nome for t in db_batch.query(Tenant).order_by(Tenant.nome).all()]
         deps_batch = db_batch.query(Departamento).order_by(Departamento.descricao).all()
@@ -639,17 +625,12 @@ with aba_batch:
                         st.success(f"{n_sel} produtos marcados como sem categoria.")
                         st.rerun()
 
-    finally:
-        db_batch.close()
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABA 3 — Marcas & Fabricantes
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with aba_marcas:
-
-    db2 = next(get_session())
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -718,119 +699,119 @@ with aba_marcas:
             db.commit()
             invalidar_cache_marcas()
 
-    # ── Fabricantes ───────────────────────────────────────────────────────────
+    with get_db() as db2:
 
-    st.subheader("Fabricantes")
+        # ── Fabricantes ───────────────────────────────────────────────────────────
 
-    col_fab_form, col_fab_lista = st.columns([2, 3])
+        st.subheader("Fabricantes")
 
-    with col_fab_form:
-        with st.form("form_fabricante", clear_on_submit=True):
-            st.markdown("**Novo fabricante**")
-            fab_nome    = st.text_input("Nome *", placeholder="ex: UNILEVER")
-            fab_cnpj    = st.text_input("CNPJ (opcional)", placeholder="14 dígitos sem máscara")
-            fab_aliases = st.text_input(
-                "Aliases (separados por vírgula)",
-                placeholder="ex: UNILEVER BRASIL, UNILEVER BRF",
-            )
-            salvar_fab = st.form_submit_button("Cadastrar Fabricante", type="primary")
+        col_fab_form, col_fab_lista = st.columns([2, 3])
 
-        if salvar_fab:
-            ok, msg = _salvar_fabricante(db2, fab_nome, fab_cnpj, fab_aliases)
-            if ok:
-                st.success(msg)
-                st.rerun()
-            else:
-                st.error(msg)
+        with col_fab_form:
+            with st.form("form_fabricante", clear_on_submit=True):
+                st.markdown("**Novo fabricante**")
+                fab_nome    = st.text_input("Nome *", placeholder="ex: UNILEVER")
+                fab_cnpj    = st.text_input("CNPJ (opcional)", placeholder="14 dígitos sem máscara")
+                fab_aliases = st.text_input(
+                    "Aliases (separados por vírgula)",
+                    placeholder="ex: UNILEVER BRASIL, UNILEVER BRF",
+                )
+                salvar_fab = st.form_submit_button("Cadastrar Fabricante", type="primary")
 
-    with col_fab_lista:
-        fabricantes = _listar_fabricantes(db2)
-        if fabricantes:
-            import pandas as pd
-            df_fab = pd.DataFrame([
-                {
-                    "ID":   f.id,
-                    "Nome": f.nome,
-                    "CNPJ": f.cnpj or "—",
-                    "Aliases": ", ".join(json.loads(f.aliases)) if f.aliases else "—",
-                }
-                for f in fabricantes
-            ])
-            st.dataframe(df_fab, use_container_width=True, hide_index=True)
-
-            with st.expander("Desativar fabricante"):
-                fab_opcoes = {f.nome: f.id for f in fabricantes}
-                fab_del = st.selectbox("Fabricante", list(fab_opcoes.keys()), key="fab_del")
-                if st.button("Desativar", key="btn_fab_del"):
-                    _desativar_fabricante(db2, fab_opcoes[fab_del])
+            if salvar_fab:
+                ok, msg = _salvar_fabricante(db2, fab_nome, fab_cnpj, fab_aliases)
+                if ok:
+                    st.success(msg)
                     st.rerun()
-        else:
-            st.info("Nenhum fabricante cadastrado.")
+                else:
+                    st.error(msg)
 
-    st.divider()
+        with col_fab_lista:
+            fabricantes = _listar_fabricantes(db2)
+            if fabricantes:
+                import pandas as pd
+                df_fab = pd.DataFrame([
+                    {
+                        "ID":   f.id,
+                        "Nome": f.nome,
+                        "CNPJ": f.cnpj or "—",
+                        "Aliases": ", ".join(json.loads(f.aliases)) if f.aliases else "—",
+                    }
+                    for f in fabricantes
+                ])
+                st.dataframe(df_fab, use_container_width=True, hide_index=True)
 
-    # ── Marcas ────────────────────────────────────────────────────────────────
-
-    st.subheader("Marcas")
-
-    col_mrc_form, col_mrc_lista = st.columns([2, 3])
-
-    with col_mrc_form:
-        fabricantes_ativos = _listar_fabricantes(db2)
-        fab_map = {"— nenhum —": None} | {f.nome: f.id for f in fabricantes_ativos}
-
-        CATEGORIAS_DISPONIVEIS = [
-            "— selecione —", "higiene", "limpeza", "bebidas",
-            "frios", "laticinios", "panificacao", "graos", "alimentos",
-        ]
-
-        with st.form("form_marca", clear_on_submit=True):
-            st.markdown("**Nova marca**")
-            mrc_nome      = st.text_input("Nome *", placeholder="ex: DOVE")
-            mrc_fab       = st.selectbox("Fabricante", list(fab_map.keys()))
-            mrc_categoria = st.selectbox("Categoria", CATEGORIAS_DISPONIVEIS)
-            mrc_aliases   = st.text_input(
-                "Aliases (separados por vírgula)",
-                placeholder="ex: DOVE ORIGINAL, DOVE MEN",
-            )
-            salvar_mrc = st.form_submit_button("Cadastrar Marca", type="primary")
-
-        if salvar_mrc:
-            fab_id   = fab_map[mrc_fab]
-            cat_val  = "" if mrc_categoria == "— selecione —" else mrc_categoria
-            ok, msg  = _salvar_marca(db2, mrc_nome, fab_id, cat_val, mrc_aliases)
-            if ok:
-                st.success(msg)
-                st.rerun()
+                with st.expander("Desativar fabricante"):
+                    fab_opcoes = {f.nome: f.id for f in fabricantes}
+                    fab_del = st.selectbox("Fabricante", list(fab_opcoes.keys()), key="fab_del")
+                    if st.button("Desativar", key="btn_fab_del"):
+                        _desativar_fabricante(db2, fab_opcoes[fab_del])
+                        st.rerun()
             else:
-                st.error(msg)
+                st.info("Nenhum fabricante cadastrado.")
 
-    with col_mrc_lista:
-        marcas = _listar_marcas(db2)
-        if marcas:
-            import pandas as pd
-            df_mrc = pd.DataFrame([
-                {
-                    "ID":          m.id,
-                    "Nome":        m.nome,
-                    "Fabricante":  f.nome if f else "—",
-                    "Categoria":   m.categoria or "—",
-                    "Aliases":     ", ".join(json.loads(m.aliases)) if m.aliases else "—",
-                }
-                for m, f in marcas
-            ])
-            st.dataframe(df_mrc, use_container_width=True, hide_index=True)
+        st.divider()
 
-            with st.expander("Desativar marca"):
-                mrc_opcoes = {m.nome: m.id for m, _ in marcas}
-                mrc_del = st.selectbox("Marca", list(mrc_opcoes.keys()), key="mrc_del")
-                if st.button("Desativar", key="btn_mrc_del"):
-                    _desativar_marca(db2, mrc_opcoes[mrc_del])
+        # ── Marcas ────────────────────────────────────────────────────────────────
+
+        st.subheader("Marcas")
+
+        col_mrc_form, col_mrc_lista = st.columns([2, 3])
+
+        with col_mrc_form:
+            fabricantes_ativos = _listar_fabricantes(db2)
+            fab_map = {"— nenhum —": None} | {f.nome: f.id for f in fabricantes_ativos}
+
+            CATEGORIAS_DISPONIVEIS = [
+                "— selecione —", "higiene", "limpeza", "bebidas",
+                "frios", "laticinios", "panificacao", "graos", "alimentos",
+            ]
+
+            with st.form("form_marca", clear_on_submit=True):
+                st.markdown("**Nova marca**")
+                mrc_nome      = st.text_input("Nome *", placeholder="ex: DOVE")
+                mrc_fab       = st.selectbox("Fabricante", list(fab_map.keys()))
+                mrc_categoria = st.selectbox("Categoria", CATEGORIAS_DISPONIVEIS)
+                mrc_aliases   = st.text_input(
+                    "Aliases (separados por vírgula)",
+                    placeholder="ex: DOVE ORIGINAL, DOVE MEN",
+                )
+                salvar_mrc = st.form_submit_button("Cadastrar Marca", type="primary")
+
+            if salvar_mrc:
+                fab_id   = fab_map[mrc_fab]
+                cat_val  = "" if mrc_categoria == "— selecione —" else mrc_categoria
+                ok, msg  = _salvar_marca(db2, mrc_nome, fab_id, cat_val, mrc_aliases)
+                if ok:
+                    st.success(msg)
                     st.rerun()
-        else:
-            st.info("Nenhuma marca cadastrada.")
+                else:
+                    st.error(msg)
 
-    db2.close()
+        with col_mrc_lista:
+            marcas = _listar_marcas(db2)
+            if marcas:
+                import pandas as pd
+                df_mrc = pd.DataFrame([
+                    {
+                        "ID":          m.id,
+                        "Nome":        m.nome,
+                        "Fabricante":  f.nome if f else "—",
+                        "Categoria":   m.categoria or "—",
+                        "Aliases":     ", ".join(json.loads(m.aliases)) if m.aliases else "—",
+                    }
+                    for m, f in marcas
+                ])
+                st.dataframe(df_mrc, use_container_width=True, hide_index=True)
+
+                with st.expander("Desativar marca"):
+                    mrc_opcoes = {m.nome: m.id for m, _ in marcas}
+                    mrc_del = st.selectbox("Marca", list(mrc_opcoes.keys()), key="mrc_del")
+                    if st.button("Desativar", key="btn_mrc_del"):
+                        _desativar_marca(db2, mrc_opcoes[mrc_del])
+                        st.rerun()
+            else:
+                st.info("Nenhuma marca cadastrada.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABA 4 — Tokens Desconhecidos
@@ -840,8 +821,7 @@ with aba_tokens:
     import pandas as pd
     from app.models.token_desconhecido import TokenDesconhecido
 
-    db_tok = next(get_session())
-    try:
+    with get_db() as db_tok:
         st.markdown(
             "Tokens encontrados nas descrições que **não foram reconhecidos** por "
             "nenhum dicionário do pipeline. Use esta lista para alimentar novas "
@@ -909,8 +889,6 @@ with aba_tokens:
                 st.success(f"{deleted} tokens removidos.")
                 st.rerun()
 
-    finally:
-        db_tok.close()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ABA 5 — Clientes & Upload
@@ -927,16 +905,13 @@ with aba_clientes:
     from sqlalchemy.orm import joinedload
     from app.models.grupo_empresarial import GrupoEmpresarial
 
-    db_cli = next(get_session())
-    try:
+    with get_db() as db_cli:
         tenants = (
             db_cli.query(Tenant)
             .options(joinedload(Tenant.grupo))
             .order_by(Tenant.nome)
             .all()
         )
-    finally:
-        db_cli.close()
 
     if tenants:
         st.dataframe(
@@ -971,11 +946,8 @@ with aba_clientes:
         t_edit = tenant_edit_opts[tenant_edit_sel]
 
         with st.form("form_editar_tenant"):
-            db_grp_edit = next(get_session())
-            try:
+            with get_db() as db_grp_edit:
                 grupos_edit = TenantService(db_grp_edit).listar_grupos()
-            finally:
-                db_grp_edit.close()
 
             grupo_opts_edit  = {"— nenhum —": None} | {g.nome: g.id for g in grupos_edit}
             grupo_atual_nome = t_edit.grupo.nome if t_edit.grupo else "— nenhum —"
@@ -998,25 +970,23 @@ with aba_clientes:
             elif len(cnpj_limpo_e) != 14:
                 st.error("CNPJ deve ter 14 dígitos numéricos.")
             else:
-                db_e = next(get_session())
-                try:
-                    t = db_e.query(Tenant).filter(Tenant.id == t_edit.id).first()
-                    t.nome          = nome_edit.strip()
-                    t.cnpj          = cnpj_limpo_e
-                    t.codigo_acesso = codigo_edit.strip() or None
-                    t.ativo         = ativo_edit
-                    t.grupo_id      = grupo_opts_edit.get(grupo_e_sel)
-                    db_e.commit()
-                    st.success("Cliente atualizado com sucesso.")
-                    st.rerun()
-                except Exception as e:
-                    msg = str(e)
-                    if "UNIQUE" in msg.upper():
-                        st.error("CNPJ ou código de acesso já está em uso por outro cliente.")
-                    else:
-                        st.error(f"Erro: {msg}")
-                finally:
-                    db_e.close()
+                with get_db() as db_e:
+                    try:
+                        t = db_e.query(Tenant).filter(Tenant.id == t_edit.id).first()
+                        t.nome          = nome_edit.strip()
+                        t.cnpj          = cnpj_limpo_e
+                        t.codigo_acesso = codigo_edit.strip() or None
+                        t.ativo         = ativo_edit
+                        t.grupo_id      = grupo_opts_edit.get(grupo_e_sel)
+                        db_e.commit()
+                        st.success("Cliente atualizado com sucesso.")
+                        st.rerun()
+                    except Exception as e:
+                        msg = str(e)
+                        if "UNIQUE" in msg.upper():
+                            st.error("CNPJ ou código de acesso já está em uso por outro cliente.")
+                        else:
+                            st.error(f"Erro: {msg}")
 
     st.divider()
 
@@ -1024,11 +994,8 @@ with aba_clientes:
 
     st.subheader("Cadastrar novo cliente")
 
-    db_grp_b = next(get_session())
-    try:
+    with get_db() as db_grp_b:
         grupos_b = TenantService(db_grp_b).listar_grupos()
-    finally:
-        db_grp_b.close()
 
     grupo_opts_b = {"— nenhum —": None} | {g.nome: g.id for g in grupos_b}
 
@@ -1053,28 +1020,26 @@ with aba_clientes:
         elif senha_nova != senha_nova2:
             st.error("As senhas não coincidem.")
         else:
-            db_cad = next(get_session())
-            try:
-                svc_cad = TenantService(db_cad)
-                novo = svc_cad.criar(
-                    nome_novo.strip(),
-                    cnpj_limpo,
-                    senha=senha_nova,
-                    codigo_acesso=codigo_novo.strip() or None,
-                )
-                grupo_id_sel = grupo_opts_b.get(grupo_sel_nome)
-                if grupo_id_sel:
-                    svc_cad.associar_tenant_a_grupo(novo.id, grupo_id_sel)
-                st.success(f"Cliente **{nome_novo.strip()}** cadastrado com sucesso.")
-                st.rerun()
-            except Exception as e:
-                msg = str(e)
-                if "UNIQUE" in msg.upper():
-                    st.error("CNPJ ou código de acesso já cadastrado.")
-                else:
-                    st.error(f"Erro: {msg}")
-            finally:
-                db_cad.close()
+            with get_db() as db_cad:
+                try:
+                    svc_cad = TenantService(db_cad)
+                    novo = svc_cad.criar(
+                        nome_novo.strip(),
+                        cnpj_limpo,
+                        senha=senha_nova,
+                        codigo_acesso=codigo_novo.strip() or None,
+                    )
+                    grupo_id_sel = grupo_opts_b.get(grupo_sel_nome)
+                    if grupo_id_sel:
+                        svc_cad.associar_tenant_a_grupo(novo.id, grupo_id_sel)
+                    st.success(f"Cliente **{nome_novo.strip()}** cadastrado com sucesso.")
+                    st.rerun()
+                except Exception as e:
+                    msg = str(e)
+                    if "UNIQUE" in msg.upper():
+                        st.error("CNPJ ou código de acesso já cadastrado.")
+                    else:
+                        st.error(f"Erro: {msg}")
 
     st.divider()
 
@@ -1082,11 +1047,8 @@ with aba_clientes:
 
     st.subheader("Definir / redefinir senha")
 
-    db_sen = next(get_session())
-    try:
+    with get_db() as db_sen:
         tenants_sen = db_sen.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
-    finally:
-        db_sen.close()
 
     tenant_sen_opts = {f"{t.nome} ({formatar_cnpj(t.cnpj)})": t.id for t in tenants_sen}
 
@@ -1105,23 +1067,21 @@ with aba_clientes:
             st.error("As senhas não coincidem.")
         else:
             tid = tenant_sen_opts[tenant_sen_sel]
-            db_s = next(get_session())
-            try:
-                svc_s = TenantService(db_s)
-                svc_s.definir_senha(tid, nova_senha)
-                if codigo_sen.strip():
-                    t = svc_s.buscar_por_id(tid)
-                    t.codigo_acesso = codigo_sen.strip()
-                    db_s.commit()
-                st.success("Senha atualizada com sucesso.")
-            except Exception as e:
-                msg = str(e)
-                if "UNIQUE" in msg.upper():
-                    st.error("Código de acesso já está em uso por outro cliente.")
-                else:
-                    st.error(f"Erro: {msg}")
-            finally:
-                db_s.close()
+            with get_db() as db_s:
+                try:
+                    svc_s = TenantService(db_s)
+                    svc_s.definir_senha(tid, nova_senha)
+                    if codigo_sen.strip():
+                        t = svc_s.buscar_por_id(tid)
+                        t.codigo_acesso = codigo_sen.strip()
+                        db_s.commit()
+                    st.success("Senha atualizada com sucesso.")
+                except Exception as e:
+                    msg = str(e)
+                    if "UNIQUE" in msg.upper():
+                        st.error("Código de acesso já está em uso por outro cliente.")
+                    else:
+                        st.error(f"Erro: {msg}")
 
     st.divider()
 
@@ -1129,13 +1089,10 @@ with aba_clientes:
 
     st.subheader("Upload de arquivos EFD")
 
-    db_up = next(get_session())
-    try:
+    with get_db() as db_up:
         svc_up = TenantService(db_up)
         tenants_ativos = db_up.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
         grupos_up = svc_up.listar_grupos()
-    finally:
-        db_up.close()
 
     if not tenants_ativos:
         st.warning("Nenhum cliente ativo. Cadastre um cliente primeiro.")
@@ -1214,70 +1171,68 @@ with aba_clientes:
         if not erro_upload:
             if st.button("Confirmar e processar todos", type="primary", use_container_width=True, key="admin_upload_btn"):
 
-                db_proc = next(get_session())
                 resultados = []
 
-                for metadados in metadados_lista:
-                    bronze = BronzeProcessor(db_proc, tenant_selecionado_id)
+                with get_db() as db_proc:
+                    for metadados in metadados_lista:
+                        bronze = BronzeProcessor(db_proc, tenant_selecionado_id)
 
-                    if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
-                        resultados.append({
-                            "arquivo": metadados['novo_nome'],
-                            "status": "ignorado",
-                        })
-                        continue
-
-                    caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                    with open(caminho, "w", encoding="latin-1") as f:
-                        f.write(metadados['conteudo'])
-
-                    registro = ArquivoImportado(
-                        tenant_id       = tenant_selecionado_id,
-                        nome_original   = metadados['nome_original'],
-                        nome_padronizado= metadados['novo_nome'],
-                        cnpj            = metadados['cnpj'],
-                        periodo_ini     = metadados['periodo_ini'],
-                        periodo_fin     = metadados['periodo_fin'],
-                        status          = "processando",
-                    )
-                    db_proc.add(registro)
-                    db_proc.commit()
-
-                    with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
-                        try:
-                            resultado_bronze = bronze.ingerir(metadados['conteudo'], metadados['novo_nome'])
-                            registro.status = "bronze_concluido"
-                            db_proc.commit()
-                        except Exception as e:
-                            registro.status = "erro"
-                            registro.erro_msg = str(e)
-                            db_proc.commit()
-                            resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
+                        if bronze.arquivo_ja_ingerido(metadados['novo_nome']):
+                            resultados.append({
+                                "arquivo": metadados['novo_nome'],
+                                "status": "ignorado",
+                            })
                             continue
 
-                    with st.spinner(f"Silver: {metadados['novo_nome']}..."):
-                        try:
-                            silver = SilverProcessor(db_proc, tenant_selecionado_id)
-                            resultado_silver = silver.processar(metadados['novo_nome'])
-                            registro.status = "concluido"
-                            registro.processado_em = datetime.utcnow()
-                            db_proc.commit()
-                            resultados.append({
-                                "arquivo":             metadados['novo_nome'],
-                                "status":              "concluido",
-                                "linhas_bronze":       resultado_bronze['linhas'],
-                                "documentos":          resultado_silver['documentos'],
-                                "itens":               resultado_silver['itens'],
-                                "produtos_criados":    resultado_silver['produtos_criados'],
-                                "produtos_atualizados":resultado_silver['produtos_atualizados'],
-                            })
-                        except Exception as e:
-                            registro.status = "erro"
-                            registro.erro_msg = str(e)
-                            db_proc.commit()
-                            resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
+                        caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                        with open(caminho, "w", encoding="latin-1") as f:
+                            f.write(metadados['conteudo'])
 
-                db_proc.close()
+                        registro = ArquivoImportado(
+                            tenant_id       = tenant_selecionado_id,
+                            nome_original   = metadados['nome_original'],
+                            nome_padronizado= metadados['novo_nome'],
+                            cnpj            = metadados['cnpj'],
+                            periodo_ini     = metadados['periodo_ini'],
+                            periodo_fin     = metadados['periodo_fin'],
+                            status          = "processando",
+                        )
+                        db_proc.add(registro)
+                        db_proc.commit()
+
+                        with st.spinner(f"Bronze: {metadados['novo_nome']}..."):
+                            try:
+                                resultado_bronze = bronze.ingerir(metadados['conteudo'], metadados['novo_nome'])
+                                registro.status = "bronze_concluido"
+                                db_proc.commit()
+                            except Exception as e:
+                                registro.status = "erro"
+                                registro.erro_msg = str(e)
+                                db_proc.commit()
+                                resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
+                                continue
+
+                        with st.spinner(f"Silver: {metadados['novo_nome']}..."):
+                            try:
+                                silver = SilverProcessor(db_proc, tenant_selecionado_id)
+                                resultado_silver = silver.processar(metadados['novo_nome'])
+                                registro.status = "concluido"
+                                registro.processado_em = datetime.utcnow()
+                                db_proc.commit()
+                                resultados.append({
+                                    "arquivo":             metadados['novo_nome'],
+                                    "status":              "concluido",
+                                    "linhas_bronze":       resultado_bronze['linhas'],
+                                    "documentos":          resultado_silver['documentos'],
+                                    "itens":               resultado_silver['itens'],
+                                    "produtos_criados":    resultado_silver['produtos_criados'],
+                                    "produtos_atualizados":resultado_silver['produtos_atualizados'],
+                                })
+                            except Exception as e:
+                                registro.status = "erro"
+                                registro.erro_msg = str(e)
+                                db_proc.commit()
+                                resultados.append({"arquivo": metadados['novo_nome'], "status": "erro", "erro": str(e)})
 
                 st.divider()
                 st.subheader("Resultado")
@@ -1302,12 +1257,9 @@ with aba_clientes:
     col_grp_lista, col_grp_form = st.columns([3, 2])
 
     with col_grp_lista:
-        db_gd = next(get_session())
-        try:
+        with get_db() as db_gd:
             grupos_d = TenantService(db_gd).listar_grupos()
             tenants_d = db_gd.query(Tenant).options(joinedload(Tenant.grupo)).order_by(Tenant.nome).all()
-        finally:
-            db_gd.close()
 
         if grupos_d:
             lojas_por_grupo = {}
@@ -1342,24 +1294,19 @@ with aba_clientes:
             if not nome_grupo.strip():
                 st.error("Nome obrigatório.")
             else:
-                db_cg = next(get_session())
-                try:
-                    TenantService(db_cg).criar_grupo(nome_grupo.strip())
-                    st.success(f"Grupo **{nome_grupo.strip()}** criado.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-                finally:
-                    db_cg.close()
+                with get_db() as db_cg:
+                    try:
+                        TenantService(db_cg).criar_grupo(nome_grupo.strip())
+                        st.success(f"Grupo **{nome_grupo.strip()}** criado.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
     with st.expander("Associar loja a grupo"):
-        db_assoc = next(get_session())
-        try:
+        with get_db() as db_assoc:
             svc_assoc    = TenantService(db_assoc)
             tenants_assoc = db_assoc.query(Tenant).filter(Tenant.ativo == True).order_by(Tenant.nome).all()
             grupos_assoc  = svc_assoc.listar_grupos()
-        finally:
-            db_assoc.close()
 
         if not tenants_assoc or not grupos_assoc:
             st.info("Cadastre pelo menos um cliente e um grupo antes de associar.")
@@ -1381,12 +1328,10 @@ with aba_clientes:
             if associar_btn:
                 tenant_sel = next(t for t in tenants_assoc if t.nome == tenant_assoc_nome)
                 grupo_sel  = next(g for g in grupos_assoc  if g.nome == grupo_assoc_nome)
-                db_a = next(get_session())
-                try:
-                    TenantService(db_a).associar_tenant_a_grupo(tenant_sel.id, grupo_sel.id)
-                    st.success(f"**{tenant_assoc_nome}** associada ao grupo **{grupo_assoc_nome}**.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-                finally:
-                    db_a.close()
+                with get_db() as db_a:
+                    try:
+                        TenantService(db_a).associar_tenant_a_grupo(tenant_sel.id, grupo_sel.id)
+                        st.success(f"**{tenant_assoc_nome}** associada ao grupo **{grupo_assoc_nome}**.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")

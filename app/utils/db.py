@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
@@ -30,30 +31,29 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def run_migrations():
-    """Migrações idempotentes — executadas em todo ponto de entrada da app."""
-    from sqlalchemy import text
-    # SQLite não suporta constraints em ALTER TABLE ADD COLUMN — UNIQUE é ignorado aqui
-    # e garantido pelo ORM/índice criado a seguir
-    _migrations = [
-        "ALTER TABLE tenants ADD COLUMN grupo_id INTEGER REFERENCES grupos_empresariais(id)",
-        "ALTER TABLE tenants ADD COLUMN senha_hash TEXT",
-        "ALTER TABLE tenants ADD COLUMN codigo_acesso TEXT",
-        "CREATE UNIQUE INDEX IF NOT EXISTS ix_tenants_codigo_acesso ON tenants(codigo_acesso)",
-    ]
-    with engine.connect() as conn:
-        for sql in _migrations:
-            try:
-                conn.execute(text(sql))
-                conn.commit()
-            except Exception:
-                pass  # coluna já existe
+def upgrade_db():
+    """Aplica todas as migrações pendentes via Alembic."""
+    from pathlib import Path
+    from alembic.config import Config
+    from alembic import command
+
+    ini_path = Path(__file__).parent.parent.parent / "alembic.ini"
+    alembic_cfg = Config(str(ini_path))
+    command.upgrade(alembic_cfg, "head")
 
 
 def get_session():
     db = SessionLocal()
     try:
         yield db
-    
+    finally:
+        db.close()
+
+
+@contextmanager
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
     finally:
         db.close()

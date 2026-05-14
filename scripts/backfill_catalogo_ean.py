@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 import app.models  # noqa: F401 — garante que todos os models estão registrados
 
-from app.utils.db import get_session
+from app.utils.db import get_db
 from app.models.produto import Produto
 from app.repositories.catalogo_repo import CatalogoProdutoRepository, ean_valido
 
@@ -33,10 +33,9 @@ def main():
     parser.add_argument("--tenant",  type=int,            help="Limita a um tenant pelo ID")
     args = parser.parse_args()
 
-    db = next(get_session())
-    repo = CatalogoProdutoRepository(db)
+    with get_db() as db:
+        repo = CatalogoProdutoRepository(db)
 
-    try:
         q = db.query(Produto).filter(
             (Produto.categoria_id.isnot(None)) | (Produto.grupo_id.isnot(None))
         )
@@ -93,9 +92,6 @@ def main():
         print(f"  Entradas atualizadas no catálogo:    {atualizados}")
         if args.dry_run:
             print("  [DRY-RUN] Nenhuma escrita realizada.")
-
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":
