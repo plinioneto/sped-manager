@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .env
+.streamlit/secrets.toml
 sped_manager.egg-info/
 criar_tenant.py
 checar_banco.py

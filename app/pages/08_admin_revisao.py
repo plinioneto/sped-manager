@@ -1184,9 +1184,13 @@ with aba_clientes:
                             })
                             continue
 
-                        caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
-                        with open(caminho, "w", encoding="latin-1") as f:
-                            f.write(metadados['conteudo'])
+                        try:
+                            caminho = os.path.join("storage", "arquivos", metadados['novo_nome'])
+                            os.makedirs(os.path.dirname(caminho), exist_ok=True)
+                            with open(caminho, "w", encoding="latin-1") as f:
+                                f.write(metadados['conteudo'])
+                        except OSError:
+                            pass
 
                         registro = ArquivoImportado(
                             tenant_id       = tenant_selecionado_id,

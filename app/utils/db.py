@@ -6,7 +6,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite::///./sped_manager.db")
+# Streamlit Cloud não expõe st.secrets via os.environ — popula manualmente
+try:
+    import streamlit as st
+    for _key in ("DATABASE_URL", "ADMIN_PASSWORD"):
+        if _key in st.secrets and not os.environ.get(_key):
+            os.environ[_key] = st.secrets[_key]
+except Exception:
+    pass
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sped_manager.db")
 
 _is_sqlite = "sqlite" in DATABASE_URL
 
