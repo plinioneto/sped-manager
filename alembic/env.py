@@ -13,8 +13,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Injeta DATABASE_URL do .env (sobrescreve o valor do alembic.ini)
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+# Lê DATABASE_URL via db.py para garantir que st.secrets seja aplicado
+# (necessário no Streamlit Cloud, onde não há .env)
+from app.utils.db import DATABASE_URL  # noqa: E402
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # Importa todos os models para que o metadata esteja completo
 import app.models  # noqa: F401 — registra todos os models no Base
