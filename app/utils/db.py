@@ -41,14 +41,14 @@ Base = declarative_base()
 
 
 def upgrade_db():
-    """Aplica todas as migrações pendentes via Alembic."""
-    from pathlib import Path
-    from alembic.config import Config
-    from alembic import command
+    """Garante que todas as tabelas existam no banco.
 
-    ini_path = Path(__file__).parent.parent.parent / "alembic.ini"
-    alembic_cfg = Config(str(ini_path))
-    command.upgrade(alembic_cfg, "head")
+    Usa create_all (idempotente — ignora tabelas já existentes).
+    Migrações de schema são aplicadas manualmente via: alembic upgrade head
+    """
+    import app.models  # noqa: F401 — registra todos os models no Base
+    from app.models.base import Base
+    Base.metadata.create_all(bind=engine)
 
 
 def get_session():
