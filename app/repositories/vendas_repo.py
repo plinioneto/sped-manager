@@ -1,6 +1,7 @@
 import re
 from sqlalchemy import func, and_
 from app.models.documento_fiscal import DocumentoFiscal
+from app.utils.sql_compat import sf_yearmonth, sf_year, sf_month, sf_dow
 from app.models.icms_c190 import IcmsC190
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
@@ -30,24 +31,24 @@ class VendasRepository(BaseRepository):
 
     def _filtrar(self, q, ano=None, meses=None, dias_semana=None):
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         if dias_semana:
             codigos = [DIA_SEMANA_MAP[d] for d in dias_semana if d in DIA_SEMANA_MAP]
             if codigos:
-                q = q.filter(func.strftime("%w", DocumentoFiscal.dt_doc).in_(codigos))
+                q = q.filter(sf_dow(DocumentoFiscal.dt_doc).in_(codigos))
         return q
 
     def _filtrar_c190(self, q, ano=None, meses=None, dias_semana=None):
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         if dias_semana:
             codigos = [DIA_SEMANA_MAP[d] for d in dias_semana if d in DIA_SEMANA_MAP]
             if codigos:
-                q = q.filter(func.strftime("%w", DocumentoFiscal.dt_doc).in_(codigos))
+                q = q.filter(sf_dow(DocumentoFiscal.dt_doc).in_(codigos))
         return q
 
     # ------------------------------------------------------------------
@@ -57,7 +58,7 @@ class VendasRepository(BaseRepository):
     def meses_disponiveis(self) -> list:
         rows = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes")
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes")
             )
             .filter(
                 DocumentoFiscal.tenant_id == self.tenant_id,
@@ -65,7 +66,7 @@ class VendasRepository(BaseRepository):
                 DocumentoFiscal.dt_doc.isnot(None),
             )
             .distinct()
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc).desc())
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc).desc())
             .all()
         )
         return [r.mes for r in rows if r.mes]
@@ -139,13 +140,13 @@ class VendasRepository(BaseRepository):
         q = self._filtrar(self._base_saida(), ano=None, meses=None, dias_semana=dias_semana)
         q = self._filtro_hierarquia_via_doc(q, departamento_id, grupo_id, categoria_id)
         q = q.with_entities(
-            func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+            sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
             func.count(DocumentoFiscal.id).label("total_notas"),
         )
         rows = (
-            q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            q.group_by(sf_yearmonth(DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
         result = []
@@ -166,13 +167,13 @@ class VendasRepository(BaseRepository):
     def faturamento_por_dia_semana(self, ano=None, meses=None, dias_semana=None) -> list:
         q = self._filtrar(self._base_saida(), ano, meses, dias_semana)
         q = q.with_entities(
-            func.strftime("%w", DocumentoFiscal.dt_doc).label("dia_semana"),
+            sf_dow(DocumentoFiscal.dt_doc).label("dia_semana"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
             func.count(DocumentoFiscal.id).label("total_notas"),
         )
         rows = (
-            q.group_by(func.strftime("%w", DocumentoFiscal.dt_doc))
-            .order_by(func.strftime("%w", DocumentoFiscal.dt_doc))
+            q.group_by(sf_dow(DocumentoFiscal.dt_doc))
+            .order_by(sf_dow(DocumentoFiscal.dt_doc))
             .all()
         )
         result = []
@@ -189,16 +190,16 @@ class VendasRepository(BaseRepository):
     def heatmap_dia_mes(self) -> list:
         """Série histórica: faturamento por (mes, dia_semana). Sem filtros."""
         q = self._base_saida().with_entities(
-            func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
-            func.strftime("%w", DocumentoFiscal.dt_doc).label("dia_semana"),
+            sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
+            sf_dow(DocumentoFiscal.dt_doc).label("dia_semana"),
             func.sum(DocumentoFiscal.vl_doc).label("faturamento"),
         )
         rows = (
             q.group_by(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc),
-                func.strftime("%w", DocumentoFiscal.dt_doc),
+                sf_yearmonth(DocumentoFiscal.dt_doc),
+                sf_dow(DocumentoFiscal.dt_doc),
             )
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
         return [
@@ -290,17 +291,17 @@ class VendasRepository(BaseRepository):
             self._base_c190_saida()
             .filter(IcmsC190.cfop.in_(top_cfops))
             .with_entities(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 IcmsC190.cfop,
                 func.sum(IcmsC190.vl_opr).label("vl_opr"),
             )
         )
         rows = (
             q.group_by(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc),
+                sf_yearmonth(DocumentoFiscal.dt_doc),
                 IcmsC190.cfop,
             )
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
         return [{"mes": r.mes, "cfop": r.cfop, "vl_opr": r.vl_opr or 0.0} for r in rows]
@@ -374,7 +375,7 @@ class VendasRepository(BaseRepository):
 
         q = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 DocumentoFiscal.cod_part,
                 Participante.nome.label("nome_part"),
                 func.sum(DocumentoFiscal.vl_doc).label("fat_total"),
@@ -395,11 +396,11 @@ class VendasRepository(BaseRepository):
         )
         rows = (
             q.group_by(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc),
+                sf_yearmonth(DocumentoFiscal.dt_doc),
                 DocumentoFiscal.cod_part,
                 Participante.nome,
             )
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
         return [
@@ -469,9 +470,9 @@ class VendasRepository(BaseRepository):
             )
         )
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         if num_nota:
             q = q.filter(DocumentoFiscal.num_doc.ilike(f"%{num_nota}%"))
         if cliente:

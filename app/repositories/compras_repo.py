@@ -1,6 +1,7 @@
 import re
 from sqlalchemy import func, case
 from app.models.documento_fiscal import DocumentoFiscal
+from app.utils.sql_compat import sf_yearmonth, sf_year, sf_month
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
 from app.models.participante import Participante
@@ -18,9 +19,9 @@ def _normalizar_cnpj(valor: str) -> str:
 def _aplicar_filtros_doc(q, session, tenant_id, ano=None, meses=None, fornecedor=None, num_nota=None, produto=None):
     """Aplica os 4 filtros padrão a uma query que já contém DocumentoFiscal."""
     if ano:
-        q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+        q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
     if meses:
-        q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+        q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
     if fornecedor:
         cnpj_norm = _normalizar_cnpj(fornecedor)
         termo = f"%{fornecedor}%"
@@ -119,14 +120,14 @@ class ComprasRepository(BaseRepository):
     def meses_disponiveis(self) -> list:
         rows = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes")
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes")
             )
             .filter(
                 DocumentoFiscal.tenant_id == self.tenant_id,
                 DocumentoFiscal.ind_oper == "0",
             )
             .distinct()
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc).desc())
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc).desc())
             .all()
         )
         return [r.mes for r in rows if r.mes]
@@ -262,7 +263,7 @@ class ComprasRepository(BaseRepository):
         """Agrupa compras por mês: valor, notas, ticket médio."""
         q = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 func.count(DocumentoFiscal.id).label("total_notas"),
                 func.sum(DocumentoFiscal.vl_doc).label("valor_total"),
                 func.avg(DocumentoFiscal.vl_doc).label("ticket_medio"),
@@ -274,8 +275,8 @@ class ComprasRepository(BaseRepository):
         )
         q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
-            q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            q.group_by(sf_yearmonth(DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
 
@@ -301,7 +302,7 @@ class ComprasRepository(BaseRepository):
 
         q = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 DocumentoFiscal.cod_part,
                 Participante.nome.label("nome_part"),
                 func.sum(DocumentoFiscal.vl_doc).label("valor_total"),
@@ -320,11 +321,11 @@ class ComprasRepository(BaseRepository):
         q = self._filtrar(q, ano, meses, fornecedor, num_nota, produto)
         return (
             q.group_by(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc),
+                sf_yearmonth(DocumentoFiscal.dt_doc),
                 DocumentoFiscal.cod_part,
                 Participante.nome,
             )
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
 

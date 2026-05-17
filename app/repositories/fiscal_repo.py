@@ -1,5 +1,6 @@
 from sqlalchemy import func, and_
 from app.models.documento_fiscal import DocumentoFiscal
+from app.utils.sql_compat import sf_yearmonth, sf_year, sf_month
 from app.models.icms_c190 import IcmsC190
 from app.models.itens_fiscal_c170 import ItemFiscal
 from app.models.produto import Produto
@@ -37,9 +38,9 @@ class FiscalRepository(BaseRepository):
     def _filtrar(self, q, ano=None, meses=None, cst_icms=None, cfop=None):
         """Aplica filtros padrão a queries que contêm C190 + DocumentoFiscal."""
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         if cst_icms:
             q = q.filter(IcmsC190.cst_icms.in_(cst_icms))
         if cfop:
@@ -49,9 +50,9 @@ class FiscalRepository(BaseRepository):
     def _filtrar_doc(self, q, ano=None, meses=None):
         """Aplica filtro de período a queries que só contêm DocumentoFiscal."""
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         return q
 
     # ------------------------------------------------------------------
@@ -61,11 +62,11 @@ class FiscalRepository(BaseRepository):
     def meses_disponiveis(self) -> list:
         rows = (
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes")
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes")
             )
             .filter(DocumentoFiscal.tenant_id == self.tenant_id)
             .distinct()
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc).desc())
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc).desc())
             .all()
         )
         return [r.mes for r in rows if r.mes]
@@ -192,7 +193,7 @@ class FiscalRepository(BaseRepository):
         for ind_oper, label_icms in [("1", "debito"), ("0", "credito")]:
             q = self._filtrar(
                 self.session.query(
-                    func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                    sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                     func.sum(IcmsC190.vl_icms).label("icms"),
                 )
                 .join(DocumentoFiscal, IcmsC190.documento_id == DocumentoFiscal.id)
@@ -200,8 +201,8 @@ class FiscalRepository(BaseRepository):
                 ano, meses, cst_icms, cfop,
             )
             rows = (
-                q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
-                .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+                q.group_by(sf_yearmonth(DocumentoFiscal.dt_doc))
+                .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
                 .all()
             )
             for r in rows:
@@ -215,7 +216,7 @@ class FiscalRepository(BaseRepository):
         # PIS/COFINS via DocumentoFiscal
         q_pis = self._filtrar_doc(
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 func.sum(DocumentoFiscal.vl_pis).label("pis"),
                 func.sum(DocumentoFiscal.vl_cofins).label("cofins"),
             )
@@ -226,7 +227,7 @@ class FiscalRepository(BaseRepository):
             ),
             ano, meses,
         )
-        for r in q_pis.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc)).all():
+        for r in q_pis.group_by(sf_yearmonth(DocumentoFiscal.dt_doc)).all():
             if r.mes not in resultado:
                 resultado[r.mes] = {
                     "mes": r.mes, "icms_debito": 0.0, "icms_credito": 0.0,
@@ -410,9 +411,9 @@ class FiscalRepository(BaseRepository):
             )
         )
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
@@ -424,7 +425,7 @@ class FiscalRepository(BaseRepository):
         """Mensal: valor operações ST (CST 060) vs ICMS Próprio (CST 000/020) nas saídas."""
         q = self._filtrar_doc(
             self.session.query(
-                func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                 func.sum(
                     func.iif(IcmsC190.cst_icms == "060", IcmsC190.vl_opr, 0)
                 ).label("vl_st"),
@@ -437,8 +438,8 @@ class FiscalRepository(BaseRepository):
             ano, meses,
         )
         return (
-            q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
-            .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+            q.group_by(sf_yearmonth(DocumentoFiscal.dt_doc))
+            .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
             .all()
         )
 
@@ -469,7 +470,7 @@ class FiscalRepository(BaseRepository):
         for ind_oper, label in [("0", "entrada"), ("1", "saida")]:
             q = self._filtrar_doc(
                 self.session.query(
-                    func.strftime("%Y%m", DocumentoFiscal.dt_doc).label("mes"),
+                    sf_yearmonth(DocumentoFiscal.dt_doc).label("mes"),
                     func.sum(DocumentoFiscal.vl_pis).label("pis"),
                     func.sum(DocumentoFiscal.vl_cofins).label("cofins"),
                 )
@@ -481,8 +482,8 @@ class FiscalRepository(BaseRepository):
                 ano, meses,
             )
             rows = (
-                q.group_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
-                .order_by(func.strftime("%Y%m", DocumentoFiscal.dt_doc))
+                q.group_by(sf_yearmonth(DocumentoFiscal.dt_doc))
+                .order_by(sf_yearmonth(DocumentoFiscal.dt_doc))
                 .all()
             )
             for r in rows:
@@ -528,9 +529,9 @@ class FiscalRepository(BaseRepository):
             )
         )
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item, ItemFiscal.cst_icms, ItemFiscal.cfop)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
@@ -561,9 +562,9 @@ class FiscalRepository(BaseRepository):
             )
         )
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(func.sum(ItemFiscal.vl_item).desc())
@@ -600,9 +601,9 @@ class FiscalRepository(BaseRepository):
             )
         )
         if ano:
-            q = q.filter(func.strftime("%Y", DocumentoFiscal.dt_doc) == ano)
+            q = q.filter(sf_year(DocumentoFiscal.dt_doc) == ano)
         if meses:
-            q = q.filter(func.strftime("%m", DocumentoFiscal.dt_doc).in_(meses))
+            q = q.filter(sf_month(DocumentoFiscal.dt_doc).in_(meses))
         return (
             q.group_by(ItemFiscal.cod_item, Produto.descr_item)
             .order_by(
