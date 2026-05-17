@@ -8,15 +8,23 @@ from alembic import context
 
 load_dotenv()
 
+# Streamlit Cloud não expõe st.secrets via os.environ — popula manualmente
+# (mesmo bloco de app/utils/db.py, replicado aqui para não importar db.py
+#  e evitar conflito com o proxy interno do Alembic)
+try:
+    import streamlit as st
+    if "DATABASE_URL" in st.secrets and not os.environ.get("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = st.secrets["DATABASE_URL"]
+except Exception:
+    pass
+
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Lê DATABASE_URL via db.py para garantir que st.secrets seja aplicado
-# (necessário no Streamlit Cloud, onde não há .env)
-from app.utils.db import DATABASE_URL  # noqa: E402
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+_database_url = os.environ.get("DATABASE_URL", "sqlite:///./sped_manager.db")
+config.set_main_option("sqlalchemy.url", _database_url)
 
 # Importa todos os models para que o metadata esteja completo
 import app.models  # noqa: F401 — registra todos os models no Base
