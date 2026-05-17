@@ -8,16 +8,9 @@ from alembic import context
 
 load_dotenv()
 
-# Streamlit Cloud não expõe st.secrets via os.environ — popula manualmente
-# (mesmo bloco de app/utils/db.py, replicado aqui para não importar db.py
-#  e evitar conflito com o proxy interno do Alembic)
-try:
-    import streamlit as st
-    if "DATABASE_URL" in st.secrets and not os.environ.get("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = st.secrets["DATABASE_URL"]
-except Exception:
-    pass
-
+# DATABASE_URL já está em os.environ quando este arquivo é carregado:
+# db.py (importado antes de upgrade_db() ser chamado) cuida de popular
+# os.environ via st.secrets no Streamlit Cloud.
 config = context.config
 
 if config.config_file_name is not None:
