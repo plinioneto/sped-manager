@@ -178,6 +178,33 @@ Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto 
 - [ ] **Padrão de cores global** — paleta de 5–6 cores em `utils/theme.py` aplicada em todas as páginas (já existe o arquivo, falta consistência)
 - [ ] **Multi-loja (Etapa 2)** — ver especificação técnica detalhada abaixo; só faz sentido após ter clientes de grupo empresarial reais
 
+### 🟠 Fase 2.5 — Revisão do modelo de dados (ANTES da migração de frontend)
+
+> **Plano completo em:** `C:\Users\Plínio\.claude\plans\ancient-cooking-dijkstra.md`
+> Revisão feita em 2026-05-28. Executar antes de iniciar a Fase 3.
+
+**Contexto da revisão:** o sistema tem duas fontes de dados (EFD histórico + XML dia a dia) que alimentam as mesmas tabelas. A revisão identificou problemas de integridade, precisão e duplicação antes de construir o novo frontend.
+
+**Mudanças pendentes (em ordem de execução):**
+
+- [ ] **Participante: lookup por CNPJ no XML parser** — o mesmo fornecedor gera dois registros em `participantes`: um do EFD (cod_part="0001") e um do XML (cod_part=CNPJ). Corrigir `_upsert_participante` em `app/parser/xml_parser.py` para buscar por CNPJ antes de criar novo. Adicionar índice único parcial `UNIQUE(tenant_id, cnpj) WHERE cnpj IS NOT NULL` em `participantes`.
+
+- [ ] **UniqueConstraint em `documentos_fiscais(tenant_id, chv_nfe)`** — deduplicação hoje é só em código (cache em memória); sem constraint no banco, imports paralelos podem criar duplicatas silenciosamente.
+
+- [ ] **UniqueConstraint em `itens_fiscais(tenant_id, chv_doc, num_item)`** — mesma razão; reprocessamento duplicaria itens.
+
+- [ ] **`Float` → `Numeric(15,2)` em todos os campos `vl_*`** — `Float` acumula erro de representação (ex: `0.1+0.2=0.30000000000000004`); valores fiscais precisam de precisão decimal exata. Afeta `documentos_fiscais` e `itens_fiscais`.
+
+- [ ] **`IcmsC190.aliq_icms`: `String` → `Numeric(7,4)`** — era workaround para limitação do SQLite em UniqueConstraints com Numeric. PostgreSQL não tem essa limitação.
+
+- [ ] **`Fabricante.aliases` e `Marca.aliases`: `Text` → `JSONB`** — JSON em string não é validado nem indexado. JSONB é o tipo correto em PostgreSQL.
+
+- [ ] **Campo `fonte` em `DocumentoFiscal`** — `fonte = Column(String(3))` com valores `'efd'` ou `'xml'`. Facilita debugging e queries que precisam distinguir origem dos dados.
+
+- [ ] **Campos PIS/COFINS por item em `ItemFiscal`** — adicionar `cst_pis`, `cst_cofins`, `aliq_pis`, `aliq_cofins`. EFD C170 tem esses campos; sem eles, análise tributária por produto fica limitada ao nível agregado.
+
+**O que NÃO muda:** estrutura da hierarquia Departamento/Grupo/Categoria; `efd_raw` (manter por enquanto); `departamento_id` em Produto (cache de performance intencional); `CatalogoProduto` (duplicação com Produto é arquiteturalmente correta — catálogo global sem tenant).
+
 ### 🟠 Fase 3 — Migração FastAPI + React
 
 O Streamlit foi a escolha certa para validar. O teto é baixo para produção: sem controle de estado real, sem componentes customizáveis, dificuldade com multi-usuário e performance limitada.

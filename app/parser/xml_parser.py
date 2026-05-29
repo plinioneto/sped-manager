@@ -54,9 +54,12 @@ except Exception:
 # Helpers de parsing (sem namespace)
 # ---------------------------------------------------------------------------
 
+_RE_XMLNS = re.compile(rb'\s*xmlns[^=]*="[^"]*"')
+
+
 def _limpar_namespace(conteudo: bytes) -> bytes:
     """Remove declarações xmlns para simplificar o parsing com ElementTree."""
-    return re.sub(rb'\s*xmlns[^=]*="[^"]*"', b"", conteudo)
+    return _RE_XMLNS.sub(b"", conteudo)
 
 
 def _parse_xml(conteudo: bytes) -> ET.Element:
@@ -175,6 +178,137 @@ class XmlParser:
         self.tenant_id = tenant_id
         self.tenant_cnpj = _limpar_cnpj(tenant_cnpj)
         self.skip_padronizacao = skip_padronizacao
+        # Caches em memória — None = cache desativado (usa DB); set/dict = cache ativo
+        self._cache_chaves: set | None = None
+        self._cache_produtos: set | None = None
+        self._cache_participantes: set | None = None
+        self._cache_marcas: dict[str, int] = {}  # nome → id (sempre dict, mesmo sem warmup)
+
+    def warmup(self) -> tuple[int, int]:
+        """
+        Pré-carrega caches de chaves NF-e, cod_item e participantes em memória.
+        Reduz drasticamente o número de queries ao banco em importações em lote.
+        Retorna (n_chaves, n_produtos) carregados.
+        """
+        self._cache_chaves = set(
+            r[0] for r in
+            self.session.query(DocumentoFiscal.chv_nfe)
+            .filter(DocumentoFiscal.tenant_id == self.tenant_id)
+            .all()
+        )
+        self._cache_produtos = set(
+            r[0] for r in
+            self.session.query(Produto.cod_item)
+            .filter(Produto.tenant_id == self.tenant_id)
+            .all()
+        )
+        self._cache_participantes = set(
+            r[0] for r in
+            self.session.query(Participante.cod_part)
+            .filter(Participante.tenant_id == self.tenant_id)
+            .all()
+        )
+        # Cache de marcas: nome → id (evita SELECT por produto categorizado)
+        self._cache_marcas: dict[str, int] = {
+            nome: mid
+            for nome, mid in self.session.query(Marca.nome, Marca.id).all()
+            if nome
+        }
+        return len(self._cache_chaves), len(self._cache_produtos)
+
+    # ── Ponto de entrada — lote (importação em massa) ─────────────────────────
+
+    def processar_lote(self, lote: list[tuple[bytes, str]]) -> dict:
+        """
+        Processa uma lista de (conteudo_bytes, nome_arquivo) com 1 flush por lote.
+
+        Fluxo otimizado:
+          1. Parse + validação + dedup via cache  (zero round trips)
+          2. Upsert participantes novos            (cache-first)
+          3. session.add_all(docs) + flush()       (1 round trip para N docs)
+          4. Itens + C190 + Produtos               (sem flush extra)
+
+        O chamador deve fazer session.commit() + expunge_all() ao final.
+        Retorna dict com: concluidos, duplicatas, invalidos, prod_criados.
+        """
+        concluidos = duplicatas = invalidos = 0
+        prod_criados = 0
+
+        # ── Fase 1: parse + filtragem (puro Python) ───────────────────────────
+        pendentes: list[tuple] = []  # (inf_nfe, chv_nfe, mod, ind_oper)
+
+        for conteudo, nome in lote:
+            try:
+                root = _parse_xml(conteudo)
+            except ET.ParseError:
+                invalidos += 1
+                continue
+
+            inf_nfe = self._localizar_inf_nfe(root)
+            if inf_nfe is None:
+                invalidos += 1
+                continue
+
+            chv_nfe = self._extrair_chave(root, inf_nfe)
+            if not chv_nfe or len(chv_nfe) != 44:
+                invalidos += 1
+                continue
+
+            mod     = _text(inf_nfe, "ide", "mod")
+            tp_nf   = _text(inf_nfe, "ide", "tpNF")
+            ind_oper = "1" if (tp_nf == "1" or mod == "65") else "0"
+
+            ok, _ = self._validar_cnpj(inf_nfe, mod, ind_oper)
+            if not ok:
+                invalidos += 1
+                continue
+
+            if self._chave_existe(chv_nfe):
+                duplicatas += 1
+                continue
+
+            # Marca no cache imediatamente — evita dup dentro do mesmo lote
+            if self._cache_chaves is not None:
+                self._cache_chaves.add(chv_nfe)
+
+            pendentes.append((inf_nfe, chv_nfe, mod, ind_oper))
+
+        if not pendentes:
+            return {"concluidos": 0, "duplicatas": duplicatas,
+                    "invalidos": invalidos, "prod_criados": 0}
+
+        # ── Fase 2: upsert participantes (cache-first, sem flush) ─────────────
+        for inf_nfe, chv_nfe, mod, ind_oper in pendentes:
+            if ind_oper == "0":
+                cnpj_part = _limpar_cnpj(_text(inf_nfe, "emit", "CNPJ"))
+                nome_part = _text(inf_nfe, "emit", "xNome")
+                cod_part  = cnpj_part or "FORNECEDOR"
+            else:
+                cnpj_part = _limpar_cnpj(_text(inf_nfe, "dest", "CNPJ"))
+                nome_part = _text(inf_nfe, "dest", "xNome")
+                cod_part  = cnpj_part if cnpj_part else "CONSUMIDOR"
+            if cnpj_part:
+                self._upsert_participante(cod_part, nome_part, cnpj_part)
+
+        # ── Fase 3: criar todos os DocumentoFiscal → 1 flush para o lote ─────
+        doc_objs = [self._criar_documento_obj(inf, chv, mod, op)
+                    for inf, chv, mod, op in pendentes]
+        self.session.add_all(doc_objs)
+        self.session.flush()  # 1 round trip para N documentos — obtém todos os IDs
+
+        # ── Fase 4: itens + C190 + produtos (sem flush extra) ─────────────────
+        for (inf_nfe, chv_nfe, mod, ind_oper), doc in zip(pendentes, doc_objs):
+            agg, pc = self._processar_itens(inf_nfe, chv_nfe, doc, mod, ind_oper)
+            self._derivar_c190(chv_nfe, doc.id, agg)
+            prod_criados += pc
+            concluidos   += 1
+
+        return {
+            "concluidos":    concluidos,
+            "duplicatas":    duplicatas,
+            "invalidos":     invalidos,
+            "prod_criados":  prod_criados,
+        }
 
     # ── Ponto de entrada — arquivo único ──────────────────────────────────────
 
@@ -229,6 +363,8 @@ class XmlParser:
         doc = self._criar_documento(inf_nfe, chv_nfe, mod, ind_oper)
         agg, prod_criados = self._processar_itens(inf_nfe, chv_nfe, doc, mod, ind_oper)
         self._derivar_c190(chv_nfe, doc.id, agg)
+        if self._cache_chaves is not None:
+            self._cache_chaves.add(chv_nfe)
         if auto_commit:
             self.session.commit()
 
@@ -383,6 +519,8 @@ class XmlParser:
         return cnpj_xml == self.tenant_cnpj, cnpj_xml
 
     def _chave_existe(self, chv_nfe: str) -> bool:
+        if self._cache_chaves is not None:
+            return chv_nfe in self._cache_chaves
         return (
             self.session.query(DocumentoFiscal)
             .filter(
@@ -393,6 +531,44 @@ class XmlParser:
         ) is not None
 
     # ── Persistência ──────────────────────────────────────────────────────────
+
+    def _criar_documento_obj(
+        self, inf_nfe: ET.Element, chv_nfe: str, mod: str, ind_oper: str
+    ) -> DocumentoFiscal:
+        """Cria objeto DocumentoFiscal sem session.add/flush — para processar_lote()."""
+        ide = _find(inf_nfe, "ide")
+        tot = _find(inf_nfe, "total", "ICMSTot")
+        dt_doc = _parse_data(_text(inf_nfe, "ide", "dhEmi"))
+
+        if ind_oper == "0":
+            cnpj_part = _limpar_cnpj(_text(inf_nfe, "emit", "CNPJ"))
+            cod_part  = cnpj_part or "FORNECEDOR"
+        else:
+            cnpj_part = _limpar_cnpj(_text(inf_nfe, "dest", "CNPJ"))
+            cod_part  = cnpj_part if cnpj_part else "CONSUMIDOR"
+
+        return DocumentoFiscal(
+            tenant_id     = self.tenant_id,
+            chv_nfe       = chv_nfe,
+            ind_oper      = ind_oper,
+            ind_emit      = "1" if ind_oper == "1" else "0",
+            cod_part      = cod_part,
+            cod_mod       = mod,
+            cod_sit       = "00",
+            ser           = _text(ide, "serie") if ide is not None else "",
+            num_doc       = _text(ide, "nNF")   if ide is not None else "",
+            dt_doc        = dt_doc,
+            dt_e_s        = dt_doc,
+            vl_doc        = _float_val(tot, "vNF")     if tot is not None else 0.0,
+            vl_desc       = _float_val(tot, "vDesc")   if tot is not None else 0.0,
+            vl_merc       = _float_val(tot, "vProd")   if tot is not None else 0.0,
+            vl_bc_icms    = _float_val(tot, "vBC")     if tot is not None else 0.0,
+            vl_icms       = _float_val(tot, "vICMS")   if tot is not None else 0.0,
+            vl_bc_icms_st = _float_val(tot, "vBCST")   if tot is not None else 0.0,
+            vl_icms_st    = _float_val(tot, "vST")     if tot is not None else 0.0,
+            vl_pis        = _float_val(tot, "vPIS")    if tot is not None else 0.0,
+            vl_cofins     = _float_val(tot, "vCOFINS") if tot is not None else 0.0,
+        )
 
     def _criar_documento(
         self, inf_nfe: ET.Element, chv_nfe: str, mod: str, ind_oper: str
@@ -437,7 +613,7 @@ class XmlParser:
             vl_cofins     = _float_val(tot, "vCOFINS") if tot is not None else 0.0,
         )
         self.session.add(doc)
-        self.session.flush()  # popula doc.id
+        self.session.flush()  # flush necessário para obter doc.id (FK dos itens)
         return doc
 
     def _processar_itens(
@@ -499,41 +675,32 @@ class XmlParser:
             if criado:
                 prod_criados += 1
 
-            # Upsert item (skip se já existe com mesma chave + num_item)
-            existe_item = (
-                self.session.query(ItemFiscal)
-                .filter(
-                    ItemFiscal.tenant_id == self.tenant_id,
-                    ItemFiscal.chv_doc   == chv_nfe,
-                    ItemFiscal.num_item  == num_item,
-                )
-                .first()
-            )
-            if not existe_item:
-                try:
-                    aliq_float = float(aliq_str.replace(",", "."))
-                except (ValueError, AttributeError):
-                    aliq_float = 0.0
+            # Documento é novo (verificado via cache de chaves) →
+            # itens desta chave não podem existir no banco; INSERT direto.
+            try:
+                aliq_float = float(aliq_str.replace(",", "."))
+            except (ValueError, AttributeError):
+                aliq_float = 0.0
 
-                self.session.add(ItemFiscal(
-                    tenant_id    = self.tenant_id,
-                    chv_doc      = chv_nfe,
-                    documento_id = doc.id,
-                    num_item     = num_item,
-                    cod_item     = cod_item,
-                    descr_compl  = xprod,
-                    qtd          = q_com,
-                    unid         = u_com,
-                    vl_item      = v_prod,
-                    vl_desc      = v_desc,
-                    cst_icms     = cst,
-                    cfop         = cfop,
-                    vl_bc_icms   = vbc_icms,
-                    aliq_icms    = aliq_float,
-                    vl_icms      = v_icms,
-                    vl_pis       = v_pis,
-                    vl_cofins    = v_cofins,
-                ))
+            self.session.add(ItemFiscal(
+                tenant_id    = self.tenant_id,
+                chv_doc      = chv_nfe,
+                documento_id = doc.id,
+                num_item     = num_item,
+                cod_item     = cod_item,
+                descr_compl  = xprod,
+                qtd          = q_com,
+                unid         = u_com,
+                vl_item      = v_prod,
+                vl_desc      = v_desc,
+                cst_icms     = cst,
+                cfop         = cfop,
+                vl_bc_icms   = vbc_icms,
+                aliq_icms    = aliq_float,
+                vl_icms      = v_icms,
+                vl_pis       = v_pis,
+                vl_cofins    = v_cofins,
+            ))
 
             # Acumula para C190
             chave_c190 = (cst, cfop, aliq_str)
@@ -544,26 +711,12 @@ class XmlParser:
             agg[chave_c190]["vl_cofins"]  += v_cofins
             agg[chave_c190]["qtd_itens"]  += 1
 
-        self.session.flush()
         return agg, prod_criados
 
     def _derivar_c190(self, chv_nfe: str, documento_id: int, agg: dict) -> None:
-        """Cria IcmsC190 derivado da agregação CST/CFOP/alíquota dos itens."""
+        """Cria IcmsC190 derivado da agregação CST/CFOP/alíquota dos itens.
+        Documento é garantidamente novo → INSERT direto sem SELECT de existência."""
         for (cst, cfop, aliq), vals in agg.items():
-            existe = (
-                self.session.query(IcmsC190)
-                .filter(
-                    IcmsC190.tenant_id == self.tenant_id,
-                    IcmsC190.chv_doc   == chv_nfe,
-                    IcmsC190.cst_icms  == cst,
-                    IcmsC190.cfop      == cfop,
-                    IcmsC190.aliq_icms == aliq,
-                )
-                .first()
-            )
-            if existe:
-                continue
-
             self.session.add(IcmsC190(
                 tenant_id    = self.tenant_id,
                 chv_doc      = chv_nfe,
@@ -581,6 +734,10 @@ class XmlParser:
     # ── Helpers de persistência ───────────────────────────────────────────────
 
     def _upsert_participante(self, cod_part: str, nome: str, cnpj: str) -> None:
+        # Cache hit — participante já existe; evita SELECT ao banco
+        if self._cache_participantes is not None and cod_part in self._cache_participantes:
+            return
+
         existente = (
             self.session.query(Participante)
             .filter(
@@ -599,7 +756,8 @@ class XmlParser:
                 nome=nome,
                 cnpj=cnpj,
             ))
-        self.session.flush()
+        if self._cache_participantes is not None:
+            self._cache_participantes.add(cod_part)
 
     def _upsert_produto(
         self,
@@ -611,6 +769,10 @@ class XmlParser:
         cest: str,
     ) -> bool:
         """Cria ou atualiza Produto. Retorna True se criou."""
+        # Cache hit — produto já existe, pula query e update
+        if self._cache_produtos is not None and cod_item in self._cache_produtos:
+            return False
+
         existente = (
             self.session.query(Produto)
             .filter(
@@ -645,20 +807,28 @@ class XmlParser:
             cest       = cest,
         )
         self.session.add(produto)
-        self.session.flush()
+        # Não faz flush aqui — produto.id não é usado como FK em importação XML
+        if self._cache_produtos is not None:
+            self._cache_produtos.add(cod_item)
 
         # EAN catalog + padronização — mesmo fluxo do silver.py
-        if _CATALOGO_DISPONIVEL and ean_valido(cod_barra):
-            catalogo_repo = CatalogoProdutoRepository(self.session)
-            entrada = catalogo_repo.buscar_por_ean(cod_barra)
-            if entrada and (entrada.categoria_id or entrada.grupo_id):
-                _copiar_do_catalogo(produto, entrada)
+        # Com skip_padronizacao=True, pula tudo: evita SELECT que dispara autoflush
+        # (a query do catálogo forçaria flush de todos os objetos pendentes na sessão).
+        # O backfill_padronizacao.py classificará esses produtos depois.
+        if not self.skip_padronizacao:
+            if _CATALOGO_DISPONIVEL and ean_valido(cod_barra):
+                catalogo_repo = CatalogoProdutoRepository(self.session)
+                with self.session.no_autoflush:
+                    entrada = catalogo_repo.buscar_por_ean(cod_barra)
+                if entrada and (entrada.categoria_id or entrada.grupo_id):
+                    _copiar_do_catalogo(produto, entrada)
+                else:
+                    self._aplicar_padronizacao(produto, descr_item)
+                    if produto.categoria_id or produto.grupo_id:
+                        with self.session.no_autoflush:
+                            catalogo_repo.upsert_from_produto(produto, cod_barra)
             else:
                 self._aplicar_padronizacao(produto, descr_item)
-                if produto.categoria_id or produto.grupo_id:
-                    catalogo_repo.upsert_from_produto(produto, cod_barra)
-        else:
-            self._aplicar_padronizacao(produto, descr_item)
 
         return True
 
@@ -681,13 +851,18 @@ class XmlParser:
             produto.departamento_id     = resultado.departamento_id
             produto.score_categoria     = resultado.score_categoria
             if resultado.marca:
-                marca_obj = (
-                    self.session.query(Marca)
-                    .filter(Marca.nome == resultado.marca)
-                    .first()
-                )
-                if marca_obj:
-                    produto.marca_id = marca_obj.id
+                # Cache de marcas evita SELECT por produto — carregado no warmup()
+                mid = self._cache_marcas.get(resultado.marca)
+                if mid is None and not self._cache_marcas:
+                    # fallback quando warmup não foi chamado
+                    marca_obj = (
+                        self.session.query(Marca)
+                        .filter(Marca.nome == resultado.marca)
+                        .first()
+                    )
+                    mid = marca_obj.id if marca_obj else None
+                if mid:
+                    produto.marca_id = mid
         except Exception:
             pass  # padronização é enriquecimento, não dado primário
 
