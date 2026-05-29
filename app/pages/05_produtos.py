@@ -211,7 +211,7 @@ with aba_inteligencia:
                 func.sum(ItemFiscal.vl_icms).label("vl_icms"),
                 func.sum(ItemFiscal.vl_pis).label("vl_pis"),
                 func.sum(ItemFiscal.vl_cofins).label("vl_cofins"),
-                func.count(func.distinct(ItemFiscal.chv_doc)).label("n_notas"),
+                func.count(func.distinct(ItemFiscal.chv_nfe)).label("n_notas"),
             )
             .filter(ItemFiscal.tenant_id == tenant_id)
             .group_by(ItemFiscal.cod_item)
@@ -225,7 +225,7 @@ with aba_inteligencia:
                 ItemFiscal.cod_item,
                 func.count(func.distinct(DocumentoFiscal.cod_part)).label("n_fornecedores"),
             )
-            .join(DocumentoFiscal, ItemFiscal.chv_doc == DocumentoFiscal.chv_nfe)
+            .join(DocumentoFiscal, ItemFiscal.chv_nfe == DocumentoFiscal.chv_nfe)
             .filter(ItemFiscal.tenant_id == tenant_id)
             .group_by(ItemFiscal.cod_item)
             .all()

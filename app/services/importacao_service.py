@@ -89,7 +89,7 @@ class ImportacaoService:
                 for _, item_row in itens.iterrows():
                     item = ItemFiscal(
                         tenant_id=self.tenant_id,
-                        chv_doc=chv,
+                        chv_nfe=chv,
                         documento_id=doc.id,
                         num_item=int(item_row.get('NUM_ITEM', 0)),
                         cod_item=str(item_row.get('COD_ITEM', '')),

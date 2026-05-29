@@ -547,6 +547,9 @@ class XmlParser:
             cnpj_part = _limpar_cnpj(_text(inf_nfe, "dest", "CNPJ"))
             cod_part  = cnpj_part if cnpj_part else "CONSUMIDOR"
 
+        # Resolve cod_part pelo CNPJ (participante pode já existir do EFD com cod_part diferente)
+        cod_part = self._resolver_cod_part(cnpj_part, cod_part)
+
         return DocumentoFiscal(
             tenant_id     = self.tenant_id,
             chv_nfe       = chv_nfe,
@@ -568,6 +571,7 @@ class XmlParser:
             vl_icms_st    = _float_val(tot, "vST")     if tot is not None else 0.0,
             vl_pis        = _float_val(tot, "vPIS")    if tot is not None else 0.0,
             vl_cofins     = _float_val(tot, "vCOFINS") if tot is not None else 0.0,
+            fonte         = 'xml',
         )
 
     def _criar_documento(
@@ -589,6 +593,7 @@ class XmlParser:
 
         if cnpj_part:
             self._upsert_participante(cod_part, nome_part, cnpj_part)
+        cod_part = self._resolver_cod_part(cnpj_part, cod_part)
 
         doc = DocumentoFiscal(
             tenant_id     = self.tenant_id,
@@ -611,6 +616,7 @@ class XmlParser:
             vl_icms_st    = _float_val(tot, "vST")     if tot is not None else 0.0,
             vl_pis        = _float_val(tot, "vPIS")    if tot is not None else 0.0,
             vl_cofins     = _float_val(tot, "vCOFINS") if tot is not None else 0.0,
+            fonte         = 'xml',
         )
         self.session.add(doc)
         self.session.flush()  # flush necessário para obter doc.id (FK dos itens)
@@ -684,7 +690,7 @@ class XmlParser:
 
             self.session.add(ItemFiscal(
                 tenant_id    = self.tenant_id,
-                chv_doc      = chv_nfe,
+                chv_nfe      = chv_nfe,
                 documento_id = doc.id,
                 num_item     = num_item,
                 cod_item     = cod_item,
@@ -719,7 +725,7 @@ class XmlParser:
         for (cst, cfop, aliq), vals in agg.items():
             self.session.add(IcmsC190(
                 tenant_id    = self.tenant_id,
-                chv_doc      = chv_nfe,
+                chv_nfe      = chv_nfe,
                 documento_id = documento_id,
                 cst_icms     = cst,
                 cfop         = cfop,
@@ -733,8 +739,38 @@ class XmlParser:
 
     # ── Helpers de persistência ───────────────────────────────────────────────
 
+    def _resolver_cod_part(self, cnpj: str, cod_part_fallback: str) -> str:
+        """Retorna o cod_part canônico para o CNPJ — usa o do EFD se já existir."""
+        if not cnpj:
+            return cod_part_fallback
+        existente = (
+            self.session.query(Participante)
+            .filter(
+                Participante.tenant_id == self.tenant_id,
+                Participante.cnpj      == cnpj,
+            )
+            .first()
+        )
+        return existente.cod_part if existente else cod_part_fallback
+
     def _upsert_participante(self, cod_part: str, nome: str, cnpj: str) -> None:
-        # Cache hit — participante já existe; evita SELECT ao banco
+        # Lookup por CNPJ para reusar cod_part do EFD quando o mesmo fornecedor já existe
+        if cnpj:
+            existente_por_cnpj = (
+                self.session.query(Participante)
+                .filter(
+                    Participante.tenant_id == self.tenant_id,
+                    Participante.cnpj      == cnpj,
+                )
+                .first()
+            )
+            if existente_por_cnpj:
+                existente_por_cnpj.nome = nome or existente_por_cnpj.nome
+                if self._cache_participantes is not None:
+                    self._cache_participantes.add(existente_por_cnpj.cod_part)
+                return
+
+        # Cache hit pelo cod_part
         if self._cache_participantes is not None and cod_part in self._cache_participantes:
             return
 

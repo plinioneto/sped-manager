@@ -94,7 +94,7 @@ class SilverProcessor:
             'k200': [],
         }
 
-        chv_doc_atual = None
+        chv_nfe_atual = None
         dt_inv_atual = None
 
         for linha in linhas_raw:
@@ -106,11 +106,11 @@ class SilverProcessor:
 
             # equivalente ao CHV_DOC_TEMP + window propagation do Databricks
             if bloco == 'C100' and len(campos) > 9:
-                chv_doc_atual = campos[9]
+                chv_nfe_atual = campos[9]
 
             registros_bloco = {
                 'campos': campos,
-                'chv_doc': chv_doc_atual
+                'chv_nfe': chv_nfe_atual
             }
 
             if bloco == 'C100':
@@ -178,6 +178,7 @@ class SilverProcessor:
                 vl_icms_st=self._cast_decimal(c[24]) if len(c) > 24 else 0.0,
                 vl_pis=self._cast_decimal(c[26]) if len(c) > 26 else 0.0,
                 vl_cofins=self._cast_decimal(c[27]) if len(c) > 27 else 0.0,
+                fonte='efd',
             )
             self.session.add(doc)
             criados += 1
@@ -188,20 +189,20 @@ class SilverProcessor:
     def _processar_c170(self, registros: list) -> int:
         """
         Equivalente à célula 7 do Databricks — extrai campos do C170.
-        Upsert por tenant_id + chv_doc + num_item.
+        Upsert por tenant_id + chv_nfe + num_item.
         """
         criados = 0
 
         for reg in registros:
             c = reg['campos']
-            chv = reg['chv_doc']
+            chv = reg['chv_nfe']
 
             if not chv:
                 continue
 
             existente = self.session.query(ItemFiscal).filter(
                 ItemFiscal.tenant_id == self.tenant_id,
-                ItemFiscal.chv_doc == chv,
+                ItemFiscal.chv_nfe == chv,
                 ItemFiscal.num_item == int(c[2]) if len(c) > 2 and c[2].isdigit() else 0
             ).first()
 
@@ -216,7 +217,7 @@ class SilverProcessor:
 
             item = ItemFiscal(
                 tenant_id=self.tenant_id,
-                chv_doc=chv,
+                chv_nfe=chv,
                 documento_id=doc.id if doc else None,
                 num_item=int(c[2]) if len(c) > 2 and c[2].isdigit() else 0,
                 cod_item=c[3] if len(c) > 3 else '',
@@ -242,13 +243,13 @@ class SilverProcessor:
     def _processar_c190(self, registros: list) -> int:
         """
         Extrai campos do C190 — registro analítico de ICMS por CST/CFOP/alíquota.
-        Upsert por tenant_id + chv_doc + cst_icms + cfop + aliq_icms.
+        Upsert por tenant_id + chv_nfe + cst_icms + cfop + aliq_icms.
         """
         criados = 0
 
         for reg in registros:
             c = reg['campos']
-            chv = reg['chv_doc']
+            chv = reg['chv_nfe']
 
             if not chv:
                 continue
@@ -259,7 +260,7 @@ class SilverProcessor:
 
             existente = self.session.query(IcmsC190).filter(
                 IcmsC190.tenant_id == self.tenant_id,
-                IcmsC190.chv_doc == chv,
+                IcmsC190.chv_nfe == chv,
                 IcmsC190.cst_icms == cst,
                 IcmsC190.cfop == cfop,
                 IcmsC190.aliq_icms == aliq,
@@ -275,7 +276,7 @@ class SilverProcessor:
 
             registro = IcmsC190(
                 tenant_id=self.tenant_id,
-                chv_doc=chv,
+                chv_nfe=chv,
                 documento_id=doc.id if doc else None,
                 cst_icms=cst,
                 cfop=cfop,

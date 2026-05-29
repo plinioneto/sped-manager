@@ -74,11 +74,11 @@ def apagar(cnpj: str, ano: int, confirmar: bool):
 
             # Apaga filhos antes do pai
             r_c190 = db.execute(text(
-                "DELETE FROM icms_c190 WHERE chv_doc = ANY(:chaves)"
+                "DELETE FROM icms_c190 WHERE chv_nfe = ANY(:chaves)"
             ), {"chaves": chaves})
 
             r_itens = db.execute(text(
-                "DELETE FROM itens_fiscais WHERE chv_doc = ANY(:chaves)"
+                "DELETE FROM itens_fiscais WHERE chv_nfe = ANY(:chaves)"
             ), {"chaves": chaves})
 
             r_docs = db.execute(text(

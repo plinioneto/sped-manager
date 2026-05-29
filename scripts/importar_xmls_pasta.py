@@ -266,7 +266,7 @@ def parsear_xml(conteudo: bytes, tenant_id: int, tenant_cnpj: str):
 
         itens.append({
             "tenant_id":   tenant_id,
-            "chv_doc":     chv,
+            "chv_nfe":     chv,
             "documento_id": None,
             "num_item":    num_item,
             "cod_item":    cod_item,
@@ -307,7 +307,7 @@ def parsear_xml(conteudo: bytes, tenant_id: int, tenant_cnpj: str):
     for (cst, cfop, aliq), vals in agg.items():
         c190.append({
             "tenant_id":   tenant_id,
-            "chv_doc":     chv,
+            "chv_nfe":     chv,
             "documento_id": None,
             "cst_icms":    cst,
             "cfop":        cfop,
@@ -378,21 +378,21 @@ VALUES
 
 SQL_ITEM = """
 INSERT OR IGNORE INTO itens_fiscais
-  (tenant_id, chv_doc, documento_id, num_item, cod_item, descr_compl,
+  (tenant_id, chv_nfe, documento_id, num_item, cod_item, descr_compl,
    qtd, unid, vl_item, vl_desc,
    cst_icms, cfop, vl_bc_icms, aliq_icms, vl_icms, vl_pis, vl_cofins)
 VALUES
-  (:tenant_id,:chv_doc,:documento_id,:num_item,:cod_item,:descr_compl,
+  (:tenant_id,:chv_nfe,:documento_id,:num_item,:cod_item,:descr_compl,
    :qtd,:unid,:vl_item,:vl_desc,
    :cst_icms,:cfop,:vl_bc_icms,:aliq_icms,:vl_icms,:vl_pis,:vl_cofins)
 """
 
 SQL_C190 = """
 INSERT OR IGNORE INTO icms_c190
-  (tenant_id, chv_doc, documento_id, cst_icms, cfop, aliq_icms,
+  (tenant_id, chv_nfe, documento_id, cst_icms, cfop, aliq_icms,
    vl_opr, vl_bc_icms, vl_icms, vl_pis, vl_cofins, criado_em)
 VALUES
-  (:tenant_id,:chv_doc,:documento_id,:cst_icms,:cfop,:aliq_icms,
+  (:tenant_id,:chv_nfe,:documento_id,:cst_icms,:cfop,:aliq_icms,
    :vl_opr,:vl_bc_icms,:vl_icms,:vl_pis,:vl_cofins,:criado_em)
 """
 

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Numeric
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.models.base import Base
@@ -18,17 +19,22 @@ class DocumentoFiscal(Base):
     num_doc = Column(String)
     dt_doc = Column(DateTime)
     dt_e_s = Column(DateTime)
-    vl_doc = Column(Float, default=0.0)
-    vl_desc = Column(Float, default=0.0)
-    vl_merc = Column(Float, default=0.0)
-    vl_bc_icms = Column(Float, default=0.0)
-    vl_icms = Column(Float, default=0.0)
-    vl_bc_icms_st = Column(Float, default=0.0)
-    vl_icms_st = Column(Float, default=0.0)
-    vl_pis = Column(Float, default=0.0)
-    vl_cofins = Column(Float, default=0.0)
+    vl_doc = Column(Numeric(15, 2), default=0.0)
+    vl_desc = Column(Numeric(15, 2), default=0.0)
+    vl_merc = Column(Numeric(15, 2), default=0.0)
+    vl_bc_icms = Column(Numeric(15, 2), default=0.0)
+    vl_icms = Column(Numeric(15, 2), default=0.0)
+    vl_bc_icms_st = Column(Numeric(15, 2), default=0.0)
+    vl_icms_st = Column(Numeric(15, 2), default=0.0)
+    vl_pis = Column(Numeric(15, 2), default=0.0)
+    vl_cofins = Column(Numeric(15, 2), default=0.0)
+    fonte = Column(String(3), default='efd')  # 'efd' | 'xml'
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     tenant = relationship("Tenant", back_populates="documentos_fiscais")
     itens = relationship("ItemFiscal", back_populates="documento")
     icms_c190 = relationship("IcmsC190", back_populates="documento")
+
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'chv_nfe', name='uq_documento_tenant_chave'),
+    )
