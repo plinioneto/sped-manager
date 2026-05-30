@@ -8,7 +8,7 @@ class InventarioH010(Base):
     __tablename__ = "inventarios_h010"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     inventario_id = Column(Integer, ForeignKey("inventarios_h005.id"), nullable=True)
     dt_inv = Column(DateTime, nullable=False)  # desnormalizado do H005 pai
 

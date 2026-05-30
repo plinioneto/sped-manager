@@ -4,12 +4,12 @@ from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 class ItemFiscal(Base):
-    __tablename__ = "itens_fiscais"
+    __tablename__ = "itens_nota_fiscal"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     chv_nfe = Column(String(44))
-    documento_id = Column(Integer, ForeignKey("documentos_fiscais.id"))
+    documento_id = Column(Integer, ForeignKey("notas_fiscais.id"))
     num_item = Column(Integer)
     cod_item = Column(String)
     descr_compl = Column(String)

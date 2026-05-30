@@ -7,7 +7,7 @@ class Produto(Base):
     __tablename__ = "produtos"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     cod_item = Column(String, nullable=False)
     descr_item = Column(String, nullable=False)
     cod_barra = Column(String)
@@ -33,9 +33,9 @@ class Produto(Base):
     marca_id = Column(Integer, ForeignKey("marcas.id"), nullable=True)
 
     # Classificação (FK global — sem tenant)
-    categoria_id    = Column(Integer, ForeignKey("categorias.id"), nullable=True)
-    grupo_id        = Column(Integer, ForeignKey("grupos.id"), nullable=True)
-    departamento_id = Column(Integer, ForeignKey("departamentos.id"), nullable=True)
+    categoria_id    = Column(Integer, ForeignKey("categorias_produto.id"), nullable=True)
+    grupo_id        = Column(Integer, ForeignKey("grupos_produto.id"), nullable=True)
+    departamento_id = Column(Integer, ForeignKey("departamentos_produto.id"), nullable=True)
     score_categoria = Column(Numeric(5, 4))  # confiança da classificação automática
 
     __table_args__ = (

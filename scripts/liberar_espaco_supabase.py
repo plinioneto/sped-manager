@@ -39,8 +39,8 @@ def verificar_tamanhos(conn):
         FROM pg_class
         WHERE relkind = 'r'
           AND relname IN (
-            'efd_raw', 'documentos_fiscais', 'itens_fiscais',
-            'icms_c190', 'produtos', 'participantes',
+            'efd_raw', 'notas_fiscais', 'itens_nota_fiscal',
+            'resumo_fiscal', 'produtos', 'fornecedores',
             'inventarios_h005', 'inventarios_h010', 'estoques_k200'
           )
         ORDER BY bytes DESC

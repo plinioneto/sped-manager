@@ -5,10 +5,10 @@ from app.models.base import Base
 
 
 class Participante(Base):
-    __tablename__ = "participantes"
+    __tablename__ = "fornecedores"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     cod_part = Column(String, nullable=False)
     nome = Column(String)
     cod_pais = Column(String(5))

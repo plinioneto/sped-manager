@@ -6,11 +6,11 @@ load_dotenv()
 engine = create_engine(os.getenv('DATABASE_URL'))
 
 with engine.connect() as conn:
-    conn.execute(text('TRUNCATE TABLE itens_fiscais, icms_c190, documentos_fiscais RESTART IDENTITY CASCADE'))
+    conn.execute(text('TRUNCATE TABLE itens_nota_fiscal, resumo_fiscal, notas_fiscais RESTART IDENTITY CASCADE'))
     conn.commit()
     print('Truncate concluido.')
 
-    for table in ['itens_fiscais', 'icms_c190', 'documentos_fiscais']:
+    for table in ['itens_nota_fiscal', 'resumo_fiscal', 'notas_fiscais']:
         count = conn.execute(text(f'SELECT COUNT(*) FROM {table}')).scalar()
         size = conn.execute(text(
             f"SELECT pg_size_pretty(pg_total_relation_size('{table}'))"

@@ -7,7 +7,7 @@ class ArquivoImportado(Base):
     __tablename__ = "arquivos_importados"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     nome_original = Column(String, nullable=False)
     nome_padronizado = Column(String, nullable=False)
     cnpj = Column(String(14), nullable=False)

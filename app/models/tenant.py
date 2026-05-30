@@ -5,7 +5,7 @@ from app.models.base import Base
 
 
 class Tenant(Base):
-    __tablename__ = "tenants"
+    __tablename__ = "lojas"
 
     id             = Column(Integer, primary_key=True, index=True)
     nome           = Column(String, nullable=False)

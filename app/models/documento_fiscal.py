@@ -5,10 +5,10 @@ from datetime import datetime
 from app.models.base import Base
 
 class DocumentoFiscal(Base):
-    __tablename__ = "documentos_fiscais"
+    __tablename__ = "notas_fiscais"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     chv_nfe = Column(String(44))
     ind_oper = Column(String)       # 0=entrada, 1=saída
     ind_emit = Column(String)

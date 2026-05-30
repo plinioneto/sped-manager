@@ -8,7 +8,7 @@ class InventarioH005(Base):
     __tablename__ = "inventarios_h005"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
 
     dt_inv = Column(DateTime, nullable=False)
     vl_inv = Column(Float, default=0.0)

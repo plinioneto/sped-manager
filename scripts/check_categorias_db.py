@@ -1,0 +1,11 @@
+import sqlite3
+conn = sqlite3.connect("categorias.db")
+cur = conn.cursor()
+cur.execute("SELECT COUNT(*) FROM departments"); print("Departments:", cur.fetchone())
+cur.execute("SELECT COUNT(*) FROM groups"); print("Groups:", cur.fetchone())
+cur.execute("SELECT COUNT(*) FROM categories"); print("Categories:", cur.fetchone())
+cur.execute("SELECT * FROM departments LIMIT 3"); print("Sample dept:", cur.fetchall())
+cur.execute("PRAGMA table_info(departments)"); print("Dept cols:", cur.fetchall())
+cur.execute("PRAGMA table_info(groups)"); print("Group cols:", cur.fetchall())
+cur.execute("PRAGMA table_info(categories)"); print("Cat cols:", cur.fetchall())
+conn.close()

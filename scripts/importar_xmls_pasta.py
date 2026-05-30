@@ -364,7 +364,7 @@ def listar_periodos(pasta_raiz: Path, ano_filtro, mes_filtro):
 # ---------------------------------------------------------------------------
 
 SQL_DOC = """
-INSERT INTO documentos_fiscais
+INSERT INTO notas_fiscais
   (tenant_id, chv_nfe, ind_oper, ind_emit, cod_part, cod_mod, cod_sit,
    ser, num_doc, dt_doc, dt_e_s,
    vl_doc, vl_desc, vl_merc, vl_bc_icms, vl_icms,
@@ -377,7 +377,7 @@ VALUES
 """
 
 SQL_ITEM = """
-INSERT OR IGNORE INTO itens_fiscais
+INSERT OR IGNORE INTO itens_nota_fiscal
   (tenant_id, chv_nfe, documento_id, num_item, cod_item, descr_compl,
    qtd, unid, vl_item, vl_desc,
    cst_icms, cfop, vl_bc_icms, aliq_icms, vl_icms, vl_pis, vl_cofins)
@@ -388,7 +388,7 @@ VALUES
 """
 
 SQL_C190 = """
-INSERT OR IGNORE INTO icms_c190
+INSERT OR IGNORE INTO resumo_fiscal
   (tenant_id, chv_nfe, documento_id, cst_icms, cfop, aliq_icms,
    vl_opr, vl_bc_icms, vl_icms, vl_pis, vl_cofins, criado_em)
 VALUES
@@ -404,7 +404,7 @@ VALUES
 """
 
 SQL_PART = """
-INSERT OR IGNORE INTO participantes (tenant_id, cod_part, nome, cnpj, criado_em)
+INSERT OR IGNORE INTO fornecedores (tenant_id, cod_part, nome, cnpj, criado_em)
 VALUES (:tenant_id, :cod_part, :nome, :cnpj, :criado_em)
 """
 
@@ -442,7 +442,7 @@ def main():
     cur  = conn.cursor()
 
     # Busca tenant
-    cur.execute("SELECT id, nome FROM tenants WHERE cnpj = ?", (tenant_cnpj,))
+    cur.execute("SELECT id, nome FROM lojas WHERE cnpj = ?", (tenant_cnpj,))
     row = cur.fetchone()
     if not row:
         print(f"[ERRO] Tenant {tenant_cnpj} nao encontrado. Cadastre pelo painel admin.")
@@ -454,7 +454,7 @@ def main():
 
     # Carrega chaves existentes em memoria
     print("Carregando chaves ja importadas...", end=" ", flush=True)
-    cur.execute("SELECT chv_nfe FROM documentos_fiscais WHERE tenant_id = ?", (tenant_id,))
+    cur.execute("SELECT chv_nfe FROM notas_fiscais WHERE tenant_id = ?", (tenant_id,))
     chaves = {r[0] for r in cur.fetchall()}
     print(f"{len(chaves)} encontradas.\n")
 

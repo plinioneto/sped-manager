@@ -7,7 +7,7 @@ class EstoqueK200(Base):
     __tablename__ = "estoques_k200"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
 
     dt_est = Column(DateTime, nullable=False)
     cod_item = Column(String, nullable=False)

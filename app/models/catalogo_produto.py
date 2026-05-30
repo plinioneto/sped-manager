@@ -16,9 +16,9 @@ class CatalogoProduto(Base):
     peso_volume_valor   = Column(Numeric(12, 3))
     peso_volume_unidade = Column(String(10))
 
-    categoria_id        = Column(Integer, ForeignKey("categorias.id"),    nullable=True)
-    grupo_id            = Column(Integer, ForeignKey("grupos.id"),         nullable=True)
-    departamento_id     = Column(Integer, ForeignKey("departamentos.id"), nullable=True)
+    categoria_id        = Column(Integer, ForeignKey("categorias_produto.id"),    nullable=True)
+    grupo_id            = Column(Integer, ForeignKey("grupos_produto.id"),         nullable=True)
+    departamento_id     = Column(Integer, ForeignKey("departamentos_produto.id"), nullable=True)
     marca_id            = Column(Integer, ForeignKey("marcas.id"),         nullable=True)
 
     score_categoria     = Column(Numeric(5, 4))

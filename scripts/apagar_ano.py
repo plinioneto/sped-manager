@@ -40,7 +40,7 @@ def apagar(cnpj: str, ano: int, confirmar: bool):
 
         # Conta só documentos (query simples, sem JOIN — não cria temp file)
         n_docs = db.execute(text(
-            "SELECT COUNT(*) FROM documentos_fiscais "
+            "SELECT COUNT(*) FROM notas_fiscais "
             "WHERE tenant_id = :tid AND EXTRACT(YEAR FROM dt_doc) = :ano"
         ), {"tid": tid, "ano": ano}).scalar()
 
@@ -62,7 +62,7 @@ def apagar(cnpj: str, ano: int, confirmar: bool):
         while True:
             # Busca próximo lote de chaves
             rows = db.execute(text(
-                "SELECT chv_nfe FROM documentos_fiscais "
+                "SELECT chv_nfe FROM notas_fiscais "
                 "WHERE tenant_id = :tid AND EXTRACT(YEAR FROM dt_doc) = :ano "
                 "LIMIT :lote"
             ), {"tid": tid, "ano": ano, "lote": LOTE}).fetchall()
@@ -74,15 +74,15 @@ def apagar(cnpj: str, ano: int, confirmar: bool):
 
             # Apaga filhos antes do pai
             r_c190 = db.execute(text(
-                "DELETE FROM icms_c190 WHERE chv_nfe = ANY(:chaves)"
+                "DELETE FROM resumo_fiscal WHERE chv_nfe = ANY(:chaves)"
             ), {"chaves": chaves})
 
             r_itens = db.execute(text(
-                "DELETE FROM itens_fiscais WHERE chv_nfe = ANY(:chaves)"
+                "DELETE FROM itens_nota_fiscal WHERE chv_nfe = ANY(:chaves)"
             ), {"chaves": chaves})
 
             r_docs = db.execute(text(
-                "DELETE FROM documentos_fiscais WHERE chv_nfe = ANY(:chaves)"
+                "DELETE FROM notas_fiscais WHERE chv_nfe = ANY(:chaves)"
             ), {"chaves": chaves})
 
             db.commit()

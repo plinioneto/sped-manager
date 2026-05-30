@@ -167,7 +167,7 @@ Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto 
 - [x] **Alembic** — `run_migrations()` substituída por `upgrade_db()` (API Python); `alembic/` configurado com `env.py` lendo `DATABASE_URL` do `.env`; migração inicial `8f8fc05b0864` gerada e marcada como baseline; `render_as_batch=True` para compatibilidade SQLite
 - [x] **Context manager de sessão** — `get_db()` adicionado em `app/utils/db.py`; todos os arquivos migrados para `with get_db() as db:` (13 arquivos: 8 páginas, main.py, 4 scripts)
 - [x] **Segurança mínima** — fallback `"admin123"` removido de `08_admin_revisao.py`; `ADMIN_PASSWORD` obrigatório no `.env`; app para com `st.error()` + `st.stop()` se não configurado
-- [ ] **Deploy** — Streamlit Cloud + Supabase (PostgreSQL); configurar secrets, remover PRAGMAs SQLite do caminho de migração, testar com dados reais
+- [~] **Deploy** — Supabase (PostgreSQL) provisionado e conectado (`db.gzhcbrfbphqzhpvrsraa.supabase.co`); migration baseline `8f8fc05b0864` aplicada; migration `5a7e9db4919c` (model_review_v2) gerada mas **pendente de aplicação** — banco está sem espaço em disco (plano Free 500MB); Streamlit descartado como frontend, próximo frontend a definir; pendente: resolver espaço no Supabase e aplicar migration
 - [ ] **Definir tipo de cliente foco** — fiscal (contador/escritório contábil) ou gestão (dono de loja); escopo das primeiras demos
 
 ### 🟠 Fase 2 — Qualidade interna (com usuários iniciais)
@@ -232,6 +232,19 @@ O que é reescrito: `app/pages/` (só a camada UI — menor custo possível de r
 - [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
 - [ ] **README prático** — como rodar localmente, configurar `.env`, rodar `init_db` e `backfill`, importar EFD, usar painel admin
 - [ ] **Documentação técnica completa** — após autenticação + deploy prontos; diagramas de arquitetura, fluxos, especificação dos models e pipeline
+
+### 📄 Documentação em `/docs` (por partes)
+
+Pasta `docs/` criada em 2026-05-29. Fazer por partes, uma seção de cada vez.
+
+| Arquivo | Status | Conteúdo |
+|---------|--------|----------|
+| `docs/dicionario-de-dados.md` | ✅ concluído | Todas as tabelas: colunas, tipos, constraints, regras de negócio, relacionamentos, convenções |
+| `docs/pipeline-de-dados.md` | ⏳ pendente | Fluxo EFD → bronze → silver (C100, C170, C190, 0200, 0150, H005, H010, K200); fluxo XML → silver; regras de upsert; o que cada parser faz |
+| `docs/pipeline-padronizacao.md` | ⏳ pendente | As 6 etapas do pipeline de padronização de produtos (limpeza, dicionários, unidades, identificador, pipeline, categorizador); exemplos de entrada/saída; como alimentar novos dicionários |
+| `docs/modelo-de-dados.md` | ⏳ pendente | Diagrama ER completo; descrição de cada model; decisões de design (ex: por que departamento_id é cache, por que CatalogoProduto é separado de Produto) |
+| `docs/processos-de-negocio.md` | ⏳ pendente | O que cada módulo calcula: faturamento, ICMS a pagar, estoque virtual, gestão de compras, gestão fiscal; quais tabelas cada cálculo consome |
+| `docs/guia-de-desenvolvimento.md` | ⏳ pendente | Como rodar localmente; estrutura de pastas; como criar novo repositório/service/página; como rodar migrations; como rodar backfill |
 - [ ] **Gestão Macro→Micro nas demais páginas** — infraestrutura criada (2026-04-06) e integrada no Início; pendente: Compras (Fase 2), Fiscal (Fase 3), Vendas (depende XML), Inventário (Fase 5), Produtos (Fase 6)
 
 ### ✅ Concluído (histórico)

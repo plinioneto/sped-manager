@@ -6,12 +6,12 @@ from app.models.base import Base
 
 
 class IcmsC190(Base):
-    __tablename__ = "icms_c190"
+    __tablename__ = "resumo_fiscal"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(Integer, ForeignKey("lojas.id"), nullable=False)
     chv_nfe = Column(String(44), nullable=False)
-    documento_id = Column(Integer, ForeignKey("documentos_fiscais.id"), nullable=True)
+    documento_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=True)
 
     cst_icms = Column(String(3))
     cfop = Column(String(4))
