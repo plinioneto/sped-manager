@@ -1,6 +1,6 @@
 # Dicionário de Dados — SPED Manager
 
-> Gerado em 2026-05-29. Reflete o schema após a migration `5a7e9db4919c` (model_review_v2).
+> Gerado em 2026-05-29. Reflete o schema após a migration `c7d8e9f0a1b2` (rename_tables).
 
 ---
 
@@ -10,14 +10,14 @@ O banco tem dois grupos de tabelas:
 
 | Grupo | Tabelas | Descrição |
 |-------|---------|-----------|
-| **Multi-tenant** | `tenants`, `produtos`, `documentos_fiscais`, `itens_fiscais`, `icms_c190`, `participantes`, `inventarios_h005`, `inventarios_h010`, `estoques_k200`, `efd_raw`, `arquivos_importados` | Dados de cada loja. Toda query filtra por `tenant_id`. |
-| **Global** | `grupos_empresariais`, `fabricantes`, `marcas`, `departamentos`, `grupos`, `categorias`, `catalogo_produtos`, `tokens_desconhecidos` | Dados compartilhados entre todos os tenants (catálogo, hierarquia, marcas). Não têm `tenant_id`. |
+| **Multi-tenant** | `lojas`, `produtos`, `notas_fiscais`, `itens_nota_fiscal`, `resumo_fiscal`, `fornecedores`, `inventarios_h005`, `inventarios_h010`, `estoques_k200`, `efd_raw`, `arquivos_importados` | Dados de cada loja. Toda query filtra por `tenant_id`. |
+| **Global** | `grupos_empresariais`, `fabricantes`, `marcas`, `departamentos_produto`, `grupos_produto`, `categorias_produto`, `catalogo_produtos`, `tokens_desconhecidos` | Dados compartilhados entre todos os tenants (catálogo, hierarquia, marcas). Não têm `tenant_id`. |
 
 ---
 
 ## Tabelas multi-tenant
 
-### `tenants`
+### `lojas`
 Representa cada loja/supermercado cliente do sistema.
 
 | Coluna | Tipo | Obrigatório | Descrição |
@@ -33,13 +33,13 @@ Representa cada loja/supermercado cliente do sistema.
 
 ---
 
-### `participantes`
+### `fornecedores`
 Fornecedores, clientes e outras contrapartes. Corresponde ao registro `0150` do EFD.
 
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `cod_part` | String | ✅ | Código interno do EFD (ex: "0001") ou CNPJ quando a origem é XML |
 | `nome` | String | — | Razão social |
 | `cnpj` | String(14) | — | CNPJ sem máscara. Usado para deduplicação entre EFD e XML |
@@ -60,17 +60,17 @@ Fornecedores, clientes e outras contrapartes. Corresponde ao registro `0150` do 
 
 ---
 
-### `documentos_fiscais`
+### `notas_fiscais`
 Cabeçalho de notas fiscais. Corresponde ao registro `C100` do EFD ou ao `<infNFe>` do XML.
 
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `chv_nfe` | String(44) | — | Chave de acesso da NF-e/NFC-e (44 dígitos). Principal chave de negócio |
 | `ind_oper` | String | — | Indicador de operação: `"0"` = entrada, `"1"` = saída |
 | `ind_emit` | String | — | Indicador do emitente: `"0"` = emissão própria, `"1"` = terceiros |
-| `cod_part` | String | — | Código do participante (FK lógica → `participantes.cod_part`) |
+| `cod_part` | String | — | Código do participante (FK lógica → `fornecedores.cod_part`) |
 | `cod_mod` | String | — | Modelo do documento: `"55"` = NF-e, `"65"` = NFC-e |
 | `cod_sit` | String | — | Situação: `"00"` = regular |
 | `ser` | String | — | Série da nota |
@@ -93,15 +93,15 @@ Cabeçalho de notas fiscais. Corresponde ao registro `C100` do EFD ou ao `<infNF
 
 ---
 
-### `itens_fiscais`
+### `itens_nota_fiscal`
 Itens de nota fiscal. Corresponde ao registro `C170` do EFD ou ao `<det>` do XML.
 
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
-| `chv_nfe` | String(44) | — | Chave da NF-e pai — mesmo valor de `documentos_fiscais.chv_nfe` |
-| `documento_id` | Integer FK → `documentos_fiscais.id` | — | FK para o cabeçalho |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
+| `chv_nfe` | String(44) | — | Chave da NF-e pai — mesmo valor de `notas_fiscais.chv_nfe` |
+| `documento_id` | Integer FK → `notas_fiscais.id` | — | FK para o cabeçalho |
 | `num_item` | Integer | — | Número sequencial do item na nota |
 | `cod_item` | String | — | Código interno do produto (mesmo do `produtos.cod_item`) |
 | `descr_compl` | String | — | Descrição complementar do item |
@@ -121,7 +121,7 @@ Itens de nota fiscal. Corresponde ao registro `C170` do EFD ou ao `<det>` do XML
 | `aliq_pis` | Numeric(7,4) | — | Alíquota do PIS |
 | `aliq_cofins` | Numeric(7,4) | — | Alíquota do COFINS |
 
-**Constraint única:** `(tenant_id, chv_doc, num_item)`
+**Constraint única:** `(tenant_id, chv_nfe, num_item)`
 
 > **Atenção — cod_item por fonte:**
 > - EFD e NFC-e (saída): código interno da loja → consistente e usável para análises de vendas
@@ -132,15 +132,15 @@ Itens de nota fiscal. Corresponde ao registro `C170` do EFD ou ao `<det>` do XML
 
 ---
 
-### `icms_c190`
+### `resumo_fiscal`
 Totais de ICMS por CST/CFOP/alíquota dentro de um documento. Corresponde ao registro `C190` do EFD ou é derivado por agregação dos itens do XML.
 
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
-| `chv_nfe` | String(44) | ✅ | Chave da NF-e — mesmo valor de `documentos_fiscais.chv_nfe` |
-| `documento_id` | Integer FK → `documentos_fiscais.id` | — | FK para o cabeçalho (nullable: C190 pode existir sem C100 no EFD) |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
+| `chv_nfe` | String(44) | ✅ | Chave da NF-e — mesmo valor de `notas_fiscais.chv_nfe` |
+| `documento_id` | Integer FK → `notas_fiscais.id` | — | FK para o cabeçalho (nullable: C190 pode existir sem C100 no EFD) |
 | `cst_icms` | String(3) | — | CST do ICMS |
 | `cfop` | String(4) | — | CFOP |
 | `aliq_icms` | Numeric(7,4) | — | Alíquota do ICMS |
@@ -165,15 +165,15 @@ Cadastro de produtos da loja (registro `0200` do EFD), enriquecido pelo pipeline
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
-| `cod_item` | String | ✅ | Código interno da loja (mesmo usado em `itens_fiscais.cod_item`) |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
+| `cod_item` | String | ✅ | Código interno da loja (mesmo usado em `itens_nota_fiscal.cod_item`) |
 | `descr_item` | String | ✅ | Descrição original do EFD (uppercase, latin-1) |
 | `cod_barra` | String | — | EAN-13 / EAN-8. Quando válido, permite herança de classificação via `catalogo_produtos` |
 | `unid_inv` | String(6) | — | Unidade de inventário: UN, KG, CX... |
 | `tipo_item` | String | — | Tipo: "00"=mercadoria para revenda, "01"=MP, etc. |
 | `cod_ncm` | String(8) | — | NCM sem pontuação |
 | `cest` | String | — | CEST (substituição tributária) |
-| `aliq_icms` | Float | — | Alíquota padrão do ICMS (campo legado, substituir por dados do C190) |
+| `aliq_icms` | Float | — | Alíquota padrão do ICMS (campo legado, substituir por dados do `resumo_fiscal`) |
 | `ativo` | Boolean | — | `true` por padrão |
 | `criado_em` | DateTime | — | — |
 | **Padronização** | | | |
@@ -186,9 +186,9 @@ Cadastro de produtos da loja (registro `0200` do EFD), enriquecido pelo pipeline
 | `origem_padronizacao` | String(20) | — | `regra` \| `fuzzy` \| `catalogo` \| `manual` \| `manual_sem_cat` |
 | `revisao_necessaria` | Boolean | — | Flag para revisão manual no painel admin |
 | `marca_id` | Integer FK → `marcas.id` | — | — |
-| `categoria_id` | Integer FK → `categorias.id` | — | Nível 3 da hierarquia |
-| `grupo_id` | Integer FK → `grupos.id` | — | Nível 2 (cache de performance — derivável via categoria) |
-| `departamento_id` | Integer FK → `departamentos.id` | — | Nível 1 (cache de performance — derivável via grupo) |
+| `categoria_id` | Integer FK → `categorias_produto.id` | — | Nível 3 da hierarquia |
+| `grupo_id` | Integer FK → `grupos_produto.id` | — | Nível 2 (cache de performance — derivável via categoria) |
+| `departamento_id` | Integer FK → `departamentos_produto.id` | — | Nível 1 (cache de performance — derivável via grupo) |
 | `score_categoria` | Numeric(5,4) | — | Confiança da classificação automática (0.0 a 1.0) |
 
 **Constraint única:** `(tenant_id, cod_item)`
@@ -203,7 +203,7 @@ Cabeçalho de inventário físico. Corresponde ao registro `H005` do EFD.
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `dt_inv` | DateTime | ✅ | Data do inventário |
 | `vl_inv` | Float | — | Valor total do inventário |
 | `mot_inv` | String(2) | — | Motivo: "01"=no final do período, "02"=na mudança de forma de tributação, etc. |
@@ -220,7 +220,7 @@ Itens do inventário físico. Corresponde ao registro `H010` do EFD.
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `inventario_id` | Integer FK → `inventarios_h005.id` | — | FK para o cabeçalho do inventário |
 | `dt_inv` | DateTime | ✅ | Data do inventário (desnormalizado do H005 para facilitar queries) |
 | `cod_item` | String | ✅ | Código interno do produto |
@@ -244,7 +244,7 @@ Saldo de estoque periódico. Corresponde ao registro `K200` do EFD (Bloco K).
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `dt_est` | DateTime | ✅ | Data do saldo |
 | `cod_item` | String | ✅ | Código interno do produto |
 | `qt_est` | Float | — | Quantidade em estoque |
@@ -261,14 +261,14 @@ Bronze layer — cada linha do arquivo EFD armazenada literalmente. Usada para r
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `file_path` | String | ✅ | Caminho do arquivo EFD de origem |
 | `num_linha` | Integer | ✅ | Número da linha no arquivo |
 | `tipo_registro` | String(10) | ✅ | Ex: "C100", "C170", "0200" |
 | `conteudo_linha` | Text | ✅ | Linha completa do EFD (encoding latin-1 convertido para UTF-8) |
 | `ingest_timestamp` | DateTime | ✅ | Momento da ingestão |
 
-> **Candidato a arquivamento:** com volume alto, mover para S3 e manter só os silver no banco.
+> **Arquitetura medalhão:** `efd_raw` é a camada bronze. No modelo-alvo, bronze e silver ficam fora do Supabase (ex: Cloudflare R2 + DuckDB). Apenas a camada gold (agregados operacionais) permanece no PostgreSQL/Supabase.
 
 ---
 
@@ -278,7 +278,7 @@ Histórico de importações de arquivos EFD.
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
 | `id` | Integer PK | ✅ | — |
-| `tenant_id` | Integer FK → `tenants.id` | ✅ | — |
+| `tenant_id` | Integer FK → `lojas.id` | ✅ | — |
 | `nome_original` | String | ✅ | Nome original do arquivo enviado |
 | `nome_padronizado` | String | ✅ | Nome após renomeação: `CNPJ_YYYYMMDD_YYYYMMDD.txt` |
 | `cnpj` | String(14) | ✅ | CNPJ extraído do arquivo (validado contra o tenant) |
@@ -294,7 +294,7 @@ Histórico de importações de arquivos EFD.
 ## Tabelas globais (sem tenant_id)
 
 ### `grupos_empresariais`
-Agrupa tenants de um mesmo dono (rede de supermercados).
+Agrupa lojas de um mesmo dono (rede de supermercados).
 
 | Coluna | Tipo | Obrigatório | Descrição |
 |--------|------|-------------|-----------|
@@ -336,36 +336,36 @@ Marcas comerciais (Dove, Sadia, Skol, Gillette...).
 
 ---
 
-### `departamentos` / `grupos` / `categorias`
+### `departamentos_produto` / `grupos_produto` / `categorias_produto`
 Hierarquia global de classificação de produtos em 3 níveis.
 
 | Nível | Tabela | Qtd | Exemplo |
 |-------|--------|-----|---------|
-| 1 | `departamentos` | 18 | BEBIDAS, LIMPEZA, PERFUMARIA, AÇOUGUE |
-| 2 | `grupos` | 118 | CERVEJAS, REFRIGERANTE, BISCOITO DOCE |
-| 3 | `categorias` | 720 | CERVEJA PURO MALTE, REFRIGERANTE COLA |
+| 1 | `departamentos_produto` | 18 | BEBIDAS, LIMPEZA, PERFUMARIA, AÇOUGUE |
+| 2 | `grupos_produto` | 118 | CERVEJAS, REFRIGERANTE, BISCOITO DOCE |
+| 3 | `categorias_produto` | 720 | CERVEJA PURO MALTE, REFRIGERANTE COLA |
 
-**`departamentos`**
+**`departamentos_produto`**
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | Integer PK | — |
 | `descricao` | String(100) UNIQUE | Nome do departamento (maiúsculas, sem acento) |
 
-**`grupos`**
+**`grupos_produto`**
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | Integer PK | — |
-| `departamento_id` | Integer FK → `departamentos.id` | — |
+| `departamento_id` | Integer FK → `departamentos_produto.id` | — |
 | `descricao` | String(100) | Nome do grupo |
 
-**`categorias`**
+**`categorias_produto`**
 
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | Integer PK | — |
-| `grupo_id` | Integer FK → `grupos.id` | — |
+| `grupo_id` | Integer FK → `grupos_produto.id` | — |
 | `descricao` | String(150) | Nome da categoria |
 
 ---
@@ -382,9 +382,9 @@ Catálogo global de produtos por EAN. Permite que a classificação feita para u
 | `tipo_embalagem` | String(30) | — | Tipo de embalagem |
 | `peso_volume_valor` | Numeric(12,3) | — | — |
 | `peso_volume_unidade` | String(10) | — | — |
-| `categoria_id` | Integer FK → `categorias.id` | — | — |
-| `grupo_id` | Integer FK → `grupos.id` | — | — |
-| `departamento_id` | Integer FK → `departamentos.id` | — | — |
+| `categoria_id` | Integer FK → `categorias_produto.id` | — | — |
+| `grupo_id` | Integer FK → `grupos_produto.id` | — | — |
+| `departamento_id` | Integer FK → `departamentos_produto.id` | — | — |
 | `marca_id` | Integer FK → `marcas.id` | — | — |
 | `score_categoria` | Numeric(5,4) | — | — |
 | `origem_padronizacao` | String(20) | — | `regra` \| `manual` \| `catalogo` |
@@ -413,25 +413,25 @@ Tokens encontrados nas descrições de produtos que nenhum dicionário do pipeli
 ## Relacionamentos principais
 
 ```
-GrupoEmpresarial (1) ──── (N) Tenant
-Tenant (1) ──── (N) Produto
-Tenant (1) ──── (N) DocumentoFiscal
-Tenant (1) ──── (N) ItemFiscal
-Tenant (1) ──── (N) IcmsC190
-Tenant (1) ──── (N) Participante
-Tenant (1) ──── (N) InventarioH005 ──── (N) InventarioH010
-Tenant (1) ──── (N) EstoqueK200
-Tenant (1) ──── (N) EfdRaw
-Tenant (1) ──── (N) ArquivoImportado
+grupos_empresariais (1) ──── (N) lojas
+lojas (1) ──── (N) produtos
+lojas (1) ──── (N) notas_fiscais
+lojas (1) ──── (N) itens_nota_fiscal
+lojas (1) ──── (N) resumo_fiscal
+lojas (1) ──── (N) fornecedores
+lojas (1) ──── (N) inventarios_h005 ──── (N) inventarios_h010
+lojas (1) ──── (N) estoques_k200
+lojas (1) ──── (N) efd_raw
+lojas (1) ──── (N) arquivos_importados
 
-DocumentoFiscal (1) ──── (N) ItemFiscal
-DocumentoFiscal (1) ──── (N) IcmsC190
+notas_fiscais (1) ──── (N) itens_nota_fiscal
+notas_fiscais (1) ──── (N) resumo_fiscal
 
-Fabricante (1) ──── (N) Marca
-Marca (1) ──── (N) Produto
-Departamento (1) ──── (N) Grupo (1) ──── (N) Categoria
-Categoria (1) ──── (N) Produto
-CatalogoProduto ── (EAN) ── Produto  [relação lógica, não FK]
+fabricantes (1) ──── (N) marcas
+marcas (1) ──── (N) produtos
+departamentos_produto (1) ──── (N) grupos_produto (1) ──── (N) categorias_produto
+categorias_produto (1) ──── (N) produtos
+catalogo_produtos ── (EAN) ── produtos  [relação lógica, não FK]
 ```
 
 ---
@@ -447,3 +447,4 @@ CatalogoProduto ── (EAN) ── Produto  [relação lógica, não FK]
 | Multi-tenant | Todo repository filtra por `tenant_id`. Nunca fazer query sem esse filtro |
 | Encoding EFD | Arquivos latin-1, convertidos para UTF-8 na ingestão |
 | Upsert | Todas as tabelas silver têm constraint única + upsert (não duplica em reprocessamento) |
+| Nomes de tabelas | Sufixo `_produto` nas hierarquias (departamentos_produto, grupos_produto, categorias_produto) para distinguir de grupos_empresariais |
