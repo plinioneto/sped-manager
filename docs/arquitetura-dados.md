@@ -37,22 +37,43 @@ XML NF-e   ──┘  Python  raw files (*)       notas_fiscais       gold_kpis_
 
 ---
 
-## Camada Silver — Supabase (tabelas leves)
+## Camada Silver — Supabase (tabelas estruturais)
 
-Tabelas estruturadas que o sistema ainda usa diretamente. Ficam no Supabase porque o volume é controlado mesmo com dezenas de clientes.
+Tabelas estruturadas que ficam no Supabase **permanentemente** — não por limitação técnica,
+mas porque o volume é irrisório e elas são dados estruturais, não transacionais.
 
-| Tabela | Fonte | Volume estimado (50 lojas) |
-|--------|-------|---------------------------|
-| `notas_fiscais` | C100 + NF-e/NFC-e XML | ~2,4 M linhas |
-| `resumo_fiscal` | C190 (CST/CFOP/alíq) | ~7,2 M linhas |
-| `produtos` | 0200 + XML | ~500 K linhas |
-| `fornecedores` | 0150 + XML emit | ~300 K linhas |
+### Estimativa de volume — 100 clientes × 36 meses
 
-**O que NÃO fica no Supabase:**
-- `itens_nota_fiscal` de NFC-e (saídas varejo): ~657 M linhas em escala — arquivo XML fica no R2
-- `efd_raw`: eliminada — arquivo bruto fica no R2
+| Tabela | Critério de crescimento | Linhas | Tamanho est. |
+|--------|------------------------|--------|--------------|
+| `notas_fiscais` | 250 notas/mês × 100 clientes × 36 meses | ~900 mil | ~500 MB |
+| `resumo_fiscal` | 80 agrup. CST/CFOP/mês × 100 × 36 | ~290 mil | ~80 MB |
+| `produtos` | 8.000 itens únicos × 100 clientes | ~800 mil | ~600 MB |
+| `fornecedores` | 500 por cliente × 100 clientes | ~50 mil | ~30 MB |
+| **Total silver** | | **~2 M linhas** | **~1,2 GB** |
+| `itens_nota_fiscal` (NFC-e saídas) | 800 cupons/dia × 15 itens × 365 dias × 100 | **~438 M linhas** | **~300 GB** |
 
-**Dívida técnica consciente:** as tabelas silver ficam no Supabase enquanto o Streamlit existir, pois as páginas atuais fazem queries direto nelas. Quando o FastAPI assumir todas as rotas e a Gold cobrir todos os casos de uso, silver sai do Supabase.
+O Supabase Pro inclui 8 GB — as 4 tabelas silver cabem com folga por toda a vida útil do produto.
+O único problema de volume real é `itens_nota_fiscal` de NFC-e saída, que **não é persistido**.
+
+### Decisão de design
+
+As 4 tabelas silver ficam no Supabase definitivamente:
+- `notas_fiscais` — necessária para gold, auditoria e drill-down fiscal
+- `resumo_fiscal` — C190 é leve e alimenta análise por CFOP/CST
+- `produtos` — catálogo com padronização; dado estrutural, não transacional
+- `fornecedores` — idem
+
+A dependência do **Streamlit** lendo silver diretamente é uma dívida temporária.
+O FastAPI nunca leu silver diretamente — as rotas sempre foram projetadas para consumir gold.
+Quando o Streamlit for desligado, o silver continua no Supabase — só deixa de ser acessado diretamente.
+
+### O que NÃO fica no Supabase
+
+| Tabela | Motivo | Destino |
+|--------|--------|---------|
+| `itens_nota_fiscal` (NFC-e saídas) | ~300 GB em escala — proibitivo | XML bruto no R2 |
+| `efd_raw` | Substituída pelo arquivo bruto | EFD .txt no R2 |
 
 ---
 
@@ -159,14 +180,17 @@ Todo o código de `app/models/`, `app/repositories/`, `app/services/`, `app/pars
 
 ---
 
-## Motivação: por que não tudo no Supabase?
+## Motivação: por que itens de NFC-e não ficam no Supabase?
 
-Volume estimado de NFC-e (itens de saída):
+Volume estimado de itens de saída (NFC-e):
 ```
-800 cupons/dia × 15 itens × 365 dias × 50 clientes × 3 anos ≈ 657 milhões de linhas
+800 cupons/dia × 15 itens × 365 dias × 100 clientes × 3 anos ≈ 438 milhões de linhas (~300 GB)
 ```
 95% das queries do frontend precisam de agregações, não de itens individuais.
-Guardar esses itens no PostgreSQL seria caro e desnecessário.
+O arquivo XML bruto fica no R2 para reprocessamento sob demanda se necessário.
+
+As demais tabelas silver (`notas_fiscais`, `resumo_fiscal`, `produtos`, `fornecedores`) totalizam
+~1,2 GB com 100 clientes em 3 anos — completamente viável no Supabase Pro (8 GB inclusos).
 
 ---
 
