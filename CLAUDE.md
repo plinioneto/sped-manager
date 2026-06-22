@@ -1,189 +1,173 @@
 # SPED Manager
 
 ## Contexto
-Sistema de gestão fiscal para supermercados baseado em arquivos EFD (SPED Fiscal).
-Streamlit ainda ativo durante a transição para FastAPI + React + Tremor.
 
-## Stack atual
-- Streamlit — interface legada (em transição)
-- FastAPI — API backend (estrutura base criada em `api/`)
-- SQLAlchemy + SQLite (dev) / PostgreSQL Supabase (prod)
-- Cloudflare R2 — armazenamento de arquivos brutos (bronze)
-- Python 3.11+
+Sistema de gestão fiscal para supermercados baseado em arquivos EFD (SPED Fiscal) e XML NFC-e/NF-e.
+Multi-tenant (uma instância, N clientes). Streamlit legado em transição para FastAPI + React + Tremor.
 
-## Stack futura (FastAPI + React)
-- Backend: FastAPI (`api/`) — reusa app/models, repositories, services, parser
-- Frontend: React + Tremor — a criar
-- Auth: JWT (implementado em `api/auth.py`)
+## Stack
 
-## Estrutura de pastas
-- app/pages — telas Streamlit (legadas, em transição)
-- app/services — lógica de negócio
-- app/repositories — acesso ao banco (sempre filtram por tenant_id)
-- app/models — SQLAlchemy ORM
-- app/parser — bronze.py (legado) e silver.py (c100, c190, 0200, 0150, h005, h010, k200)
-- app/components — sidebar.py, auth.py
-- app/utils — db.py, formatters.py, r2.py (Cloudflare R2)
-- api/ — FastAPI: main.py, auth.py, deps.py, routers/
-- scripts/ — importar_efd.py, importar_xmls_pasta.py, backfill_padronizacao.py, seed_fabricantes_marcas.py
-
-## Models existentes
-- GrupoEmpresarial — global (sem tenant_id); agrupa tenants de um mesmo dono (nome, ativo)
-- Tenant — empresa/supermercado (CNPJ sem máscara, 14 dígitos); FK nullable → GrupoEmpresarial
-- Produto — cadastro 0200 (chave única: tenant_id + cod_item)
-- DocumentoFiscal — C100 (chave única: tenant_id + chv_nfe)
-- ItemFiscal — C170 (chave única: tenant_id + chv_doc + num_item)
-- EfdRaw — bronze linha a linha
-- ArquivoImportado — histórico de importações
-- Fabricante — global (sem tenant_id); grupo empresarial (Unilever, BRF, Ambev...)
-- Marca — global (sem tenant_id); marca comercial (Dove, Sadia, Skol...), FK → Fabricante
-- Departamento / Grupo / Categoria — hierarquia global de 3 níveis para classificação de produtos
-
-## Regras importantes
-- SEMPRE filtrar por tenant_id em todas as queries
-- CNPJ salvo sem máscara, formatado só na exibição com formatar_cnpj()
-- Encoding latin-1 nos arquivos EFD
-- Arquivos renomeados: CNPJ_YYYYMMDD_YYYYMMDD.txt
-- imports de models sempre via: import app.models
-- session_state guarda: tenant_id, tenant_nome, tenant_cnpj
-- Guard de autenticação no topo de cada página:
-  if not st.session_state.get("tenant_id"):
-      st.switch_page("main.py")
-
-## Padrões de código
-- Repositories herdam de BaseRepository (tem tenant_id)
-- Services recebem session + tenant_id
-- Upsert em todos os registros silver
-- db.close() após cada query no Streamlit
-
-## Status das páginas
-| Página | Status | Observações |
-|--------|--------|-------------|
-| 00_inicio.py | ✅ concluído | resumo executivo: cards (faturamento, ICMS a pagar, ticket médio, PIS+COFINS), evolução últimos 6 meses, top 5 fornecedores, gráfico de composição por departamento (via C170 saída — aparece quando há itens de saída detalhados), filtro hierarquia Depto>Grupo>Cat na sidebar, rodapé com última data e arquivo importado |
-| 01_gestao_vendas.py | ✅ concluído | gestão de vendas: visão geral com evolução mensal, ritmo de vendas (heatmap dia×mês, histograma de ticket), mix comercial (CFOP/CST via C190), clientes B2B e notas; 2 filtros (período, dia da semana) |
-| 02_compras.py | ✅ concluído | gestão de compras: notas entrada, itens, por fornecedor, por produto; 4 filtros independentes (período, fornecedor, nº nota, produto) aplicados em todas as seções; CNPJ normalizado no filtro |
-| 03_gestao_fiscal.py | ✅ concluído | gestão fiscal: visão geral tributos, ICMS débito/crédito, ST, PIS/COFINS, diagnóstico; 5 abas, 3 filtros (período, CST, CFOP); PIS/COFINS via DocumentoFiscal |
-| 04_inventario.py | ✅ concluído | 3 abas: Estoque Virtual (movimentação calculada via C170 com fallback K200/H010/zero), Inventário H005/H010, Saldo K200 |
-| 05_produtos.py | ✅ concluído | 3 abas: Cadastro EFD (campos 0200 + filtros), Padronização & Categorias (descrição padronizada, marca, embalagem, scores, situação), Inteligência de Produtos (preço médio, concentração de fornecedor, carga tributária) |
-| 08_admin_revisao.py | ✅ concluído | painel interno (sem sidebar); auth por senha; 5 abas: Revisão Individual, Revisão em Lote, Marcas & Fabricantes, Tokens Desconhecidos, Clientes & Upload (lista clientes com grupo, cadastro com grupo opcional, upload admin com filtro por grupo, gestão de grupos empresariais) |
-| 06_dados.py | ✅ concluído | 2 abas: Upload (bronze+silver, múltiplos arquivos) e Histórico (5 métricas + tabela de arquivos importados com exclusão) |
-| 07_configuracoes.py | ⏳ pendente | |
-
-## Status dos models
-| Model | Status | Observações |
-|-------|--------|-------------|
-| GrupoEmpresarial | ✅ | global (sem tenant_id); nome, ativo; FK ← Tenant.grupo_id |
-| Tenant | ✅ | grupo_id (FK nullable → GrupoEmpresarial) |
-| Produto | ✅ | campos 0200 + padronização (descricao_padrao, tipo_embalagem, peso_volume, scores) + FK para Marca, Categoria, Grupo, Departamento |
-| Fabricante | ✅ | global; nome, cnpj, aliases (JSON), ativo |
-| Marca | ✅ | global; nome, fabricante_id, categoria, aliases (JSON), ativo |
-| Departamento | ✅ | global; 18 departamentos carregados do categorias.db |
-| Grupo | ✅ | global; 118 grupos, FK → Departamento |
-| Categoria | ✅ | global; 720 categorias, FK → Grupo |
-| DocumentoFiscal | ✅ | campos C100 completos |
-| ItemFiscal | ✅ | campos C170 completos |
-| EfdRaw | ✅ | |
-| ArquivoImportado | ✅ | |
-| IcmsC190 | ✅ | constraint única (tenant_id, chv_doc, cst_icms, cfop, aliq_icms); aliq_icms como String |
-| InventarioH005 | ✅ | cabeçalho H005; constraint (tenant_id, dt_inv, mot_inv) |
-| InventarioH010 | ✅ | itens H010; dt_inv desnormalizado; constraint (tenant_id, dt_inv, cod_item, ind_prop) |
-| EstoqueK200 | ✅ | saldo K200; constraint (tenant_id, dt_est, cod_item, ind_est) |
-| Participante | ✅ | registro 0150; constraint (tenant_id, cod_part); nome, cnpj, endereço |
-| TokenDesconhecido | ✅ | global; token único + contagem + primeiro/último visto + exemplo de descrição |
-
-## Status do parser
-| Etapa | Status | Observações |
-|-------|--------|-------------|
-| Renomeação | ✅ | CNPJ_YYYYMMDD_YYYYMMDD.txt |
-| Bronze | ✅ | efd_raw linha a linha |
-| Silver C100 | ✅ | todos os campos |
-| Silver C170 | ✅ | todos os campos |
-| Silver 0200 | ✅ | todos os campos |
-| Silver C190 | ✅ | campos completos, upsert por CST/CFOP/aliq |
-| Silver H005 | ✅ | cabeçalho inventário, upsert por dt_inv+mot_inv |
-| Silver H010 | ✅ | itens inventário, propaga dt_inv do H005 pai |
-| Silver K200 | ✅ | saldo de estoque, upsert por dt_est+cod_item+ind_est |
-| Silver 0150 | ✅ | participantes, upsert por cod_part |
-
-## Decisões de arquitetura
-- SQLite no dev, PostgreSQL na produção — troca só o .env
-- Multi-tenant via tenant_id em todos os models
-- Bronze/Silver seguindo padrão do Databricks original
-- Storage local em storage/arquivos/ — vira S3 na produção
-- Autenticação temporária só por CNPJ — senha ainda não implementada
-- Pipeline de padronização de produtos (app/services/produto_padronizacao/):
-  1. limpeza.py — uppercase, remove acentos, caracteres especiais e stopwords promocionais (PROMO, OFERTA, NOVO…)
-  2. dicionarios.py — expansão de abreviações (~120 termos) + abreviações contextuais (DES→desnatado/desodorante/desinfetante conforme vizinhança; TP→tetra pak só com leite/suco/chá)
-  3. unidades.py — extração de peso/volume via regex
-  4. identificador.py — detecção de marca/fabricante: match exato por token/bigrama (banco > dicionário fixo) + fuzzy matching RapidFuzz (threshold=90, blacklist de tokens genéricos)
-  5. pipeline.py — extração de atributos (ZERO, LIGHT, INTEGRAL, EXTRA VIRGEM, SEM GLUTEN…) separados da descrição; montagem final em ordem canônica: base + atributos + embalagem + volume
-  6. categorizador.py — _VOCAB_CATEGORIA (~195 entradas, score 0.98) → _VOCAB_TIPO_PRODUTO (score 0.95) → _VOCAB_HORTIFRUTI (score 0.90) → Jaccard fallback
-  - Cobertura automática atual: ~70.6% dos produtos com categoria/grupo
-  - Protegido: produtos com origem_padronizacao='manual'/'manual_sem_cat' nunca são sobrescritos pelo backfill
-- Marcas e fabricantes globais: 45 fabricantes + 225 marcas seedadas; banco tem prioridade sobre dicionário fixo; PRESTOBARBA é alias de GILLETTE (P&G)
-- Tokens desconhecidos: pipeline salva no banco (tabela `tokens_desconhecidos`) tokens ≥4 chars não reconhecidos por nenhum dicionário; acessíveis na aba "Tokens Desconhecidos" do admin, ordenados por frequência; uso esperado: alimentar novas entradas na fila do CLAUDE.md
-- scripts/backfill_padronizacao.py: flags --todos (reprocessa tudo exceto manuais) e --force (sobrescreve inclusive manuais); scripts/seed_fabricantes_marcas.py: popula fabricantes/marcas
-- scripts/importar_xmls_pasta.py: importação em lote de NFC-e/NF-e XML via raw SQL (executemany); ~3000 arq/s; estrutura esperada: `PASTA/CAIXA0X/ANO/MES/Transmitidos/*.xml`; uso: `python scripts/importar_xmls_pasta.py --pasta "..." --cnpj CNPJ --ano 2025`; flags: `--mes 01`, `--dry-run`; ignora Contingencia e ErroTransmissao; dedup por chave no nome do arquivo; rode backfill_padronizacao.py depois para classificar os produtos importados
-
-## Diagnóstico de Arquitetura (2026-05-12)
-
-### Pontos fortes
-- Padrão repository correto e consistente — `tenant_id` filtrado em toda query de leitura
-- bcrypt para senhas — escolha correta
-- Parser bronze/silver bem desenhado — upserts, separação de responsabilidades, tratamento de encoding
-- Isolamento multi-tenant arquiteturalmente sólido
-- Catálogo EAN global — herança de classificação entre tenants entrega valor real
-- O pipeline de padronização é investimento justificado: habilita navegação hierárquica no produto E é a base técnica para o modelo de dados anônimos para indústrias (IRI/Nielsen)
-
-### Problemas identificados
-
-#### Críticos (bloqueiam produção)
-1. ~~**Migrações via try/except**~~ — ✅ resolvido: Alembic configurado (`alembic/`), `run_migrations()` substituída por `upgrade_db()` via API Python; migração inicial gerada e aplicada como baseline.
-2. ~~**Gerenciamento de sessões inconsistente**~~ — ✅ resolvido: `get_db()` context manager adicionado em `app/utils/db.py`; todas as páginas, scripts e `main.py` migrados para `with get_db() as db:`.
-3. ~~**Segurança mínima ausente**~~ — ✅ resolvido: fallback `"admin123"` removido; `ADMIN_PASSWORD` obrigatório no `.env`; app para com erro claro se não configurado.
-
-#### Qualidade e manutenibilidade
-4. **Regras do categorizador em código** — cada nova entrada (abreviação, categoria, combinação) exige edição de arquivo Python + deploy. Com ~200 regras acumuladas, o custo cresce indefinidamente. Solução: mover para tabelas editáveis no banco, gerenciáveis pelo painel admin.
-5. **`08_admin_revisao.py` tem 1.392 linhas** — uma página fazendo revisão individual, lote, marcas, tokens, clientes, upload e grupos. Ponto crítico de manutenção.
-6. **Sem testes** — 9.000 linhas, zero testes. Qualquer refatoração do pipeline ou do parser é uma aposta cega.
-
-#### Limitação de produto
-7. **Gestão de vendas incompleta sem XML** — EFD de supermercado tem C170 (itens) apenas para entradas. Saídas (varejo) viram C190: resumo fiscal sem produto ou quantidade. A página `01_gestao_vendas.py` mostra faturamento e impostos, não vendas de produto. **NFC-e XML é pré-requisito para o módulo funcionar**.
-
----
-
-## Stack futura
-
-O Streamlit foi a escolha certa para validar. O teto é baixo para produção: sem controle de estado real, sem componentes customizáveis, dificuldade com multi-usuário e performance limitada em queries pesadas.
-
-**Destino:**
-- **Backend:** FastAPI — preserva todo o código Python existente; só adiciona camada de rotas em cima dos services e repositories atuais
-- **Frontend:** React + [Tremor](https://tremor.so) — biblioteca de componentes feita para dashboards analíticos (charts, KPI cards, tabelas, filtros prontos)
-- **Auth:** JWT com FastAPI — substitui `session_state` por tokens Bearer padrão de mercado
+| Camada | Tecnologia | Status |
+|--------|-----------|--------|
+| Backend API | FastAPI (`api/`) | ✅ estrutura base criada |
+| Frontend | React + Tremor | ⏳ a criar |
+| Auth | JWT bcrypt (`api/auth.py`) | ✅ implementado |
+| Banco | Supabase PostgreSQL (prod) / SQLite (dev) | ✅ ativo |
+| Armazenamento raw | Cloudflare R2 (`app/utils/r2.py`) | ✅ ativo |
+| Interface legada | Streamlit (`app/pages/`) | ⚠ em transição |
+| ORM | SQLAlchemy + Alembic | ✅ ativo |
+| Python | 3.11+ | — |
 
 **O que migra sem tocar:** `app/models/`, `app/repositories/`, `app/services/`, `app/parser/`, `app/utils/`
-**O que é reescrito:** `app/pages/` (só a camada UI — o menor custo de reescrita possível)
+**O que é reescrito:** `app/pages/` (camada UI substituída pelo React)
 
 ---
 
-## Próximos passos — ordem de execução para o MVP
+## Estrutura de pastas
 
-> Atualizado em 2026-06-22. Seguir esta ordem evita retrabalho.
+```
+api/                    FastAPI: main.py, auth.py, deps.py, routers/
+app/
+  models/               SQLAlchemy ORM
+  repositories/         acesso ao banco (sempre filtram por tenant_id)
+  services/             lógica de negócio
+  parser/               silver.py (EFD), xml_parser.py (NFC-e/NF-e), renomeador.py
+  utils/                db.py, r2.py, formatters.py, theme.py
+  components/           sidebar.py, filtro_hierarquia.py
+  pages/                telas Streamlit (legadas)
+scripts/                importar_efd.py, importar_xmls_pasta.py,
+                        backfill_padronizacao.py, seed_fabricantes_marcas.py
+docs/                   arquitetura-dados.md, dicionario-de-dados.md, ...
+alembic/                migrations
+```
 
-### Passo 1 — Dados completos no banco (desbloqueante)
-- [ ] Importar Mar–Jul/2025 da GS Mercearia: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
-- [ ] Rodar backfill após importação: `python scripts/backfill_padronizacao.py --todos`
-- [ ] Confirmar gold_kpis_mensais populado para todos os 7 meses
+---
 
-### Passo 2 — Corrigir pipeline XML (antes de rodar em produção)
-- [ ] Adicionar upload para R2 no `xml_parser.py` (`upload_bytes` antes de processar)
+## Modelos e tabelas
+
+### Por tenant (filtrar sempre por tenant_id)
+
+| Model | Tabela | Descrição |
+|-------|--------|-----------|
+| Tenant | `lojas` | Empresa/supermercado; CNPJ 14 dígitos sem máscara |
+| DocumentoFiscal | `notas_fiscais` | C100 + NF-e/NFC-e XML; chave única: tenant_id + chv_nfe |
+| ItemFiscal | `itens_nota_fiscal` | C170; chave única: tenant_id + chv_nfe + num_item |
+| IcmsC190 | `resumo_fiscal` | C190 agrupado por CST/CFOP/alíq |
+| Participante | `fornecedores` | 0150 + emitentes XML |
+| Produto | `produtos` | 0200 + padronização + FK para Marca/Categoria |
+| ArquivoImportado | `arquivos_importados` | histórico de importações EFD e XML |
+| InventarioH005/H010 | `inventario_h005/h010` | cabeçalho e itens de inventário |
+| EstoqueK200 | `estoque_k200` | saldo de estoque |
+| GoldKpisMensais | `gold_kpis_mensais` | KPIs pré-calculados por tenant+mês |
+
+### Globais (sem tenant_id)
+
+| Model | Tabela | Descrição |
+|-------|--------|-----------|
+| GrupoEmpresarial | `grupos_empresariais` | agrupa tenants do mesmo dono |
+| Fabricante | `fabricantes` | 45 seedados; aliases JSON |
+| Marca | `marcas` | 225 seedadas; FK → Fabricante |
+| Departamento/Grupo/Categoria | `departamentos_produto`, `grupos_produto`, `categorias_produto` | hierarquia 18 > 118 > 720 |
+| CatalogoProduto | `catalogo_produtos` | herança de classificação por EAN entre tenants |
+| TokenDesconhecido | `tokens_desconhecidos` | tokens não reconhecidos pelo pipeline |
+
+---
+
+## Regras críticas de código
+
+- **tenant_id em toda query** — sem exceção; repositories herdam de BaseRepository
+- **CNPJ sem máscara** no banco (14 dígitos); formatar só na exibição com `formatar_cnpj()`
+- **Encoding latin-1** nos arquivos EFD
+- **Arquivos nomeados** `CNPJ_YYYYMMDD_YYYYMMDD.txt` (via `renomeador.py`)
+- **Auth Streamlit:** `session_state` com tenant_id; guard no topo de cada página:
+  ```python
+  if not st.session_state.get("tenant_id"):
+      st.switch_page("main.py")
+  ```
+- **Auth FastAPI:** JWT Bearer — `Depends(get_tenant)` em toda rota protegida
+- **Sessões:** sempre usar `with get_db() as db:` (context manager) — nunca `db.close()` manual
+- **Imports de models:** sempre via `import app.models` (registra todos no Base)
+- **Upsert** em todos os registros silver (nunca insert cego)
+- **Services** recebem `session + tenant_id`; repositories herdam de `BaseRepository`
+
+---
+
+## Arquitetura de dados
+
+Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento completo.
+
+**Resumo das camadas:**
+- **Bronze (R2):** arquivos brutos permanentes — `efd/{cnpj}/{nome}.txt`, `xml/{cnpj}/{chv}.xml`
+- **Silver (Supabase):** tabelas estruturais leves (~1,2 GB com 100 clientes em 3 anos) — ficam para sempre
+- **Gold (Supabase):** agregações pré-calculadas consumidas pelo FastAPI/React — `gold_kpis_mensais` e futuras
+- **`itens_nota_fiscal` NFC-e saídas** não é persistida (~300 GB em escala) — XML fica no R2
+
+---
+
+## Estado atual
+
+### Pipeline de importação
+
+| Etapa | Status | Observações |
+|-------|--------|-------------|
+| Renomeação | ✅ | `CNPJ_YYYYMMDD_YYYYMMDD.txt` via `renomeador.py` |
+| Bronze R2 | ✅ | arquivo bruto enviado ao R2; `efd_raw` eliminada |
+| Silver C100 | ✅ | todos os campos → `notas_fiscais` |
+| Silver C170 | ✅ | todos os campos → `itens_nota_fiscal` |
+| Silver 0200 | ✅ | todos os campos → `produtos` |
+| Silver C190 | ✅ | upsert por CST/CFOP/alíq → `resumo_fiscal` |
+| Silver H005/H010 | ✅ | inventário |
+| Silver K200 | ✅ | saldo de estoque |
+| Silver 0150 | ✅ | participantes → `fornecedores` |
+| XML NFC-e/NF-e | ✅ | `xml_parser.py`; dedup por chv_nfe; ⚠ não sobe ao R2 ainda |
+| Gold KPIs | ✅ | `gold_kpis_service.py`; ⚠ XML não recalcula gold ainda |
+
+### API FastAPI (`api/`)
+
+| Rota | Status |
+|------|--------|
+| `POST /auth/token` | ✅ login CNPJ + senha → JWT |
+| `POST /auth/senha` | ✅ define senha (primeira vez) |
+| `GET /auth/me` | ✅ dados do tenant autenticado |
+| `GET /kpis/mensais` | ✅ todos os meses do tenant |
+| `GET /kpis/mensais/{ano}/{mes}` | ✅ mês específico |
+| `/compras/*`, `/fiscal/*`, `/produtos/*` | ⏳ a criar |
+| `POST /importar/efd`, `/importar/xml` | ⏳ a criar |
+
+### Páginas Streamlit (legado)
+
+| Página | Status |
+|--------|--------|
+| 00_inicio.py | ✅ dashboard executivo |
+| 01_gestao_vendas.py | ✅ vendas (limitado sem XML NFC-e) |
+| 02_compras.py | ✅ notas entrada, fornecedor, produto |
+| 03_gestao_fiscal.py | ✅ ICMS, ST, PIS/COFINS, diagnóstico |
+| 04_inventario.py | ✅ estoque virtual, H005/H010, K200 |
+| 05_produtos.py | ✅ cadastro, padronização, inteligência |
+| 06_dados.py | ✅ upload EFD/XML + histórico |
+| 08_admin_revisao.py | ✅ painel admin (revisão, marcas, clientes, grupos) |
+| 07_configuracoes.py | ⏳ pendente |
+
+---
+
+## 🎯 Próximos passos — MVP
+
+> Seguir esta ordem evita retrabalho. Atualizado em 2026-06-22.
+
+### Passo 1 — Dados completos no banco
+- [ ] Importar Mar–Jul/2025: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
+- [ ] Backfill após importação: `python scripts/backfill_padronizacao.py --todos`
+- [ ] Confirmar `gold_kpis_mensais` populado para os 7 meses
+
+### Passo 2 — Corrigir pipeline XML
+- [ ] Adicionar `upload_bytes()` no `xml_parser.py` antes de processar
 - [ ] Chamar `calcular_kpis_arquivo()` ao final do `xml_parser.py`
 
 ### Passo 3 — Rotas FastAPI restantes
 - [ ] `api/routers/compras.py` — GET /compras/mensais, /compras/fornecedores
 - [ ] `api/routers/fiscal.py` — GET /fiscal/mensal, /fiscal/cfop
 - [ ] `api/routers/produtos.py` — GET /produtos, /produtos/{cod_item}
-- [ ] `api/routers/importar.py` — POST /importar/efd, /importar/xml (substitui Streamlit)
+- [ ] `api/routers/importar.py` — POST /importar/efd, /importar/xml
 
 ### Passo 4 — Tabelas gold complementares
 - [ ] `gold_compras_fornecedor` — migration + service + rota
@@ -191,294 +175,99 @@ O Streamlit foi a escolha certa para validar. O teto é baixo para produção: s
 - [ ] `gold_estoque_atual` — migration + service + rota
 
 ### Passo 5 — Deploy da API
-- [ ] Deploy FastAPI no Railway ou Render (gratuito para começar)
-- [ ] Variáveis de ambiente configuradas no painel do provedor
+- [ ] Deploy FastAPI no Railway ou Render
+- [ ] Variáveis de ambiente configuradas (ver seção abaixo)
 - [ ] URL pública testada contra Supabase
 
 ### Passo 6 — Frontend React + Tremor
 - [ ] Setup: Vite + React + Tremor + React Query
 - [ ] Tela de login (CNPJ + senha → JWT)
-- [ ] Dashboard: cards KPI + evolução mensal (consome /kpis/mensais)
-- [ ] Página de compras (consome /compras/*)
-- [ ] Página fiscal (consome /fiscal/*)
-- [ ] Upload de EFD/XML pela interface (consome /importar/*)
+- [ ] Dashboard: cards KPI + evolução mensal
+- [ ] Páginas de compras e fiscal
+- [ ] Upload de EFD/XML pela interface
 - [ ] Deploy no Vercel
 
 ### Passo 7 — Desligar Streamlit
-- [ ] Verificar paridade funcional com o Streamlit
-- [ ] Desligar ou manter só para painel admin interno
+- [ ] Paridade funcional verificada
+- [ ] Streamlit desligado (ou mantido só para admin interno)
 
 ---
 
-## Pendente
+## Backlog pós-MVP
 
-### 🔴 Fase 1 — Deploy com produto funcional (prioridade máxima)
+### Qualidade
+- [ ] **Categorizador no banco** — tabelas `regras_abreviacao` e `regras_categorizacao` editáveis pelo admin; elimina ciclo "edita Python → deploy"
+- [ ] **Dividir `08_admin_revisao.py`** — 1.400+ linhas; separar em módulos por domínio
+- [ ] **Testes de unidade** — parser silver + `processar_descricao`; 20–30 testes dão segurança para refatorar
+- [ ] **Definir tipo de cliente foco** — fiscal (contador) ou gestão (dono de loja)
 
-Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto perfeito sem usuários.
+### Escala (pós 50+ clientes)
+- [ ] **Dados anônimos para indústrias** — modelo IRI/Nielsen; requer ~50–100 lojas + contrato de uso secundário
+- [ ] **Modelo supervisionado de categorização** — TF-IDF + Naive Bayes após ~500 revisões manuais; aumenta cobertura de ~70% para ~90%+
+- [ ] **Embeddings para produtos similares** — detecta duplicatas entre tenants; custo alto, só com volume
 
-- [x] **Import XML NFC-e/NF-e** — `app/parser/xml_parser.py` implementado; suporta NFC-e (mod 65, saída) e NF-e (mod 55, entrada/saída); valida CNPJ, deduplica por chv_nfe, upsert Produto/Participante/ItemFiscal/IcmsC190; suporta ZIP com múltiplos XMLs; `06_dados.py` com aba "Upload XML"
-- [x] **Alembic** — `run_migrations()` substituída por `upgrade_db()` (API Python); `alembic/` configurado com `env.py` lendo `DATABASE_URL` do `.env`; migração inicial `8f8fc05b0864` gerada e marcada como baseline; `render_as_batch=True` para compatibilidade SQLite
-- [x] **Context manager de sessão** — `get_db()` adicionado em `app/utils/db.py`; todos os arquivos migrados para `with get_db() as db:` (13 arquivos: 8 páginas, main.py, 4 scripts)
-- [x] **Segurança mínima** — fallback `"admin123"` removido de `08_admin_revisao.py`; `ADMIN_PASSWORD` obrigatório no `.env`; app para com `st.error()` + `st.stop()` se não configurado
-- [x] **Deploy** — Supabase (PostgreSQL) provisionado e conectado (`db.gzhcbrfbphqzhpvrsraa.supabase.co`); todas as 4 migrations aplicadas (`8f8fc05b0864` → `5a7e9db4919c` → `b3f1c2d4e5a6` → `c7d8e9f0a1b2`); banco em 14MB após Fase 2.5; Streamlit descartado como frontend — FastAPI + React + Tremor é o destino (Fase 3)
-- [x] **Cloudflare R2** — bucket `sped-manager` provisionado; `app/utils/r2.py` com `upload_bytes`, `download_bytes`, `r2_key_efd`, `r2_key_xml`; EFDs enviados para `efd/{cnpj}/{nome}.txt` no momento da importação
-- [x] **Pipeline de importação EFD** — `scripts/importar_efd.py` reescrito: upload para R2 → `silver.processar_conteudo()` direto em memória (sem efd_raw) → `gold_kpis_service.calcular_kpis_arquivo()`; dedup via `arquivos_importados`; flags `--skip-padronizacao`, `--dry-run`, `--pasta`, `--arquivo`
-- [x] **gold_kpis_mensais** — primeira tabela gold implementada; migration `a04f951ab3d1` aplicada no Supabase; `app/services/gold_kpis_service.py` com `calcular_kpis_mes()` e `calcular_kpis_arquivo()`; dados de Jan+Fev 2025 populados (R$377k e R$337k faturamento)
-- [x] **FastAPI estrutura base** — `api/main.py` (CORS, routers), `api/auth.py` (JWT bcrypt), `api/deps.py` (get_db, get_tenant); routers: `POST /auth/token`, `POST /auth/senha`, `GET /auth/me`, `GET /kpis/mensais`, `GET /kpis/mensais/{ano}/{mes}`; testado e funcional
-- [ ] **Definir tipo de cliente foco** — fiscal (contador/escritório contábil) ou gestão (dono de loja); escopo das primeiras demos
+### Documentação técnica (`docs/`)
 
-### 🟠 Fase 2 — Qualidade interna (com usuários iniciais)
-
-- [ ] **Regras do categorizador no banco** — tabelas `regras_abreviacao` e `regras_categorizacao` editáveis pelo painel admin; elimina o ciclo "escreve no CLAUDE.md → aplica fila → deploy"; regras viram dados, não código
-- [ ] **Dividir `08_admin_revisao.py`** — 1.392 linhas fazendo coisas demais; extrair lógica para services; separar UI em módulos por domínio (produtos, marcas, clientes, tokens)
-- [ ] **Testes de unidade** — parser silver (arquivo EFD de amostra fixo como fixture) + `processar_descricao` com casos de entrada conhecidos; 20–30 testes já dão segurança para refatorar o pipeline
-- [ ] **Padrão de cores global** — paleta de 5–6 cores em `utils/theme.py` aplicada em todas as páginas (já existe o arquivo, falta consistência)
-- [ ] **Multi-loja (Etapa 2)** — ver especificação técnica detalhada abaixo; só faz sentido após ter clientes de grupo empresarial reais
-
-### ✅ Fase 2.5 — Revisão do modelo de dados — CONCLUÍDA em 2026-05-29
-
-> **Plano completo em:** `C:\Users\Plínio\.claude\plans\ancient-cooking-dijkstra.md`
-
-**Contexto da revisão:** o sistema tem duas fontes de dados (EFD histórico + XML dia a dia) que alimentam as mesmas tabelas. A revisão corrigiu problemas de integridade, precisão e duplicação antes de construir o novo frontend.
-
-**Mudanças aplicadas (migrations `5a7e9db4919c`, `b3f1c2d4e5a6`, `c7d8e9f0a1b2`):**
-
-- [x] **`fornecedores`: lookup por CNPJ no XML parser** — `_upsert_participante` em `xml_parser.py` faz lookup por CNPJ antes de criar novo; helper `_resolver_cod_part` retorna cod_part canônico
-- [x] **UniqueConstraint em `notas_fiscais(tenant_id, chv_nfe)`** — constraint no banco, não só em código
-- [x] **UniqueConstraint em `itens_nota_fiscal(tenant_id, chv_nfe, num_item)`** — previne duplicatas em reprocessamento
-- [x] **`Float` → `Numeric(15,2)` em todos os campos `vl_*`** — precisão decimal exata em `notas_fiscais`, `itens_nota_fiscal`, `resumo_fiscal`
-- [x] **`resumo_fiscal.aliq_icms`: `String` → `Numeric(7,4)`** — tipo correto em PostgreSQL
-- [x] **`Fabricante.aliases` e `Marca.aliases`: `Text` → `JSONB`** — validado e indexável
-- [x] **Campo `fonte` em `notas_fiscais`** — `'efd'` ou `'xml'`; setado em `silver.py` e `xml_parser.py`
-- [x] **Campos PIS/COFINS por item em `itens_nota_fiscal`** — `cst_pis`, `cst_cofins`, `aliq_pis`, `aliq_cofins` adicionados
-- [x] **Renomeação de tabelas** — 8 tabelas renomeadas para nomes semânticos claros (tenants→lojas, participantes→fornecedores, documentos_fiscais→notas_fiscais, itens_fiscais→itens_nota_fiscal, icms_c190→resumo_fiscal, departamentos→departamentos_produto, grupos→grupos_produto, categorias→categorias_produto)
-- [x] **`chv_doc` → `chv_nfe`** — coluna renomeada em `itens_nota_fiscal` e `resumo_fiscal` para consistência
-- [x] **Dicionário de dados** — `docs/dicionario-de-dados.md` criado com schema completo atualizado
-
-### 🟠 Fase 3 — Migração FastAPI + React
-
-Stack destino: FastAPI (backend) + React + Tremor (frontend) + JWT (auth).
-O que migra sem tocar: `app/models/`, `app/repositories/`, `app/services/`, `app/parser/`, `app/utils/`
-O que é reescrito: `app/pages/` (só a camada UI)
-
-**Estado atual (2026-06-22):**
-- [x] Estrutura base `api/` criada e funcional
-- [x] Auth JWT: login por CNPJ + senha, token 24h
-- [x] `GET /kpis/mensais` — primeiro endpoint de dados
-
-**Pendente:**
-- [ ] Rotas de compras (`/compras/mensais`, `/compras/fornecedores`)
-- [ ] Rotas de fiscal (`/fiscal/mensal`, `/fiscal/cfop`)
-- [ ] Rotas de produtos e estoque
-- [ ] Frontend React + Tremor (componentes de KPI, charts)
-- [ ] Desligar Streamlit quando paridade funcional estiver completa
-
-### 🟡 Fase 4 — Features que só fazem sentido com escala
-
-- [ ] **Dados anônimos para indústrias** — modelo IRI/Nielsen; requer ~50–100 lojas para anonimização estatística válida + contrato explícito com cada cliente autorizando uso secundário dos dados; a pipeline atual já é o investimento certo para isso
-- [ ] **Modelo supervisionado de categorização** — TF-IDF + classificador simples (Naive Bayes ou Regressão Logística via scikit-learn) após ~500 revisões manuais acumuladas (`origem_padronizacao = 'manual'`); plugar em `categorizador.py` antes do Jaccard fallback; aumenta cobertura de ~70% para ~90%+
-- [ ] **Embeddings para produtos similares** — detectar duplicatas entre tenants, sugerir classificação por similaridade; custo alto de infraestrutura (~400MB de modelo), só justifica com volume alto; pós-MVP
-- [ ] **Importação NF-e XML** (B2B, notas de saída entre empresas) — complementa NFC-e; mesma arquitetura do parser XML
-
-### 🟢 Qualidade / backlog
-
-- [ ] **Testar inventário** com arquivo EFD real contendo Bloco H e K200
-- [ ] **README prático** — como rodar localmente, configurar `.env`, rodar `init_db` e `backfill`, importar EFD, usar painel admin
-- [ ] **Documentação técnica completa** — após autenticação + deploy prontos; diagramas de arquitetura, fluxos, especificação dos models e pipeline
-
-### 📄 Documentação em `/docs` (por partes)
-
-Pasta `docs/` criada em 2026-05-29. Fazer por partes, uma seção de cada vez.
-
-| Arquivo | Status | Conteúdo |
-|---------|--------|----------|
-| `docs/dicionario-de-dados.md` | ✅ concluído | Todas as tabelas: colunas, tipos, constraints, regras de negócio, relacionamentos, convenções |
-| `docs/arquitetura-dados.md` | ✅ concluído | Camadas Bronze/Silver/Gold; fluxo EFD e XML; tabelas gold planejadas; variáveis de ambiente; decisões de volume |
-| `docs/pipeline-de-dados.md` | ⏳ pendente | Fluxo EFD → bronze → silver (C100, C170, C190, 0200, 0150, H005, H010, K200); fluxo XML → silver; regras de upsert; o que cada parser faz |
-| `docs/pipeline-padronizacao.md` | ⏳ pendente | As 6 etapas do pipeline de padronização de produtos (limpeza, dicionários, unidades, identificador, pipeline, categorizador); exemplos de entrada/saída; como alimentar novos dicionários |
-| `docs/modelo-de-dados.md` | ⏳ pendente | Diagrama ER completo; descrição de cada model; decisões de design (ex: por que departamento_id é cache, por que CatalogoProduto é separado de Produto) |
-| `docs/processos-de-negocio.md` | ⏳ pendente | O que cada módulo calcula: faturamento, ICMS a pagar, estoque virtual, gestão de compras, gestão fiscal; quais tabelas cada cálculo consome |
-| `docs/guia-de-desenvolvimento.md` | ⏳ pendente | Como rodar localmente; estrutura de pastas; como criar novo repositório/service/página; como rodar migrations; como rodar backfill |
-- [ ] **Gestão Macro→Micro nas demais páginas** — infraestrutura criada (2026-04-06) e integrada no Início; pendente: Compras (Fase 2), Fiscal (Fase 3), Vendas (depende XML), Inventário (Fase 5), Produtos (Fase 6)
-
-### ✅ Concluído (histórico)
-
-- [x] Página de cadastro de produto — 3 abas: Cadastro EFD, Padronização & Categorias, Inteligência de Produtos
-- [x] Página de gestão de compras — 4 filtros independentes (período, fornecedor, nº nota, produto)
-- [x] Página de gestão de vendas (saídas)
-- [x] Relatórios fiscais → Gestão Fiscal com 5 abas (ICMS, ST, PIS/COFINS, diagnóstico)
-- [x] Dashboard → resumo executivo real (faturamento, ICMS a pagar, crescimento, top fornecedor)
-- [x] Página de Dados — upload + histórico de importações unificados
-- [x] Estoque virtual com fallback K200/H010/zero
-- [x] Silver C190 com constraint correta
-- [x] Compras: CNPJ → razão social nos gráficos; gráfico CFOP revisado
-- [x] Filtros de período com seleção múltipla de meses/anos
-- [x] Renomear e reordenar páginas na sidebar
-- [x] Legendas dos gráficos movidas para cima
-- [x] Última data contemplada exibida no dashboard
-- [x] Revisão em Lote com checkbox por linha no data_editor
-- [x] Pipeline de padronização: stopwords, abreviações contextuais, extração de atributos, ordem canônica
-- [x] Fuzzy matching de marcas (RapidFuzz threshold=90)
-- [x] Tokens desconhecidos salvos no banco para revisão futura
-- [x] Catálogo global de EAN (`catalogo_produtos`) — herança de classificação entre tenants; backfill rodado com 2.657 entradas
-- [x] GrupoEmpresarial — model + FK em Tenant + TenantService com 5 métodos; aba Clientes & Upload no admin com gestão de grupos
-- [x] Infraestrutura macro→micro: `filtro_hierarquia.py` (componente sidebar cascateado), helpers `_filtro_hierarquia_via_doc/item/por_produto` no `base_repo.py`; página Início integrada com filtro e gráfico de composição por departamento; repos `vendas`, `compras`, `fiscal` com params de hierarquia
-
-## Checklist de testes — funcionalidades recentes (2026-04-06)
-
-### 1. Banco de dados (verificação inicial)
-- [x] `grupos_empresariais` existe no SQLite ✅
-- [x] `tenants.grupo_id` existe ✅
-- [x] `catalogo_produtos` tem 2.657 entradas ✅
-
-### 2. Admin — Grupos Empresariais (Seção D da aba Clientes & Upload)
-- [x] Abrir `localhost:8501/08_admin_revisao`, logar com a senha admin
-- [x] Ir para aba **Clientes & Upload** → rolar até **Grupos Empresariais**
-- [x] Criar grupo: ex. "Rede GS"
-- [x] Verificar que o grupo aparece na tabela com coluna "Lojas" vazia
-
-### 3. Admin — Cadastrar GS Mercearia
-- [x] Seção **Cadastrar novo cliente**: preencher nome "GS Mercearia", CNPJ correto
-- [ ] Selecionar grupo "Rede GS" no dropdown opcional
-- [ ] Clicar Cadastrar → verificar mensagem de sucesso
-- [ ] Verificar na tabela da Seção A que a GS aparece com coluna "Grupo: Rede GS"
-- [ ] Verificar na Seção D que o grupo "Rede GS" agora lista "GS Mercearia" em "Lojas"
-
-### 4. Admin — Associar loja existente a grupo (se houver outra loja no banco)
-- [ ] Expandir **Associar loja a grupo**, selecionar a loja e o grupo, clicar Associar
-- [ ] Verificar que a coluna "Grupo" da loja foi atualizada na tabela
-
-### 5. Admin — Filtro por grupo no upload
-- [ ] Na Seção C, selecionar "Rede GS" no dropdown "Filtrar por grupo"
-- [ ] Verificar que o selectbox "Tenant de destino" mostra apenas lojas do grupo GS
-
-### 6. Admin — Upload dos arquivos da GS Mercearia
-- [ ] Selecionar "GS Mercearia" no selectbox de destino
-- [ ] Subir 1 arquivo EFD como teste
-- [ ] **Teste de validação de CNPJ**: tentar subir um arquivo de outro supermercado → deve aparecer erro em vermelho e arquivo ser ignorado
-- [ ] Subir o arquivo correto da GS → deve processar sem erro
-- [ ] Verificar resultado: documentos, itens, produtos criados/atualizados
-- [ ] Verificar que o `ArquivoImportado` foi criado com o `tenant_id` correto (não o tenant logado)
-
-### 7. Herança de classificação via EAN
-- [ ] Após o upload, consultar no SQLite:
-  ```sql
-  SELECT origem_padronizacao, COUNT(*) FROM produtos
-  WHERE tenant_id = <id_gs> GROUP BY origem_padronizacao;
-  ```
-- [ ] Verificar que há registros com `origem_padronizacao = 'catalogo'` — indica que produtos já classificados no primeiro tenant foram herdados
-- [ ] Produtos com EAN inválido ou novo devem ter `origem_padronizacao = 'regra'`
-
-### 8. Upload dos 5 arquivos restantes
-- [ ] Subir os demais arquivos da GS um a um (ou todos de uma vez) pelo admin
-- [ ] Verificar que nenhum tem erro de CNPJ divergente
-- [ ] Verificar resumo final de cada arquivo
-
-### 9. Login como GS Mercearia
-- [ ] Logar na tela principal com o CNPJ da GS
-- [ ] Verificar que as páginas de gestão carregam os dados corretos
-
-### Queries úteis para verificar no SQLite
-```sql
--- Tenants e grupos
-SELECT t.nome, t.cnpj, g.nome as grupo
-FROM tenants t LEFT JOIN grupos_empresariais g ON t.grupo_id = g.id;
-
--- Arquivos importados por tenant
-SELECT t.nome, a.nome_padronizado, a.status, a.processado_em
-FROM arquivos_importados a JOIN tenants t ON a.tenant_id = t.id
-ORDER BY a.processado_em DESC;
-
--- Origem da classificação após upload
-SELECT origem_padronizacao, COUNT(*) as qtd
-FROM produtos WHERE tenant_id = <id>
-GROUP BY origem_padronizacao ORDER BY qtd DESC;
-
--- Catálogo EAN
-SELECT COUNT(*) FROM catalogo_produtos;
-SELECT COUNT(*) FROM catalogo_produtos WHERE categoria_id IS NOT NULL;
-```
+| Arquivo | Status |
+|---------|--------|
+| `docs/arquitetura-dados.md` | ✅ |
+| `docs/dicionario-de-dados.md` | ✅ |
+| `docs/pipeline-de-dados.md` | ⏳ |
+| `docs/pipeline-padronizacao.md` | ⏳ |
+| `docs/guia-de-desenvolvimento.md` | ⏳ |
 
 ---
 
-## Decisões mapeadas: Importação NF-e XML
+## Variáveis de ambiente (`.env`)
 
-### Contexto
-Clientes que não têm o EFD fechado (mês em andamento) ou recebem XMLs diretamente de fornecedores precisam importar dados de compras sem depender do SPED.
-
-### Abordagem decidida
-- **Fonte independente**: XML e EFD coexistem no banco; deduplicação pela chave NF-e de 44 dígitos (`chv_nfe`)
-- **Escopo**: alimenta Compras + Fiscal (C190 derivado dos itens por agregação CST/CFOP/alíquota)
-- **Bronze ignorado**: XML não se encaixa no modelo linha a linha do EfdRaw — ir direto para silver
-- **`cod_part` = CNPJ do emitente**: evita conflito com cod_part do EFD (que são códigos internos)
-- **Sem nova dependência**: usar `xml.etree.ElementTree` da stdlib
-- **Sem mudança de schema**: todos os models já existem com os campos necessários
-
-### Arquivos a criar/editar
-- `app/parser/xml_parser.py` — novo: `XmlParser(session, tenant_id).processar(xml, nome)`
-- `app/pages/06_dados.py` — nova aba "Upload XML" com suporte a múltiplos arquivos
-
-### Mapeamento XML → banco
-| XML | Destino |
-|---|---|
-| `<infNFe Id>` / `<chNFe>` | `DocumentoFiscal.chv_nfe` |
-| `<emit>` CNPJ + xNome | `Participante` (cod_part = CNPJ) |
-| `<ide>` nNF, serie, dhEmi | `DocumentoFiscal` (ind_oper="0" fixo) |
-| `<ICMSTot>` vNF, vICMS, vPIS, vCOFINS | `DocumentoFiscal` totais |
-| `<det>` cProd, xProd, qCom, vProd, CFOP, CST, pICMS | `ItemFiscal` + `Produto` |
-| Agrupamento de itens por CST/CFOP/alíq | `IcmsC190` (derivado) |
+| Variável | Descrição |
+|----------|-----------|
+| `DATABASE_URL` | PostgreSQL Supabase ou `sqlite:///./sped_manager.db` |
+| `JWT_SECRET` | Chave secreta JWT (obrigatório) |
+| `JWT_TTL_HOURS` | Validade do token em horas (padrão: 24) |
+| `R2_ENDPOINT` | Endpoint Cloudflare R2 |
+| `R2_ACCESS_KEY` | Access key do bucket |
+| `R2_SECRET_KEY` | Secret key do bucket |
+| `R2_BUCKET` | Nome do bucket (padrão: sped-manager) |
+| `ADMIN_PASSWORD` | Senha do painel admin Streamlit (obrigatório) |
+| `CORS_ORIGINS` | Origens permitidas no FastAPI (padrão: http://localhost:5173) |
 
 ---
 
-## Fila de adições ao pipeline de padronização
+## Pipeline de padronização de produtos
 
-Use esta seção para acumular novas entradas antes de pedir ao Claude para aplicá-las.
-Quando quiser aplicar, diga: **"aplica a fila de padronização"**.
-Após aplicado, o Claude limpa as entradas e move para o histórico.
+Pipeline em `app/services/produto_padronizacao/`:
+1. `limpeza.py` — uppercase, remove acentos e stopwords promocionais
+2. `dicionarios.py` — expansão de ~120 abreviações + contextuais (DES, TP…)
+3. `unidades.py` — extração de peso/volume via regex
+4. `identificador.py` — detecção de marca/fabricante: match exato + fuzzy RapidFuzz (threshold=90)
+5. `pipeline.py` — extração de atributos (ZERO, LIGHT…); montagem canônica: base + atributos + embalagem + volume
+6. `categorizador.py` — VOCAB_CATEGORIA → VOCAB_TIPO_PRODUTO → VOCAB_HORTIFRUTI → Jaccard fallback
 
-### Como preencher
+Cobertura automática: **~70.6%**. Produtos com `origem_padronizacao='manual'` nunca são sobrescritos pelo backfill.
 
-**Abreviações** — `abrev` → `expansão` (vai para `dicionarios.py`)
-- Se for bigrama (duas palavras), colocar entre aspas: `"ap glic"` → `glicerinado`
-- Expansão sempre em português sem abreviação
+Scripts:
+- `scripts/backfill_padronizacao.py --todos` — reprocessa tudo exceto manuais
+- `scripts/backfill_padronizacao.py --force` — sobrescreve inclusive manuais
+- `scripts/seed_fabricantes_marcas.py` — popula fabricantes/marcas no banco
 
-**Categorias** — `keyword` → `Departamento > Grupo > Categoria` (vai para `categorizador.py`)
-- Keyword pode ser unigrama ou bigrama
-- Se a categoria for ambígua em grupos diferentes, indicar o grupo entre parênteses
-- Consultar nomes exatos na seção "Hierarquia de categorias" abaixo se necessário
+### Fila de adições
 
-**Marcas** — `Nome da marca | Fabricante | aliases separados por vírgula` (vai para `identificador.py`)
-- Aliases: variações de grafia que aparecem nas descrições EFD
-- Fabricante deve bater com um fabricante já cadastrado, ou será criado novo
+Use esta seção para acumular entradas antes de pedir "aplica a fila de padronização".
 
-**Fabricantes** — `Nome | aliases separados por vírgula` (vai para `identificador.py`)
+**Abreviações** — `abrev` → `expansão` (→ `dicionarios.py`)
+**Categorias** — `keyword` → `Departamento > Grupo > Categoria` (→ `categorizador.py`)
+**Combinações não adjacentes** — `{TOKEN_A, TOKEN_B}` → `Depto > Grupo > Cat` (→ `_VOCAB_COMBINACAO`)
+**Marcas** — `Nome | Fabricante | aliases` (→ `identificador.py`)
+**Fabricantes** — `Nome | aliases`
 
-**Combinações não adjacentes** — `{TOKEN_A, TOKEN_B}` → `Departamento > Grupo > Categoria` (vai para `categorizador.py` → `_VOCAB_COMBINACAO`)
-- Use quando dois tokens **juntos** definem uma categoria, mas podem aparecer separados por marca ou outros termos
-- Ex: "COCO ANCHIETA RALADO" — COCO e RALADO não são adjacentes, mas juntos indicam MERCEARIA DOCE > CULINARIA DOCE > COCO RALADO
-- Ex: "FARINHA DONA BENTA TRIGO 1KG" — FARINHA e TRIGO separados pela marca
-- Escreva os tokens em maiúsculo, separados por vírgula dentro de chaves
-- **Quando usar `> -` (sem categoria)**: se o match for apenas até o grupo (ex: FARINHA DE TRIGO é grupo, não categoria), coloque `-` no nível de categoria; o Claude usará `_match_por_grupo_nome` automaticamente
-- Prioridade: combinações são checadas APÓS bigramas adjacentes do `_VOCAB_CATEGORIA`, mas ANTES do `_VOCAB_TIPO_PRODUTO`; logo, só precisam cobrir casos que bigramas adjacentes não conseguem
+#### ✏️ Fila — preencha abaixo
 
----
-
-### ✏️ Fila — preencha abaixo, peça "aplica a fila" quando quiser aplicar
-
-#### Abreviações
-<!-- formato: abrev → expansão -->
-
-#### Categorias
-<!-- formato: keyword → Departamento > Grupo > Categoria -->
-
-#### Combinações não adjacentes
-<!-- formato: {TOKEN_A, TOKEN_B} → Departamento > Grupo > Categoria (ou > - se só até o grupo) -->
-
-#### Marcas
-<!-- formato: Nome | Fabricante | alias1, alias2, ... -->
-
-#### Fabricantes
-<!-- formato: Nome | alias1, alias2, ... -->
+##### Abreviações
+##### Categorias
+##### Combinações não adjacentes
+##### Marcas
+##### Fabricantes
 
 ---
 
@@ -499,7 +288,7 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 | 2026-04-09 | Fabricante | CERVEJARIA CIDADE IMPERIAL |
 | 2026-04-09 | Fabricante | CERVEJARIA BRUDER |
 | 2026-04-09 | Fabricante | HIJOS DE RIVERA |
-| 2026-04-09 | Marca | FINI \| FINI (aliases já no identificador.py) |
+| 2026-04-09 | Marca | FINI \| FINI |
 | 2026-04-09 | Marca | THEREZOPOLIS \| COCA-COLA FEMSA \| THEREZOP |
 | 2026-04-09 | Marca | IMPERIO \| CERVEJARIA CIDADE IMPERIAL |
 | 2026-04-09 | Marca | PURO MALTE PILSEN \| CERVEJARIA CIDADE IMPERIAL \| PURO MALTE |
@@ -535,181 +324,35 @@ Após aplicado, o Claude limpa as entradas e move para o histórico.
 | 2026-04-03 | Categoria | `suco pronto` / `nectar` → Bebidas > Sucos > Suco Pronto/Néctar |
 | 2026-04-03 | Categoria | `petit suisse` → Laticínios > Iogurtes > Iogurtes Infantis |
 | 2026-04-03 | Categoria | `sandalia havaiana` / `sandalia` / `chinelo` / `havaiana` → Têxtil > Calçados > Sandália e Chinelo |
-| 2026-04-03 | Fabricante | SOVENA |
-| 2026-04-03 | Fabricante | VICTOR GUEDES |
-| 2026-04-03 | Fabricante | FLAMBOYANT |
-| 2026-04-03 | Fabricante | ARCOR |
-| 2026-04-03 | Fabricante | DOCILE |
-| 2026-04-03 | Fabricante | FINI |
-| 2026-04-03 | Fabricante | BARILLA |
-| 2026-04-03 | Fabricante | RICLAN |
-| 2026-04-03 | Fabricante | PERFETTI VAN MELLE |
-| 2026-04-03 | Fabricante | PIF PAF ALIMENTOS |
-| 2026-04-03 | Fabricante | TIAL |
-| 2026-04-03 | Marca | ANDORINHA \| SOVENA |
-| 2026-04-03 | Marca | GALLO \| VICTOR GUEDES |
-| 2026-04-03 | Marca | FLAMBOYANT \| FLAMBOYANT |
-| 2026-04-03 | Marca | ARCOR \| ARCOR \| alias: BUTTER TOFFEES |
-| 2026-04-03 | Marca | DOCILE \| DOCILE |
-| 2026-04-03 | Marca | FINI \| FINI \| aliases: DENTADURAS FINI, MINHOCAS FINI, TUBES FINI |
-| 2026-04-03 | Marca | FREEGELLS \| RICLAN |
-| 2026-04-03 | Marca | AZEDINHA \| RICLAN |
-| 2026-04-03 | Marca | MENTOS \| PERFETTI VAN MELLE |
-| 2026-04-03 | Marca | BARILLA \| BARILLA |
-| 2026-04-03 | Marca | SANTA AMALIA \| CAMIL |
-| 2026-04-03 | Marca | DEL VALLE \| THE COCA-COLA CO |
-| 2026-04-03 | Marca | TIAL \| TIAL |
-| 2026-04-03 | Marca | PIF PAF \| PIF PAF ALIMENTOS \| alias: PIFPAF |
-| 2026-04-03 | Marca | AYMORE \| ARCOR \| alias: AYMORÉ |
-| 2026-04-06 | Combinação não adjacente | `COCO` + `RALADO` → Mercearia Doce > Culinária Doce > Coco Ralado |
-| 2026-04-06 | Combinação não adjacente | `BANANA` + `PASSA` → Mercearia Doce > Frutas Secas > Uva Passa |
-| 2026-04-06 | Combinação não adjacente | `ALHO` + `PO/GRANULADO/DESIDRATADO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
-| 2026-04-06 | Combinação não adjacente | `CEBOLA` + `FLOCOS/DESIDRATADA/PO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
-| 2026-04-06 | Combinação não adjacente | `TOMATE` + `SECO` → Mercearia Salgada > Conservas e Enlatados > Outras Conservas |
-| 2026-04-06 | Combinação não adjacente | `BATATA` + `CHIPS` → Mercearia Doce > Salgadinho > Batata Frita |
-| 2026-04-06 | Combinação não adjacente | `BATATA` + `SNACK` → Mercearia Doce > Salgadinho > Salgadinhos Sabores |
-| 2026-04-06 | Combinação não adjacente | `LEITE` + `COCO` → Mercearia Doce > Culinária Doce > Leite de Coco |
-| 2026-04-06 | Combinação não adjacente | `OLEO` + `COCO` → Mercearia Salgada > Óleo > Óleo de Coco |
-| 2026-04-06 | Combinação não adjacente | `FARINHA` + `MANDIOCA` → Commodities > Farináceos > Farinha de Mandioca |
-| 2026-04-06 | Combinação não adjacente | `FARINHA` + `TRIGO` → Commodities > Farinha de Trigo > - (nível grupo) |
-| 2026-04-06 | Combinação não adjacente | `ACUCAR` + `MASCAVO/REFINADO/CRISTAL/DEMERARA` → Commodities > Açúcar > subtipo |
-| 2026-04-06 | Abreviação | `whiskey` → whisky |
-| 2026-04-06 | Abreviação | `whisk` → whisky |
-| 2026-04-06 | Abreviação | `sard` → sardinha |
-| 2026-04-06 | Categoria | `mingau` → Mercearia Doce > Matinais > Cereais |
-| 2026-04-06 | Combinação não adjacente | `PESSEGO` + `CALDA` → Mercearia Doce > Sobremesas e Outros Doces > Compotas de Frutas |
-| 2026-04-06 | Combinação não adjacente | `PO` + `DESCOLORANTE` → Perfumaria > Produtos Capilares > Tintura / Descolorantes para Cabelo |
-| 2026-04-06 | Abreviação | `plast` → plastico |
-| 2026-04-06 | Abreviação | `beb` → bebida |
-| 2026-04-06 | Abreviação | `amant` → amanteigado |
-| 2026-04-06 | Abreviação | `bisc` → biscoito |
-| 2026-04-06 | Categoria | `bacia` → Bazar Geral > Utilidades da Cozinha (nível grupo) |
-| 2026-04-06 | Categoria | `club social` → Mercearia Doce > Biscoito Salgado > Água e Sal |
-| 2026-04-06 | Categoria | `biscoito amanteigado` → Mercearia Doce > Biscoito Doce > Biscoito Amenteigado (bridge grafia popular) |
-| 2026-04-06 | Combinação não adjacente | `AMEIXA` + `SECA` → Hortifruti > Frutas Secas > Frutas Secas / Cristalizadas |
-| 2026-04-06 | Combinação não adjacente | `SEQUILHO` + `LEITE` → Mercearia Doce > Biscoito Doce > Rosquinhas e Sequilhos |
-| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `AGUA` → Mercearia Doce > Biscoito Salgado > Água e Sal |
-| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `MAIZENA` → Mercearia Doce > Biscoito Doce > Biscoito Maizena |
-| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `RECHEADO` → Mercearia Doce > Biscoito Doce > Biscoito Recheado |
-| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `CRACKER` → Mercearia Doce > Biscoito Salgado > Cream Cracker |
-| 2026-04-06 | Combinação não adjacente | `BISCOITO` + `AMANTEIGADO` → Mercearia Doce > Biscoito Doce > Biscoito Amenteigado |
-| 2026-04-06 | Combinação não adjacente | `BANANA` + `CHIPS` → Mercearia Doce > Salgadinho > Snacks |
-| 2026-04-06 | Combinação não adjacente | `BARRA` + `CEREAL` → Mercearia Doce > Mercearia Doce Light e Diet > Cereais em Barra |
-| 2026-04-06 | Combinação não adjacente | `BICARBONATO` + `SODIO` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-06 | Abreviação | `deseng` → desengordurante |
-| 2026-04-06 | Abreviação | `preserv` → preservativo |
-| 2026-04-06 | Categoria | `preservativo` → Perfumaria > Farmácia > Preservativos |
-| 2026-04-06 | Categoria | `banha` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
-| 2026-04-06 | Combinação não adjacente | `BANHA` + `SUINA` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
-| 2026-04-06 | Combinação não adjacente | `GORDURA` + `SUINA` → Perecíveis do Autoserviço > Friambreria > Banhas e Gorduras Vegetais |
-| 2026-04-06 | Combinação não adjacente | `SABAO` + `COCO` → Limpeza > Limpeza para Roupas > Sabão em Barra e Pasta |
-| 2026-04-06 | Combinação não adjacente | `BALDE` + `PLASTICO` → Bazar Geral > Utilidades da Cozinha > Baldes de Plástico |
-| 2026-04-06 | Categoria | `corante alimenticio` / `corante alimentar` → Mercearia Doce > Culinária Doce > Complementos (bigrama — evita conflito com corante de roupa) |
-| 2026-04-06 | Categoria | `anilina` → Mercearia Doce > Culinária Doce > Complementos |
-| 2026-04-06 | Categoria | `essencia` → Mercearia Doce > Culinária Doce > Complementos |
-| 2026-04-06 | Abreviação | `empan` → empanado |
-| 2026-04-06 | Abreviação | `trat` → tratamento |
-| 2026-04-06 | Abreviação | `aero` → aerosol |
-| 2026-04-06 | Abreviação | `masc` → mascara |
-| 2026-04-06 | Abreviação | `pent` → pentear |
-| 2026-04-06 | Categoria | `salpet` → Mercearia Doce > Biscoito Salgado > Salpet |
-| 2026-04-06 | Categoria | `cominho` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-06 | Categoria | `caneta` → Bazar Geral > Artigos para Papelaria e Armarinho > Canetas em Geral |
-| 2026-04-06 | Categoria | `marcador` → Bazar Geral > Artigos para Papelaria e Armarinho > Canetas em Geral |
-| 2026-04-06 | Categoria | `pacoca` / `pacoquinha` / `pacoquita` → Mercearia Doce > Guloseimas > Doces de Amendoim |
-| 2026-04-06 | Categoria | `peneira` → Bazar Geral > Utilidades da Cozinha > Escorredores e Peneiras |
-| 2026-04-06 | Categoria | `luva` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
-| 2026-04-06 | Categoria | `haste flexivel` / `hastes flexiveis` → Perfumaria > Higiene Corporal (nível grupo; HASTE FLEXÍVEL tem acento no banco) |
-| 2026-04-06 | Combinação não adjacente | `CREME` + `TRATAMENTO` → Perfumaria > Produtos Capilares > Cremes p/ Hidratação |
-| 2026-04-06 | Combinação não adjacente | `DESODORANTE` + `AEROSOL` → Perfumaria > Desodorantes e Colônias > Desodorante Aerosol |
-| 2026-04-06 | Combinação não adjacente | `DESODORANTE` + `SPRAY` → Perfumaria > Desodorantes e Colônias > Desodorante Aerosol |
-| 2026-04-06 | Combinação não adjacente | `SEMENTE` + `GIRASSOL/CHIA/LINHACA/GERGELIM` → Mercearia Salgada > Farináceos > Sementes (Chia, Linhaça, Girassol, etc.) |
-| 2026-04-07 | Categoria | `vela` / `velas` → Bazar Geral > Utilidades Descartáveis > Velas Comum / Citronela / Aromáticas |
-| 2026-04-07 | Categoria | `copo` → Bazar Geral > Utilidades da Cozinha > Copo Individual |
-| 2026-04-07 | Categoria | `tapete` → Têxtil > Cama, Mesa, Banho > Tapetes em Geral |
-| 2026-04-07 | Categoria | `adocante` → Mercearia Doce Light e Diet > Mercearia Doce Light e Diet > Adoçantes |
-| 2026-04-07 | Categoria | `conhaque` → Bebidas > Destilados > Conhaque/Brandy |
-| 2026-04-07 | Categoria | `torrada` / `torradas` → Padaria Industrial > Padaria Industrial > Torradas |
-| 2026-04-07 | Categoria | `cloro` → Limpeza > Limpeza para Roupas > Alvejantes e Cloro |
-| 2026-04-07 | Categoria | `acetona` → Perfumaria > Estética > Removedores de Esmaltes / Acetona |
-| 2026-04-07 | Categoria | `canela` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Categoria | `oregano` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Categoria | `soda caustica` → Limpeza > Limpeza de Banheiro > Limpeza Pesada |
-| 2026-04-07 | Categoria | `bucha banho` (bigrama) → Perfumaria > Higiene Corporal > Esponja de Banho |
-| 2026-04-07 | Categoria | `gel fixador` / `gel capilar` (bigramas) → Perfumaria > Produtos Capilares > Gel Fixador |
-| 2026-04-07 | Categoria | `mamadeira` → Perfumaria > Seção Infantil (nível grupo; acento no banco) |
-| 2026-04-07 | Categoria | `gel` → Perfumaria > Produtos Capilares (nível grupo; standalone ambíguo) |
-| 2026-04-07 | Categoria | `file de peito` → Perecíveis do Autoserviço > Congelados (nível grupo; era AVES, movido para congelados) |
-| 2026-04-07 | Categoria | `caderno` → Bazar Geral > Artigos para Papelaria e Armarinho (nível grupo) |
-| 2026-04-07 | Categoria | `agua oxigenada` → Perfumaria > Farmácia > Outros Fármacos |
-| 2026-04-07 | Combinação não adjacente | `PEIXE` + `POSTAS/POSTA/FILE` → Perecíveis do Autoserviço > Congelados > Peixes Congelado |
-| 2026-04-07 | Combinação não adjacente | `PEIXE` + `INTEIRO` → Açougue > Peixes > Peixe Fresco |
-| 2026-04-07 | Combinação não adjacente | `CACAU` + `PO` → Mercearia Doce > Culinária Doce > Chocolates em Pó |
-| 2026-04-07 | Combinação não adjacente | `AZEITE` + `VIRGEM` → Mercearia Salgada > Azeites > Azeite Extra Virgem |
-| 2026-04-07 | Combinação não adjacente | `VINAGRE` + `MACA` → Mercearia Salgada > Vinagres > Vinagre de Maçã |
-| 2026-04-07 | Combinação não adjacente | `VINAGRE` + `ARROZ` → Mercearia Salgada > Vinagres > Vinagre de Arroz |
-| 2026-04-07 | Combinação não adjacente | `CHOCOLATE` + `BARRA` → Mercearia Doce > Chocolates > Chocolate em Barras |
-| 2026-04-07 | Combinação não adjacente | `NOZ` + `MOSCADA` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Combinação não adjacente | `CERVEJA` + `LATA/LATAO` → Bebidas > Cervejas > Cerveja Lata |
-| 2026-04-07 | Combinação não adjacente | `CERVEJA` + `LONG/NECK` → Bebidas > Cervejas > Cerveja Long Neck |
+| 2026-04-03 | Fabricante | SOVENA, VICTOR GUEDES, FLAMBOYANT, ARCOR, DOCILE, FINI, BARILLA, RICLAN, PERFETTI VAN MELLE, PIF PAF ALIMENTOS, TIAL |
+| 2026-04-03 | Marca | ANDORINHA \| SOVENA; GALLO \| VICTOR GUEDES; FLAMBOYANT \| FLAMBOYANT; ARCOR \| ARCOR; DOCILE \| DOCILE; FINI \| FINI; FREEGELLS \| RICLAN; AZEDINHA \| RICLAN; MENTOS \| PERFETTI VAN MELLE; BARILLA \| BARILLA; SANTA AMALIA \| CAMIL; DEL VALLE \| COCA-COLA CO; TIAL \| TIAL; PIF PAF \| PIF PAF ALIMENTOS; AYMORE \| ARCOR |
+| 2026-04-06 | Combinação | `COCO+RALADO` → Mercearia Doce > Culinária Doce > Coco Ralado |
+| 2026-04-06 | Combinação | `BANANA+PASSA` → Mercearia Doce > Frutas Secas > Uva Passa |
+| 2026-04-06 | Combinação | `ALHO+PO/GRANULADO/DESIDRATADO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
+| 2026-04-06 | Combinação | `CEBOLA+FLOCOS/DESIDRATADA/PO` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
+| 2026-04-06 | Combinação | `TOMATE+SECO` → Mercearia Salgada > Conservas e Enlatados > Outras Conservas |
+| 2026-04-06 | Combinação | `BATATA+CHIPS` → Mercearia Doce > Salgadinho > Batata Frita |
+| 2026-04-06 | Combinação | `BATATA+SNACK` → Mercearia Doce > Salgadinho > Salgadinhos Sabores |
+| 2026-04-06 | Combinação | `LEITE+COCO` → Mercearia Doce > Culinária Doce > Leite de Coco |
+| 2026-04-06 | Combinação | `OLEO+COCO` → Mercearia Salgada > Óleo > Óleo de Coco |
+| 2026-04-06 | Combinação | `FARINHA+MANDIOCA` → Commodities > Farináceos > Farinha de Mandioca |
+| 2026-04-06 | Combinação | `FARINHA+TRIGO` → Commodities > Farinha de Trigo > - |
+| 2026-04-06 | Combinação | `ACUCAR+MASCAVO/REFINADO/CRISTAL/DEMERARA` → Commodities > Açúcar > subtipo |
+| 2026-04-06 | Abreviação | `whiskey`/`whisk` → whisky; `sard` → sardinha; `plast` → plastico; `beb` → bebida; `amant` → amanteigado; `bisc` → biscoito; `deseng` → desengordurante; `preserv` → preservativo; `empan` → empanado; `trat` → tratamento; `aero` → aerosol; `masc` → mascara; `pent` → pentear |
+| 2026-04-06 | Categoria | `mingau` → Mercearia Doce > Matinais > Cereais; `bacia` → Bazar Geral > Utilidades da Cozinha; `club social` → Mercearia Doce > Biscoito Salgado > Água e Sal; `biscoito amanteigado` → Mercearia Doce > Biscoito Doce > Biscoito Amenteigado; `preservativo` → Perfumaria > Farmácia > Preservativos; `banha` → Perecíveis > Friambreria > Banhas e Gorduras; `salpet` → Mercearia Doce > Biscoito Salgado > Salpet; `cominho`/`canela`/`oregano`/`paprica`/`pimenta` → Mercearia Salgada > Temperos; `caneta`/`marcador` → Bazar Geral > Papelaria; `pacoca` → Mercearia Doce > Guloseimas > Doces de Amendoim; `peneira` → Bazar Geral > Utilidades da Cozinha; `luva` → Bazar Geral > Utensílios para Limpeza; `essencia`/`anilina`/`corante alimenticio` → Mercearia Doce > Culinária Doce > Complementos |
+| 2026-04-06 | Combinação | `PESSEGO+CALDA`; `PO+DESCOLORANTE`; `AMEIXA+SECA`; `SEQUILHO+LEITE`; `BISCOITO+AGUA/MAIZENA/RECHEADO/CRACKER/AMANTEIGADO`; `BANANA+CHIPS`; `BARRA+CEREAL`; `BICARBONATO+SODIO`; `BANHA+SUINA`; `GORDURA+SUINA`; `SABAO+COCO`; `BALDE+PLASTICO`; `CREME+TRATAMENTO`; `DESODORANTE+AEROSOL/SPRAY`; `SEMENTE+GIRASSOL/CHIA/LINHACA/GERGELIM` |
 | 2026-04-07 | Abreviação | `capil` → capilar |
-| 2026-04-07 | Categoria | `sopao` → Mercearia Salgada > Massas e Sopas > Sopas |
-| 2026-04-07 | Categoria | `shoyu` → Mercearia Salgada > Temperos e Molhos > Molho de Soja (movido de grupo para categoria) |
-| 2026-04-07 | Categoria | `pimenta` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Categoria | `paprica` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Categoria | `lamina` → Perfumaria > Barbearia > Lâminas (Refil) (standalone; bigrama LAMINA BARBEAR já existia) |
-| 2026-04-07 | Categoria | `mexerica` / `tangerina` → Hortifruti > Frutas |
-| 2026-04-07 | Categoria | `cera` → Limpeza > Limpeza de Pisos (nível grupo) |
-| 2026-04-07 | Categoria | `bucha` → Perfumaria > Higiene Corporal (nível grupo; standalone) |
-| 2026-04-07 | Categoria | `escova` → Perfumaria > Higiene Corporal (nível grupo; ESCOVA DENTAL bigrama já cobre o específico) |
-| 2026-04-07 | Categoria | `sacola` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
-| 2026-04-07 | Categoria | `bobina` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
-| 2026-04-07 | Categoria | `palito` → Bazar Geral > Utilidades Descartáveis (nível grupo) |
-| 2026-04-07 | Categoria | `drink` → Bebidas > Destilados (nível grupo) |
-| 2026-04-07 | Categoria | `filtro` → Mercearia Doce > Matinais (nível grupo; filtro de café) |
-| 2026-04-07 | Categoria | `torresmo` → Açougue > Suíno (nível grupo) |
-| 2026-04-07 | Categoria | `reparador` → Perfumaria > Produtos Capilares (nível grupo) |
-| 2026-04-07 | Categoria | `toalha` → Têxtil > Cama, Mesa, Banho (nível grupo) |
-| 2026-04-07 | Categoria | `erva` → Bebidas > Matinais (nível grupo; erva-mate) |
-| 2026-04-07 | Categoria | `flanela` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
-| 2026-04-07 | Categoria | `espuma` → Bazar Geral > Utensílios para Limpeza (nível grupo) |
-| 2026-04-07 | Categoria | `tesoura` → Bazar Geral > Artigos para Papelaria e Armarinho (nível grupo) |
-| 2026-04-07 | Categoria | `colher` → Bazar Geral > Utilidades da Cozinha (nível grupo) |
-| 2026-04-07 | Categoria | `graxa` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
-| 2026-04-07 | Categoria | `cadeado` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
-| 2026-04-07 | Categoria | `extensao` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
-| 2026-04-07 | Categoria | `mangueira` → Bazar Geral > Ferramentas e Acessórios (nível grupo) |
-| 2026-04-07 | Combinação não adjacente | `MACARRAO` + `SEMOLA` → Mercearia Salgada > Massas e Sopas > Massa Semola |
-| 2026-04-07 | Combinação não adjacente | `MACARRAO` + `OVOS` → Mercearia Salgada > Massas e Sopas > Massa com Ovos |
-| 2026-04-07 | Combinação não adjacente | `MASSA` + `PASTEL` → Mercearia Salgada > Massas e Sopas > Outras Massas |
-| 2026-04-07 | Combinação não adjacente | `CREME` + `CEBOLA` → Mercearia Salgada > Massas e Sopas > Sopas |
-| 2026-04-07 | Combinação não adjacente | `CALDO` + `KNORR/MAGGI` → Mercearia Salgada > Temperos e Molhos > Caldo Tablete e Pó |
-| 2026-04-07 | Combinação não adjacente | `MOLHO` + `TOMATE` → Mercearia Salgada > Temperos e Molhos > Molhos e Polpas Tomate |
-| 2026-04-07 | Combinação não adjacente | `MOLHO` + `PIMENTA` → Mercearia Salgada > Temperos e Molhos > Molho de Pimenta |
-| 2026-04-07 | Combinação não adjacente | `CREME` + `LEITE` → Mercearia Doce > Culinária Doce > Creme de Leite |
-| 2026-04-07 | Combinação não adjacente | `DOCE` + `LEITE` → Mercearia Doce > Sobremesas e Outros Doces > Doces de Leite |
-| 2026-04-07 | Combinação não adjacente | `TEMPERO` + `SAZON` → Mercearia Salgada > Temperos e Molhos > Temperos Pronto em Pó/Sachê |
-| 2026-04-07 | Combinação não adjacente | `LEITE` + `PO` → Commodities > Leite > Leite em Pó |
-| 2026-04-07 | Combinação não adjacente | `REPARADOR` + `PONTAS` → Perfumaria > Produtos Capilares (nível grupo) |
-| 2026-04-07 | Categoria | `saca rolha` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades de Cozinha |
-| 2026-04-07 | Categoria | `bobina` → Uso e Consumo > Embalagens e Bobinas Térmicas > Bobinas Térmicas (era Utilidades Descartáveis) |
-| 2026-04-07 | Categoria | `benjamin` → Bazar Geral > Ferramentas e Acessórios > Material Elétrico |
-| 2026-04-07 | Marca | BEATS \| Ambev (adicionada ao seed_fabricantes_marcas.py) |
-| 2026-04-07 | Combinação não adjacente | `FEIJAO` + `CARIOCA/PRETO/BRANCO/CORDA/JALO` → Commodities > Feijão > subtipo |
-| 2026-04-07 | Combinação não adjacente | `ABRIDOR` + `LATA/LATAS/VINHO` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades |
-| 2026-04-07 | Combinação não adjacente | `AFIADOR` + `FACA` → Bazar Geral > Utilidades da Cozinha > Outras Utilidades |
-| 2026-04-07 | Combinação não adjacente | `ABSORVENTE` + `ABAS` → Perfumaria > Absorventes > Absorvente Externo |
-| 2026-04-07 | Combinação não adjacente | `ALICATE` + `CUTICULA` → Perfumaria > Estética > Acessórios Manicure |
-| 2026-04-07 | Combinação não adjacente | `CORTADOR` + `UNHAS` → Perfumaria > Estética > Acessórios Manicure |
-| 2026-04-07 | Combinação não adjacente | `AGUA` + `COCO` → Bebidas > Águas > Água de Coco (cobre marca separando tokens) |
-| 2026-04-07 | Combinação não adjacente | `CAFE` + `SOLUVEL` → Mercearia Doce > Matinais > Café Solúvel (cobre marca separando tokens) |
+| 2026-04-07 | Categoria | `vela`/`velas` → Bazar Geral > Utilidades Descartáveis > Velas; `copo` → Bazar Geral > Utilidades da Cozinha > Copo Individual; `tapete` → Têxtil > Cama, Mesa, Banho; `adocante` → Mercearia Doce Light > Adoçantes; `conhaque` → Bebidas > Destilados; `torrada` → Padaria Industrial; `cloro` → Limpeza para Roupas > Alvejantes; `acetona` → Perfumaria > Estética > Removedores; `soda caustica` → Limpeza de Banheiro > Limpeza Pesada; `bucha banho` → Perfumaria > Higiene Corporal > Esponja de Banho; `gel fixador`/`gel capilar` → Perfumaria > Produtos Capilares > Gel Fixador; `mamadeira` → Perfumaria > Seção Infantil; `gel` → Perfumaria > Produtos Capilares; `file de peito` → Perecíveis > Congelados; `caderno` → Bazar Geral > Papelaria; `agua oxigenada` → Perfumaria > Farmácia; `shoyu` → Mercearia Salgada > Temperos > Molho de Soja; `lamina` → Perfumaria > Barbearia > Lâminas; `mexerica`/`tangerina` → Hortifruti > Frutas; `cera` → Limpeza de Pisos; `bucha` → Perfumaria > Higiene Corporal; `escova` → Perfumaria > Higiene Corporal; `sacola`/`bobina`/`palito` → Bazar Geral > Utilidades Descartáveis; `drink` → Bebidas > Destilados; `filtro` → Mercearia Doce > Matinais; `torresmo` → Açougue > Suíno; `reparador` → Perfumaria > Produtos Capilares; `toalha` → Têxtil; `erva` → Bebidas > Matinais; `flanela`/`espuma` → Bazar Geral > Utensílios para Limpeza; `tesoura` → Bazar Geral > Papelaria; `colher` → Bazar Geral > Utilidades da Cozinha; `graxa`/`cadeado`/`extensao`/`mangueira` → Bazar Geral > Ferramentas; `saca rolha` → Bazar Geral > Utilidades da Cozinha; `bobina` → Uso e Consumo > Bobinas Térmicas; `benjamin` → Bazar Geral > Ferramentas > Material Elétrico; `sopao` → Mercearia Salgada > Massas e Sopas > Sopas |
+| 2026-04-07 | Combinação | `PEIXE+POSTAS/FILE` → Congelados > Peixes; `PEIXE+INTEIRO` → Açougue > Peixes; `CACAU+PO` → Culinária Doce > Chocolates em Pó; `AZEITE+VIRGEM` → Azeites > Extra Virgem; `VINAGRE+MACA/ARROZ`; `CHOCOLATE+BARRA`; `NOZ+MOSCADA`; `CERVEJA+LATA/LATAO`; `CERVEJA+LONG/NECK`; `MACARRAO+SEMOLA/OVOS`; `MASSA+PASTEL`; `CREME+CEBOLA` → Sopas; `CALDO+KNORR/MAGGI`; `MOLHO+TOMATE/PIMENTA`; `CREME+LEITE`; `DOCE+LEITE`; `TEMPERO+SAZON`; `LEITE+PO`; `REPARADOR+PONTAS`; `FEIJAO+CARIOCA/PRETO/BRANCO/CORDA/JALO`; `ABRIDOR+LATA/VINHO`; `AFIADOR+FACA`; `ABSORVENTE+ABAS`; `ALICATE+CUTICULA`; `CORTADOR+UNHAS`; `AGUA+COCO`; `CAFE+SOLUVEL` |
+| 2026-04-07 | Marca | BEATS \| Ambev |
 
 ---
 
-**How to maintain it — simple rule:**
+## Como manter este arquivo
 
-After every commit, ask yourself 3 questions:
+Após cada commit, responda:
 ```
-1. Did I add or change a model?       → update "Status dos models"
-2. Did I finish or start a page?      → update "Status das páginas"  
-3. Did I make an architectural decision? → update "Decisões de arquitetura"
+1. Adicionei ou mudei um model?            → atualizar "Modelos e tabelas"
+2. Concluí ou iniciei um passo do MVP?     → atualizar "🎯 Próximos passos"
+3. Tomei uma decisão de arquitetura?       → atualizar docs/arquitetura-dados.md
+```
