@@ -2,21 +2,30 @@
 
 ## Contexto
 Sistema de gestão fiscal para supermercados baseado em arquivos EFD (SPED Fiscal).
-MVP em Streamlit com Python, evoluindo para FastAPI + React no futuro.
+Streamlit ainda ativo durante a transição para FastAPI + React + Tremor.
 
-## Stack
-- Streamlit — interface
-- SQLAlchemy + SQLite (dev) / PostgreSQL (prod)
+## Stack atual
+- Streamlit — interface legada (em transição)
+- FastAPI — API backend (estrutura base criada em `api/`)
+- SQLAlchemy + SQLite (dev) / PostgreSQL Supabase (prod)
+- Cloudflare R2 — armazenamento de arquivos brutos (bronze)
 - Python 3.11+
 
+## Stack futura (FastAPI + React)
+- Backend: FastAPI (`api/`) — reusa app/models, repositories, services, parser
+- Frontend: React + Tremor — a criar
+- Auth: JWT (implementado em `api/auth.py`)
+
 ## Estrutura de pastas
-- app/pages — telas Streamlit (01_dashboard, 02_upload_sped, etc.)
+- app/pages — telas Streamlit (legadas, em transição)
 - app/services — lógica de negócio
 - app/repositories — acesso ao banco (sempre filtram por tenant_id)
 - app/models — SQLAlchemy ORM
-- app/parser — bronze.py (efd_raw) e silver.py (c100, c170, 0200)
+- app/parser — bronze.py (legado) e silver.py (c100, c190, 0200, 0150, h005, h010, k200)
 - app/components — sidebar.py, auth.py
-- app/utils — db.py, formatters.py
+- app/utils — db.py, formatters.py, r2.py (Cloudflare R2)
+- api/ — FastAPI: main.py, auth.py, deps.py, routers/
+- scripts/ — importar_efd.py, importar_xmls_pasta.py, backfill_padronizacao.py, seed_fabricantes_marcas.py
 
 ## Models existentes
 - GrupoEmpresarial — global (sem tenant_id); agrupa tenants de um mesmo dono (nome, ativo)
@@ -167,7 +176,11 @@ Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto 
 - [x] **Alembic** — `run_migrations()` substituída por `upgrade_db()` (API Python); `alembic/` configurado com `env.py` lendo `DATABASE_URL` do `.env`; migração inicial `8f8fc05b0864` gerada e marcada como baseline; `render_as_batch=True` para compatibilidade SQLite
 - [x] **Context manager de sessão** — `get_db()` adicionado em `app/utils/db.py`; todos os arquivos migrados para `with get_db() as db:` (13 arquivos: 8 páginas, main.py, 4 scripts)
 - [x] **Segurança mínima** — fallback `"admin123"` removido de `08_admin_revisao.py`; `ADMIN_PASSWORD` obrigatório no `.env`; app para com `st.error()` + `st.stop()` se não configurado
-- [x] **Deploy** — Supabase (PostgreSQL) provisionado e conectado (`db.gzhcbrfbphqzhpvrsraa.supabase.co`); todas as 4 migrations aplicadas (`8f8fc05b0864` → `5a7e9db4919c` → `b3f1c2d4e5a6` → `c7d8e9f0a1b2`); banco em 14MB após Fase 2.5; Streamlit descartado como frontend — FastAPI + React + Tremor é o destino (Fase 3); pendente: definir stack bronze/silver (Cloudflare R2 + DuckDB recomendado)
+- [x] **Deploy** — Supabase (PostgreSQL) provisionado e conectado (`db.gzhcbrfbphqzhpvrsraa.supabase.co`); todas as 4 migrations aplicadas (`8f8fc05b0864` → `5a7e9db4919c` → `b3f1c2d4e5a6` → `c7d8e9f0a1b2`); banco em 14MB após Fase 2.5; Streamlit descartado como frontend — FastAPI + React + Tremor é o destino (Fase 3)
+- [x] **Cloudflare R2** — bucket `sped-manager` provisionado; `app/utils/r2.py` com `upload_bytes`, `download_bytes`, `r2_key_efd`, `r2_key_xml`; EFDs enviados para `efd/{cnpj}/{nome}.txt` no momento da importação
+- [x] **Pipeline de importação EFD** — `scripts/importar_efd.py` reescrito: upload para R2 → `silver.processar_conteudo()` direto em memória (sem efd_raw) → `gold_kpis_service.calcular_kpis_arquivo()`; dedup via `arquivos_importados`; flags `--skip-padronizacao`, `--dry-run`, `--pasta`, `--arquivo`
+- [x] **gold_kpis_mensais** — primeira tabela gold implementada; migration `a04f951ab3d1` aplicada no Supabase; `app/services/gold_kpis_service.py` com `calcular_kpis_mes()` e `calcular_kpis_arquivo()`; dados de Jan+Fev 2025 populados (R$377k e R$337k faturamento)
+- [x] **FastAPI estrutura base** — `api/main.py` (CORS, routers), `api/auth.py` (JWT bcrypt), `api/deps.py` (get_db, get_tenant); routers: `POST /auth/token`, `POST /auth/senha`, `GET /auth/me`, `GET /kpis/mensais`, `GET /kpis/mensais/{ano}/{mes}`; testado e funcional
 - [ ] **Definir tipo de cliente foco** — fiscal (contador/escritório contábil) ou gestão (dono de loja); escopo das primeiras demos
 
 ### 🟠 Fase 2 — Qualidade interna (com usuários iniciais)
@@ -200,18 +213,21 @@ Objetivo: ter usuários reais. Produto imperfeito com usuários reais > produto 
 
 ### 🟠 Fase 3 — Migração FastAPI + React
 
-O Streamlit foi a escolha certa para validar. O teto é baixo para produção: sem controle de estado real, sem componentes customizáveis, dificuldade com multi-usuário e performance limitada.
-
-Stack destino definida: FastAPI (backend) + React + Tremor (frontend) + JWT (auth). Ver seção "Stack futura" acima.
-
-Ordem dentro da fase:
-1. FastAPI com rotas principais (compras, fiscal, produtos, vendas)
-2. Auth JWT substituindo `session_state` do Streamlit
-3. Frontend React + Tremor replicando páginas uma a uma
-4. Desligar Streamlit quando paridade funcional estiver completa
-
+Stack destino: FastAPI (backend) + React + Tremor (frontend) + JWT (auth).
 O que migra sem tocar: `app/models/`, `app/repositories/`, `app/services/`, `app/parser/`, `app/utils/`
-O que é reescrito: `app/pages/` (só a camada UI — menor custo possível de reescrita)
+O que é reescrito: `app/pages/` (só a camada UI)
+
+**Estado atual (2026-06-22):**
+- [x] Estrutura base `api/` criada e funcional
+- [x] Auth JWT: login por CNPJ + senha, token 24h
+- [x] `GET /kpis/mensais` — primeiro endpoint de dados
+
+**Pendente:**
+- [ ] Rotas de compras (`/compras/mensais`, `/compras/fornecedores`)
+- [ ] Rotas de fiscal (`/fiscal/mensal`, `/fiscal/cfop`)
+- [ ] Rotas de produtos e estoque
+- [ ] Frontend React + Tremor (componentes de KPI, charts)
+- [ ] Desligar Streamlit quando paridade funcional estiver completa
 
 ### 🟡 Fase 4 — Features que só fazem sentido com escala
 
@@ -233,6 +249,7 @@ Pasta `docs/` criada em 2026-05-29. Fazer por partes, uma seção de cada vez.
 | Arquivo | Status | Conteúdo |
 |---------|--------|----------|
 | `docs/dicionario-de-dados.md` | ✅ concluído | Todas as tabelas: colunas, tipos, constraints, regras de negócio, relacionamentos, convenções |
+| `docs/arquitetura-dados.md` | ✅ concluído | Camadas Bronze/Silver/Gold; fluxo EFD e XML; tabelas gold planejadas; variáveis de ambiente; decisões de volume |
 | `docs/pipeline-de-dados.md` | ⏳ pendente | Fluxo EFD → bronze → silver (C100, C170, C190, 0200, 0150, H005, H010, K200); fluxo XML → silver; regras de upsert; o que cada parser faz |
 | `docs/pipeline-padronizacao.md` | ⏳ pendente | As 6 etapas do pipeline de padronização de produtos (limpeza, dicionários, unidades, identificador, pipeline, categorizador); exemplos de entrada/saída; como alimentar novos dicionários |
 | `docs/modelo-de-dados.md` | ⏳ pendente | Diagrama ER completo; descrição de cada model; decisões de design (ex: por que departamento_id é cache, por que CatalogoProduto é separado de Produto) |
