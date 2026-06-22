@@ -15,3 +15,4 @@ from app.models.estoque_k200 import EstoqueK200
 from app.models.participante import Participante
 from app.models.token_desconhecido import TokenDesconhecido
 from app.models.catalogo_produto import CatalogoProduto
+from app.models.gold_kpis_mensais import GoldKpisMensais
