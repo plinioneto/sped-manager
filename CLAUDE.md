@@ -166,6 +166,50 @@ O Streamlit foi a escolha certa para validar. O teto é baixo para produção: s
 
 ---
 
+## Próximos passos — ordem de execução para o MVP
+
+> Atualizado em 2026-06-22. Seguir esta ordem evita retrabalho.
+
+### Passo 1 — Dados completos no banco (desbloqueante)
+- [ ] Importar Mar–Jul/2025 da GS Mercearia: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
+- [ ] Rodar backfill após importação: `python scripts/backfill_padronizacao.py --todos`
+- [ ] Confirmar gold_kpis_mensais populado para todos os 7 meses
+
+### Passo 2 — Corrigir pipeline XML (antes de rodar em produção)
+- [ ] Adicionar upload para R2 no `xml_parser.py` (`upload_bytes` antes de processar)
+- [ ] Chamar `calcular_kpis_arquivo()` ao final do `xml_parser.py`
+
+### Passo 3 — Rotas FastAPI restantes
+- [ ] `api/routers/compras.py` — GET /compras/mensais, /compras/fornecedores
+- [ ] `api/routers/fiscal.py` — GET /fiscal/mensal, /fiscal/cfop
+- [ ] `api/routers/produtos.py` — GET /produtos, /produtos/{cod_item}
+- [ ] `api/routers/importar.py` — POST /importar/efd, /importar/xml (substitui Streamlit)
+
+### Passo 4 — Tabelas gold complementares
+- [ ] `gold_compras_fornecedor` — migration + service + rota
+- [ ] `gold_fiscal_cfop` — migration + service + rota
+- [ ] `gold_estoque_atual` — migration + service + rota
+
+### Passo 5 — Deploy da API
+- [ ] Deploy FastAPI no Railway ou Render (gratuito para começar)
+- [ ] Variáveis de ambiente configuradas no painel do provedor
+- [ ] URL pública testada contra Supabase
+
+### Passo 6 — Frontend React + Tremor
+- [ ] Setup: Vite + React + Tremor + React Query
+- [ ] Tela de login (CNPJ + senha → JWT)
+- [ ] Dashboard: cards KPI + evolução mensal (consome /kpis/mensais)
+- [ ] Página de compras (consome /compras/*)
+- [ ] Página fiscal (consome /fiscal/*)
+- [ ] Upload de EFD/XML pela interface (consome /importar/*)
+- [ ] Deploy no Vercel
+
+### Passo 7 — Desligar Streamlit
+- [ ] Verificar paridade funcional com o Streamlit
+- [ ] Desligar ou manter só para painel admin interno
+
+---
+
 ## Pendente
 
 ### 🔴 Fase 1 — Deploy com produto funcional (prioridade máxima)
