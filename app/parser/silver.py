@@ -50,52 +50,40 @@ def _copiar_do_catalogo(produto: Produto, catalogo) -> None:
 
 class SilverProcessor:
     def __init__(self, session: Session, tenant_id: int):
-        self.session = session
+        self.session   = session
         self.tenant_id = tenant_id
 
+    # ------------------------------------------------------------------
+    # Helpers de conversão
+    # ------------------------------------------------------------------
+
     def _cast_decimal(self, valor) -> float:
-        """
-        Equivalente ao cast_decimal do Databricks —
-        converte string para float tratando vírgula como separador decimal.
-        """
         try:
             if valor is None or str(valor).strip() == '':
                 return 0.0
             return float(str(valor).replace(',', '.'))
-        except:
+        except Exception:
             return 0.0
 
     def _cast_data(self, valor) -> datetime:
-        """
-        Equivalente ao try_to_timestamp do Databricks —
-        converte ddMMyyyy para datetime.
-        """
         try:
             return datetime.strptime(str(valor).strip(), '%d%m%Y')
-        except:
+        except Exception:
             return None
 
+    # ------------------------------------------------------------------
+    # Parser de linhas (sem I/O)
+    # ------------------------------------------------------------------
+
     def _parse_linhas(self, linhas_raw: list) -> dict:
-        """
-        Equivalente às células 3, 4 e 5 do Databricks:
-        - divide cada linha por pipe
-        - identifica o bloco
-        - propaga CHV_DOC para as linhas filhas (C170, C190)
-        """
         registros = {
-            'c100': [],
-            'c170': [],
-            'c190': [],
-            '0200': [],
-            '0150': [],
-            'loja': [],
-            'h005': [],
-            'h010': [],
-            'k200': [],
+            'c100': [], 'c170': [], 'c190': [],
+            '0200': [], '0150': [], 'loja': [],
+            'h005': [], 'h010': [], 'k200': [],
         }
 
         chv_nfe_atual = None
-        dt_inv_atual = None
+        dt_inv_atual  = None
 
         for linha in linhas_raw:
             campos = linha.split('|')
@@ -104,27 +92,23 @@ class SilverProcessor:
 
             bloco = campos[1]
 
-            # equivalente ao CHV_DOC_TEMP + window propagation do Databricks
             if bloco == 'C100' and len(campos) > 9:
                 chv_nfe_atual = campos[9]
 
-            registros_bloco = {
-                'campos': campos,
-                'chv_nfe': chv_nfe_atual
-            }
+            rb = {'campos': campos, 'chv_nfe': chv_nfe_atual}
 
             if bloco == 'C100':
-                registros['c100'].append(registros_bloco)
+                registros['c100'].append(rb)
             elif bloco == 'C170':
-                registros['c170'].append(registros_bloco)
+                registros['c170'].append(rb)
             elif bloco == 'C190':
-                registros['c190'].append(registros_bloco)
+                registros['c190'].append(rb)
             elif bloco == '0150':
                 registros['0150'].append({'campos': campos})
             elif bloco == '0200':
-                registros['0200'].append(registros_bloco)
+                registros['0200'].append(rb)
             elif bloco == '0000':
-                registros['loja'].append(registros_bloco)
+                registros['loja'].append(rb)
             elif bloco == 'H005' and len(campos) > 2:
                 dt_inv_atual = campos[2]
                 registros['h005'].append({'campos': campos})
@@ -135,243 +119,209 @@ class SilverProcessor:
 
         return registros
 
-    def _processar_c100(self, registros: list) -> int:
-        """
-        Equivalente à célula 6 do Databricks — extrai campos do C100.
-        Upsert por tenant_id + chv_nfe.
-        """
-        criados = 0
+    # ------------------------------------------------------------------
+    # Carregamento de chaves existentes (evita N+1 de existência)
+    # ------------------------------------------------------------------
 
+    def _chaves_existentes(self, model, *colunas):
+        """Retorna set de tuplas com os valores das colunas para registros já existentes."""
+        rows = self.session.query(*[getattr(model, c) for c in colunas]).filter(
+            getattr(model, 'tenant_id') == self.tenant_id
+        ).all()
+        return {tuple(r) for r in rows}
+
+    # ------------------------------------------------------------------
+    # Processadores (sem commits intermediários)
+    # ------------------------------------------------------------------
+
+    def _processar_0150(self, registros: list, existentes: set) -> int:
+        criados = 0
         for reg in registros:
             c = reg['campos']
+            cod_part = c[2] if len(c) > 2 else ''
+            if not cod_part or (cod_part,) in existentes:
+                continue
+            self.session.add(Participante(
+                tenant_id=self.tenant_id,
+                cod_part=cod_part,
+                nome    =c[3]  if len(c) > 3  else '',
+                cod_pais=c[4]  if len(c) > 4  else '',
+                cnpj    =c[5]  if len(c) > 5  else '',
+                cpf     =c[6]  if len(c) > 6  else '',
+                ie      =c[7]  if len(c) > 7  else '',
+                cod_mun =c[8]  if len(c) > 8  else '',
+                suframa =c[9]  if len(c) > 9  else '',
+                endereco=c[10] if len(c) > 10 else '',
+                num     =c[11] if len(c) > 11 else '',
+                compl   =c[12] if len(c) > 12 else '',
+                bairro  =c[13] if len(c) > 13 else '',
+            ))
+            existentes.add((cod_part,))
+            criados += 1
+        return criados
+
+    def _processar_c100(self, registros: list, existentes: set) -> int:
+        """Retorna contagem. Após chamar, faça session.flush() para obter IDs."""
+        criados = 0
+        for reg in registros:
+            c   = reg['campos']
             chv = c[9] if len(c) > 9 else ''
-
-            if not chv:
+            if not chv or (chv,) in existentes:
                 continue
-
-            existente = self.session.query(DocumentoFiscal).filter(
-                DocumentoFiscal.tenant_id == self.tenant_id,
-                DocumentoFiscal.chv_nfe == chv
-            ).first()
-
-            if existente:
-                continue
-
-            doc = DocumentoFiscal(
-                tenant_id=self.tenant_id,
-                chv_nfe=chv,
-                ind_oper=c[2] if len(c) > 2 else '',
-                ind_emit=c[3] if len(c) > 3 else '',
-                cod_part=c[4] if len(c) > 4 else '',
-                cod_mod=c[5] if len(c) > 5 else '',
-                cod_sit=c[6] if len(c) > 6 else '',
-                ser=c[7] if len(c) > 7 else '',
-                num_doc=c[8] if len(c) > 8 else '',
-                dt_doc=self._cast_data(c[10]) if len(c) > 10 else None,
-                dt_e_s=self._cast_data(c[11]) if len(c) > 11 else None,
-                vl_doc=self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
-                vl_desc=self._cast_decimal(c[14]) if len(c) > 14 else 0.0,
-                vl_merc=self._cast_decimal(c[16]) if len(c) > 16 else 0.0,
-                vl_bc_icms=self._cast_decimal(c[21]) if len(c) > 21 else 0.0,
-                vl_icms=self._cast_decimal(c[22]) if len(c) > 22 else 0.0,
+            self.session.add(DocumentoFiscal(
+                tenant_id    =self.tenant_id,
+                chv_nfe      =chv,
+                ind_oper     =c[2]  if len(c) > 2  else '',
+                ind_emit     =c[3]  if len(c) > 3  else '',
+                cod_part     =c[4]  if len(c) > 4  else '',
+                cod_mod      =c[5]  if len(c) > 5  else '',
+                cod_sit      =c[6]  if len(c) > 6  else '',
+                ser          =c[7]  if len(c) > 7  else '',
+                num_doc      =c[8]  if len(c) > 8  else '',
+                dt_doc       =self._cast_data(c[10])    if len(c) > 10 else None,
+                dt_e_s       =self._cast_data(c[11])    if len(c) > 11 else None,
+                vl_doc       =self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
+                vl_desc      =self._cast_decimal(c[14]) if len(c) > 14 else 0.0,
+                vl_merc      =self._cast_decimal(c[16]) if len(c) > 16 else 0.0,
+                vl_bc_icms   =self._cast_decimal(c[21]) if len(c) > 21 else 0.0,
+                vl_icms      =self._cast_decimal(c[22]) if len(c) > 22 else 0.0,
                 vl_bc_icms_st=self._cast_decimal(c[23]) if len(c) > 23 else 0.0,
-                vl_icms_st=self._cast_decimal(c[24]) if len(c) > 24 else 0.0,
-                vl_pis=self._cast_decimal(c[26]) if len(c) > 26 else 0.0,
-                vl_cofins=self._cast_decimal(c[27]) if len(c) > 27 else 0.0,
-                fonte='efd',
-            )
-            self.session.add(doc)
+                vl_icms_st   =self._cast_decimal(c[24]) if len(c) > 24 else 0.0,
+                vl_pis       =self._cast_decimal(c[26]) if len(c) > 26 else 0.0,
+                vl_cofins    =self._cast_decimal(c[27]) if len(c) > 27 else 0.0,
+                fonte        ='efd',
+            ))
+            existentes.add((chv,))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_c170(self, registros: list) -> int:
-        """
-        Equivalente à célula 7 do Databricks — extrai campos do C170.
-        Upsert por tenant_id + chv_nfe + num_item.
-        """
+    def _build_doc_cache(self) -> dict:
+        """Retorna dict {chv_nfe: doc_id} após flush do C100."""
+        rows = self.session.query(DocumentoFiscal.chv_nfe, DocumentoFiscal.id).filter(
+            DocumentoFiscal.tenant_id == self.tenant_id
+        ).all()
+        return {r.chv_nfe: r.id for r in rows}
+
+    def _processar_c170(self, registros: list, existentes: set, doc_cache: dict) -> int:
         criados = 0
-
         for reg in registros:
-            c = reg['campos']
+            c   = reg['campos']
             chv = reg['chv_nfe']
-
-            if not chv:
+            num = int(c[2]) if len(c) > 2 and c[2].isdigit() else 0
+            if not chv or (chv, num) in existentes:
                 continue
-
-            existente = self.session.query(ItemFiscal).filter(
-                ItemFiscal.tenant_id == self.tenant_id,
-                ItemFiscal.chv_nfe == chv,
-                ItemFiscal.num_item == int(c[2]) if len(c) > 2 and c[2].isdigit() else 0
-            ).first()
-
-            if existente:
-                continue
-
-            # busca o documento pai para associar
-            doc = self.session.query(DocumentoFiscal).filter(
-                DocumentoFiscal.tenant_id == self.tenant_id,
-                DocumentoFiscal.chv_nfe == chv
-            ).first()
-
-            item = ItemFiscal(
-                tenant_id=self.tenant_id,
-                chv_nfe=chv,
-                documento_id=doc.id if doc else None,
-                num_item=int(c[2]) if len(c) > 2 and c[2].isdigit() else 0,
-                cod_item=c[3] if len(c) > 3 else '',
-                descr_compl=c[4] if len(c) > 4 else '',
-                qtd=self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
-                unid=c[6] if len(c) > 6 else '',
-                vl_item=self._cast_decimal(c[7]) if len(c) > 7 else 0.0,
-                vl_desc=self._cast_decimal(c[8]) if len(c) > 8 else 0.0,
-                cst_icms=c[10] if len(c) > 10 else '',
-                cfop=c[11] if len(c) > 11 else '',
-                vl_bc_icms=self._cast_decimal(c[13]) if len(c) > 13 else 0.0,
-                aliq_icms=self._cast_decimal(c[14]) if len(c) > 14 else 0.0,
-                vl_icms=self._cast_decimal(c[15]) if len(c) > 15 else 0.0,
-                vl_pis=self._cast_decimal(c[30]) if len(c) > 30 else 0.0,
-                vl_cofins=self._cast_decimal(c[36]) if len(c) > 36 else 0.0,
-            )
-            self.session.add(item)
+            self.session.add(ItemFiscal(
+                tenant_id   =self.tenant_id,
+                chv_nfe     =chv,
+                documento_id=doc_cache.get(chv),
+                num_item    =num,
+                cod_item    =c[3]  if len(c) > 3  else '',
+                descr_compl =c[4]  if len(c) > 4  else '',
+                qtd         =self._cast_decimal(c[5])  if len(c) > 5  else 0.0,
+                unid        =c[6]  if len(c) > 6  else '',
+                vl_item     =self._cast_decimal(c[7])  if len(c) > 7  else 0.0,
+                vl_desc     =self._cast_decimal(c[8])  if len(c) > 8  else 0.0,
+                cst_icms    =c[10] if len(c) > 10 else '',
+                cfop        =c[11] if len(c) > 11 else '',
+                vl_bc_icms  =self._cast_decimal(c[13]) if len(c) > 13 else 0.0,
+                aliq_icms   =self._cast_decimal(c[14]) if len(c) > 14 else 0.0,
+                vl_icms     =self._cast_decimal(c[15]) if len(c) > 15 else 0.0,
+                vl_pis      =self._cast_decimal(c[30]) if len(c) > 30 else 0.0,
+                vl_cofins   =self._cast_decimal(c[36]) if len(c) > 36 else 0.0,
+            ))
+            existentes.add((chv, num))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_c190(self, registros: list) -> int:
-        """
-        Extrai campos do C190 — registro analítico de ICMS por CST/CFOP/alíquota.
-        Upsert por tenant_id + chv_nfe + cst_icms + cfop + aliq_icms.
-        """
+    def _processar_c190(self, registros: list, existentes: set, doc_cache: dict) -> int:
         criados = 0
-
         for reg in registros:
-            c = reg['campos']
-            chv = reg['chv_nfe']
-
-            if not chv:
-                continue
-
-            cst = c[2] if len(c) > 2 else ''
+            c    = reg['campos']
+            chv  = reg['chv_nfe']
+            cst  = c[2] if len(c) > 2 else ''
             cfop = c[3] if len(c) > 3 else ''
-            aliq = c[4] if len(c) > 4 else ''
-
-            existente = self.session.query(IcmsC190).filter(
-                IcmsC190.tenant_id == self.tenant_id,
-                IcmsC190.chv_nfe == chv,
-                IcmsC190.cst_icms == cst,
-                IcmsC190.cfop == cfop,
-                IcmsC190.aliq_icms == aliq,
-            ).first()
-
-            if existente:
+            aliq = self._cast_decimal(c[4]) if len(c) > 4 else 0.0
+            if not chv or (chv, cst, cfop, aliq) in existentes:
                 continue
-
-            doc = self.session.query(DocumentoFiscal).filter(
-                DocumentoFiscal.tenant_id == self.tenant_id,
-                DocumentoFiscal.chv_nfe == chv
-            ).first()
-
-            registro = IcmsC190(
-                tenant_id=self.tenant_id,
-                chv_nfe=chv,
-                documento_id=doc.id if doc else None,
-                cst_icms=cst,
-                cfop=cfop,
-                aliq_icms=aliq,
-                vl_opr=self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
-                vl_bc_icms=self._cast_decimal(c[6]) if len(c) > 6 else 0.0,
-                vl_icms=self._cast_decimal(c[7]) if len(c) > 7 else 0.0,
-                vl_bc_icms_st=self._cast_decimal(c[8]) if len(c) > 8 else 0.0,
-                vl_icms_st=self._cast_decimal(c[9]) if len(c) > 9 else 0.0,
-                vl_red_bc=self._cast_decimal(c[10]) if len(c) > 10 else 0.0,
-                vl_pis=self._cast_decimal(c[11]) if len(c) > 11 else 0.0,
-                vl_cofins=self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
-                cod_obs=c[13] if len(c) > 13 else '',
-            )
-            self.session.add(registro)
+            self.session.add(IcmsC190(
+                tenant_id    =self.tenant_id,
+                chv_nfe      =chv,
+                documento_id =doc_cache.get(chv),
+                cst_icms     =cst,
+                cfop         =cfop,
+                aliq_icms    =aliq,
+                vl_opr       =self._cast_decimal(c[5])  if len(c) > 5  else 0.0,
+                vl_bc_icms   =self._cast_decimal(c[6])  if len(c) > 6  else 0.0,
+                vl_icms      =self._cast_decimal(c[7])  if len(c) > 7  else 0.0,
+                vl_bc_icms_st=self._cast_decimal(c[8])  if len(c) > 8  else 0.0,
+                vl_icms_st   =self._cast_decimal(c[9])  if len(c) > 9  else 0.0,
+                vl_red_bc    =self._cast_decimal(c[10]) if len(c) > 10 else 0.0,
+                vl_pis       =self._cast_decimal(c[11]) if len(c) > 11 else 0.0,
+                vl_cofins    =self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
+                cod_obs      =c[13] if len(c) > 13 else '',
+            ))
+            existentes.add((chv, cst, cfop, aliq))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_0200(self, registros: list) -> dict:
-        """
-        Equivalente à célula 9 do Databricks — extrai campos do 0200.
-        Upsert por tenant_id + cod_item.
-        """
-        criados = 0
-        atualizados = 0
+    def _processar_0200(self, registros: list, existentes_cod: set) -> dict:
+        criados = atualizados = 0
 
         for reg in registros:
-            c = reg['campos']
+            c   = reg['campos']
             cod = c[2] if len(c) > 2 else ''
-
             if not cod:
                 continue
 
-            existente = self.session.query(Produto).filter(
-                Produto.tenant_id == self.tenant_id,
-                Produto.cod_item == cod
-            ).first()
-
-            descr_item = c[3] if len(c) > 3 else ''
-
+            descr_item   = c[3] if len(c) > 3 else ''
             cod_barra_raw = (c[4] if len(c) > 4 else '').strip()
 
-            if existente:
-                existente.descr_item = descr_item
-                existente.cod_barra  = cod_barra_raw
-                existente.unid_inv   = c[6] if len(c) > 6 else ''
-                existente.tipo_item  = c[7] if len(c) > 7 else ''
-                existente.cod_ncm    = c[8] if len(c) > 8 else ''
-                existente.aliq_icms  = self._cast_decimal(c[12]) if len(c) > 12 else 0.0
-                existente.cest       = c[13] if len(c) > 13 else ''
-                produto_obj = existente
-                atualizados += 1
+            if (cod,) in existentes_cod:
+                produto_obj = self.session.query(Produto).filter(
+                    Produto.tenant_id == self.tenant_id,
+                    Produto.cod_item  == cod
+                ).first()
+                if produto_obj:
+                    produto_obj.descr_item = descr_item
+                    produto_obj.cod_barra  = cod_barra_raw
+                    produto_obj.unid_inv   = c[6]  if len(c) > 6  else ''
+                    produto_obj.tipo_item  = c[7]  if len(c) > 7  else ''
+                    produto_obj.cod_ncm    = c[8]  if len(c) > 8  else ''
+                    produto_obj.aliq_icms  = self._cast_decimal(c[12]) if len(c) > 12 else 0.0
+                    produto_obj.cest       = c[13] if len(c) > 13 else ''
+                    atualizados += 1
             else:
                 produto_obj = Produto(
-                    tenant_id = self.tenant_id,
-                    cod_item  = cod,
-                    descr_item= descr_item,
-                    cod_barra = cod_barra_raw,
-                    unid_inv  = c[6] if len(c) > 6 else '',
-                    tipo_item = c[7] if len(c) > 7 else '',
-                    cod_ncm   = c[8] if len(c) > 8 else '',
-                    aliq_icms = self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
-                    cest      = c[13] if len(c) > 13 else '',
+                    tenant_id =self.tenant_id,
+                    cod_item  =cod,
+                    descr_item=descr_item,
+                    cod_barra =cod_barra_raw,
+                    unid_inv  =c[6]  if len(c) > 6  else '',
+                    tipo_item =c[7]  if len(c) > 7  else '',
+                    cod_ncm   =c[8]  if len(c) > 8  else '',
+                    aliq_icms =self._cast_decimal(c[12]) if len(c) > 12 else 0.0,
+                    cest      =c[13] if len(c) > 13 else '',
                 )
                 self.session.add(produto_obj)
+                existentes_cod.add((cod,))
                 criados += 1
 
-            # EAN catalog lookup — herda classificação entre tenants quando possível
             if _CATALOGO_DISPONIVEL and ean_valido(cod_barra_raw):
-                catalogo_repo = CatalogoProdutoRepository(self.session)
+                catalogo_repo   = CatalogoProdutoRepository(self.session)
                 entrada_catalogo = catalogo_repo.buscar_por_ean(cod_barra_raw)
-
                 if entrada_catalogo and _esta_classificado_catalogo(entrada_catalogo):
-                    # Catálogo já tem classificação — copiar ao produto (exceto manuais)
                     if produto_obj.origem_padronizacao not in ('manual', 'manual_sem_cat'):
                         _copiar_do_catalogo(produto_obj, entrada_catalogo)
                 else:
-                    # Catálogo vazio/não classificado — rodar pipeline e gravar resultado
                     self._aplicar_padronizacao(produto_obj, descr_item)
                     if _esta_classificado_produto(produto_obj):
                         catalogo_repo.upsert_from_produto(produto_obj, cod_barra_raw)
             else:
-                # Sem EAN válido — comportamento original
                 self._aplicar_padronizacao(produto_obj, descr_item)
 
-        self.session.commit()
         return {"criados": criados, "atualizados": atualizados}
 
     def _aplicar_padronizacao(self, produto: Produto, descr_item: str) -> None:
-        """
-        Enriquece o produto com dados da pipeline de padronização.
-        Falha silenciosa — o import nunca é bloqueado por erro aqui.
-        """
         if not _PADRONIZACAO_DISPONIVEL or not descr_item:
             return
         try:
@@ -384,245 +334,171 @@ class SilverProcessor:
             produto.score_padronizacao  = resultado.score_confianca
             produto.origem_padronizacao = resultado.origem
             produto.revisao_necessaria  = resultado.revisao_necessaria
-            # Classificação
-            produto.categoria_id    = resultado.categoria_id
-            produto.grupo_id        = resultado.grupo_id
-            produto.departamento_id = resultado.departamento_id
-            produto.score_categoria = resultado.score_categoria
-            # Resolve marca_id pelo nome canônico (se identificada)
+            produto.categoria_id        = resultado.categoria_id
+            produto.grupo_id            = resultado.grupo_id
+            produto.departamento_id     = resultado.departamento_id
+            produto.score_categoria     = resultado.score_categoria
             if resultado.marca:
-                marca_obj = self.session.query(Marca).filter(
-                    Marca.nome == resultado.marca
-                ).first()
+                marca_obj = self.session.query(Marca).filter(Marca.nome == resultado.marca).first()
                 if marca_obj:
                     produto.marca_id = marca_obj.id
         except Exception:
-            pass  # falha silenciosa — padronização é enriquecimento, não dado primário
+            pass
 
-    def _processar_h005(self, registros: list) -> int:
-        """
-        Extrai campos do H005 — cabeçalho do inventário físico.
-        Upsert por tenant_id + dt_inv + mot_inv.
-        """
+    def _processar_h005(self, registros: list, existentes: set) -> int:
         criados = 0
-
         for reg in registros:
-            c = reg['campos']
-            dt_inv = self._cast_data(c[2]) if len(c) > 2 else None
+            c       = reg['campos']
+            dt_inv  = self._cast_data(c[2]) if len(c) > 2 else None
             mot_inv = c[4] if len(c) > 4 else ''
-
             if not dt_inv:
                 continue
-
-            existente = self.session.query(InventarioH005).filter(
-                InventarioH005.tenant_id == self.tenant_id,
-                InventarioH005.dt_inv == dt_inv,
-                InventarioH005.mot_inv == mot_inv,
-            ).first()
-
-            if existente:
-                existente.vl_inv = self._cast_decimal(c[3]) if len(c) > 3 else 0.0
+            if (dt_inv, mot_inv) in existentes:
+                h = self.session.query(InventarioH005).filter(
+                    InventarioH005.tenant_id == self.tenant_id,
+                    InventarioH005.dt_inv    == dt_inv,
+                    InventarioH005.mot_inv   == mot_inv,
+                ).first()
+                if h:
+                    h.vl_inv = self._cast_decimal(c[3]) if len(c) > 3 else 0.0
                 continue
-
-            registro = InventarioH005(
+            self.session.add(InventarioH005(
                 tenant_id=self.tenant_id,
-                dt_inv=dt_inv,
-                vl_inv=self._cast_decimal(c[3]) if len(c) > 3 else 0.0,
-                mot_inv=mot_inv,
-            )
-            self.session.add(registro)
+                dt_inv   =dt_inv,
+                vl_inv   =self._cast_decimal(c[3]) if len(c) > 3 else 0.0,
+                mot_inv  =mot_inv,
+            ))
+            existentes.add((dt_inv, mot_inv))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_h010(self, registros: list) -> int:
-        """
-        Extrai campos do H010 — itens do inventário físico.
-        Upsert por tenant_id + dt_inv + cod_item + ind_prop.
-        Deve ser chamado após _processar_h005() (precisa do FK do pai).
-        """
-        criados = 0
+    def _build_h005_cache(self) -> dict:
+        """Retorna dict {(dt_inv, mot_inv): h005_id} após flush do H005."""
+        rows = self.session.query(
+            InventarioH005.dt_inv, InventarioH005.mot_inv, InventarioH005.id
+        ).filter(InventarioH005.tenant_id == self.tenant_id).all()
+        return {(r.dt_inv, r.mot_inv): r.id for r in rows}
 
+    def _processar_h010(self, registros: list, existentes: set, h005_cache: dict) -> int:
+        criados = 0
         for reg in registros:
-            c = reg['campos']
-            dt_inv = self._cast_data(reg.get('dt_inv')) if reg.get('dt_inv') else None
+            c        = reg['campos']
+            dt_inv   = self._cast_data(reg.get('dt_inv')) if reg.get('dt_inv') else None
             cod_item = c[2] if len(c) > 2 else ''
             ind_prop = c[7] if len(c) > 7 else '0'
-
-            if not dt_inv or not cod_item:
+            if not dt_inv or not cod_item or (dt_inv, cod_item, ind_prop) in existentes:
                 continue
-
-            existente = self.session.query(InventarioH010).filter(
-                InventarioH010.tenant_id == self.tenant_id,
-                InventarioH010.dt_inv == dt_inv,
-                InventarioH010.cod_item == cod_item,
-                InventarioH010.ind_prop == ind_prop,
-            ).first()
-
-            if existente:
-                existente.qtd = self._cast_decimal(c[4]) if len(c) > 4 else 0.0
-                existente.vl_unit = self._cast_decimal(c[5]) if len(c) > 5 else 0.0
-                existente.vl_item = self._cast_decimal(c[6]) if len(c) > 6 else 0.0
-                continue
-
-            pai = self.session.query(InventarioH005).filter(
-                InventarioH005.tenant_id == self.tenant_id,
-                InventarioH005.dt_inv == dt_inv,
-            ).first()
-
-            item = InventarioH010(
-                tenant_id=self.tenant_id,
-                inventario_id=pai.id if pai else None,
-                dt_inv=dt_inv,
-                cod_item=cod_item,
-                unid=c[3] if len(c) > 3 else '',
-                qtd=self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
-                vl_unit=self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
-                vl_item=self._cast_decimal(c[6]) if len(c) > 6 else 0.0,
-                ind_prop=ind_prop,
-                cod_part=c[8] if len(c) > 8 else '',
-                txt_compl=c[9] if len(c) > 9 else '',
-                cod_cta=c[10] if len(c) > 10 else '',
-            )
-            self.session.add(item)
+            pai_id = next((v for (d, m), v in h005_cache.items() if d == dt_inv), None)
+            self.session.add(InventarioH010(
+                tenant_id   =self.tenant_id,
+                inventario_id=pai_id,
+                dt_inv      =dt_inv,
+                cod_item    =cod_item,
+                unid        =c[3]  if len(c) > 3  else '',
+                qtd         =self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
+                vl_unit     =self._cast_decimal(c[5]) if len(c) > 5 else 0.0,
+                vl_item     =self._cast_decimal(c[6]) if len(c) > 6 else 0.0,
+                ind_prop    =ind_prop,
+                cod_part    =c[8]  if len(c) > 8  else '',
+                txt_compl   =c[9]  if len(c) > 9  else '',
+                cod_cta     =c[10] if len(c) > 10 else '',
+            ))
+            existentes.add((dt_inv, cod_item, ind_prop))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_k200(self, registros: list) -> int:
-        """
-        Extrai campos do K200 — saldo de estoque por data.
-        Upsert por tenant_id + dt_est + cod_item + ind_est.
-        """
+    def _processar_k200(self, registros: list, existentes: set) -> int:
         criados = 0
-
         for reg in registros:
-            c = reg['campos']
-            dt_est = self._cast_data(c[2]) if len(c) > 2 else None
+            c        = reg['campos']
+            dt_est   = self._cast_data(c[2]) if len(c) > 2 else None
             cod_item = c[3] if len(c) > 3 else ''
-            ind_est = c[5] if len(c) > 5 else '0'
-
-            if not dt_est or not cod_item:
+            ind_est  = c[5] if len(c) > 5 else '0'
+            if not dt_est or not cod_item or (dt_est, cod_item, ind_est) in existentes:
                 continue
-
-            existente = self.session.query(EstoqueK200).filter(
-                EstoqueK200.tenant_id == self.tenant_id,
-                EstoqueK200.dt_est == dt_est,
-                EstoqueK200.cod_item == cod_item,
-                EstoqueK200.ind_est == ind_est,
-            ).first()
-
-            if existente:
-                existente.qt_est = self._cast_decimal(c[4]) if len(c) > 4 else 0.0
-                continue
-
-            saldo = EstoqueK200(
+            self.session.add(EstoqueK200(
                 tenant_id=self.tenant_id,
-                dt_est=dt_est,
-                cod_item=cod_item,
-                qt_est=self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
-                ind_est=ind_est,
-            )
-            self.session.add(saldo)
+                dt_est   =dt_est,
+                cod_item =cod_item,
+                qt_est   =self._cast_decimal(c[4]) if len(c) > 4 else 0.0,
+                ind_est  =ind_est,
+            ))
+            existentes.add((dt_est, cod_item, ind_est))
             criados += 1
-
-        self.session.commit()
         return criados
 
-    def _processar_0150(self, registros: list) -> int:
-        """
-        Extrai campos do 0150 — cadastro de participantes.
-        Upsert por tenant_id + cod_part.
-        Layout: |0150|COD_PART|NOME|COD_PAIS|CNPJ|CPF|IE|COD_MUN|SUFRAMA|END|NUM|COMPL|BAIRRO|
-        """
-        criados = 0
+    # ------------------------------------------------------------------
+    # Ponto de entrada
+    # ------------------------------------------------------------------
 
-        for reg in registros:
-            c = reg['campos']
-            cod_part = c[2] if len(c) > 2 else ''
-
-            if not cod_part:
-                continue
-
-            existente = self.session.query(Participante).filter(
-                Participante.tenant_id == self.tenant_id,
-                Participante.cod_part == cod_part,
-            ).first()
-
-            if existente:
-                existente.nome = c[3] if len(c) > 3 else existente.nome
-                existente.cnpj = c[5] if len(c) > 5 else existente.cnpj
-                existente.cpf = c[6] if len(c) > 6 else existente.cpf
-                continue
-
-            part = Participante(
-                tenant_id=self.tenant_id,
-                cod_part=cod_part,
-                nome=c[3] if len(c) > 3 else '',
-                cod_pais=c[4] if len(c) > 4 else '',
-                cnpj=c[5] if len(c) > 5 else '',
-                cpf=c[6] if len(c) > 6 else '',
-                ie=c[7] if len(c) > 7 else '',
-                cod_mun=c[8] if len(c) > 8 else '',
-                suframa=c[9] if len(c) > 9 else '',
-                endereco=c[10] if len(c) > 10 else '',
-                num=c[11] if len(c) > 11 else '',
-                compl=c[12] if len(c) > 12 else '',
-                bairro=c[13] if len(c) > 13 else '',
-            )
-            self.session.add(part)
-            criados += 1
-
-        self.session.commit()
-        return criados
+    def processar_conteudo(self, conteudo: str) -> dict:
+        """Processa diretamente o conteúdo do arquivo EFD (sem passar pelo efd_raw)."""
+        linhas_raw = [l.strip() for l in conteudo.splitlines() if l.strip()]
+        if not linhas_raw:
+            return {"status": "erro", "motivo": "arquivo vazio"}
+        return self._processar(linhas_raw)
 
     def processar(self, file_path: str) -> dict:
-        """
-        Ponto de entrada — lê o efd_raw do banco e processa todas as tabelas.
-        Equivalente ao fluxo completo do notebook silver.
-        """
+        """Mantido para compatibilidade — lê do efd_raw."""
         from app.models.efd_raw import EfdRaw
-
-        # lê as linhas do bronze — equivalente ao df_raw do Databricks
         linhas = (
             self.session.query(EfdRaw.conteudo_linha)
-            .filter(
-                EfdRaw.tenant_id == self.tenant_id,
-                EfdRaw.file_path == file_path
-            )
+            .filter(EfdRaw.tenant_id == self.tenant_id, EfdRaw.file_path == file_path)
             .order_by(EfdRaw.num_linha)
             .all()
         )
-
         linhas_raw = [l.conteudo_linha for l in linhas]
-
         if not linhas_raw:
             return {"status": "erro", "motivo": "arquivo não encontrado no bronze"}
+        return self._processar(linhas_raw)
 
-        # equivalente às células 3, 4 e 5
+    def _processar(self, linhas_raw: list) -> dict:
         registros = self._parse_linhas(linhas_raw)
 
-        # equivalente às células 6, 7, 8 e 9
-        participantes = self._processar_0150(registros['0150'])
-        docs = self._processar_c100(registros['c100'])
-        itens = self._processar_c170(registros['c170'])
-        c190 = self._processar_c190(registros['c190'])
-        resultado_produtos = self._processar_0200(registros['0200'])
-        h005 = self._processar_h005(registros['h005'])
-        h010 = self._processar_h010(registros['h010'])
-        k200 = self._processar_k200(registros['k200'])
+        # Pré-carrega chaves existentes (1 query por tabela)
+        ex_0150 = self._chaves_existentes(Participante, 'cod_part')
+        ex_c100 = self._chaves_existentes(DocumentoFiscal, 'chv_nfe')
+        ex_c170 = self._chaves_existentes(ItemFiscal, 'chv_nfe', 'num_item')
+        ex_c190 = self._chaves_existentes(IcmsC190, 'chv_nfe', 'cst_icms', 'cfop', 'aliq_icms')
+        ex_0200 = self._chaves_existentes(Produto, 'cod_item')
+        ex_h005 = self._chaves_existentes(InventarioH005, 'dt_inv', 'mot_inv')
+        ex_h010 = self._chaves_existentes(InventarioH010, 'dt_inv', 'cod_item', 'ind_prop')
+        ex_k200 = self._chaves_existentes(EstoqueK200, 'dt_est', 'cod_item', 'ind_est')
+
+        # 1. Participantes e C100
+        participantes = self._processar_0150(registros['0150'], ex_0150)
+        docs          = self._processar_c100(registros['c100'], ex_c100)
+
+        # Flush para obter IDs dos documentos recém-inseridos
+        self.session.flush()
+        doc_cache = self._build_doc_cache()
+
+        # 2. Itens e fiscal (dependem dos IDs de C100)
+        itens              = self._processar_c170(registros['c170'], ex_c170, doc_cache)
+        c190               = self._processar_c190(registros['c190'], ex_c190, doc_cache)
+        resultado_produtos = self._processar_0200(registros['0200'], ex_0200)
+
+        # 3. Inventário H005 → flush → H010
+        h005 = self._processar_h005(registros['h005'], ex_h005)
+        self.session.flush()
+        h005_cache = self._build_h005_cache()
+        h010       = self._processar_h010(registros['h010'], ex_h010, h005_cache)
+
+        # 4. Estoque
+        k200 = self._processar_k200(registros['k200'], ex_k200)
+
+        # Commit único
+        self.session.commit()
 
         return {
-            "status": "concluido",
-            "participantes": participantes,
-            "documentos": docs,
-            "itens": itens,
-            "c190": c190,
-            "produtos_criados": resultado_produtos['criados'],
+            "status"            : "concluido",
+            "participantes"     : participantes,
+            "documentos"        : docs,
+            "itens"             : itens,
+            "c190"              : c190,
+            "produtos_criados"  : resultado_produtos['criados'],
             "produtos_atualizados": resultado_produtos['atualizados'],
-            "h005": h005,
-            "h010": h010,
-            "k200": k200,
+            "h005"              : h005,
+            "h010"              : h010,
+            "k200"              : k200,
         }

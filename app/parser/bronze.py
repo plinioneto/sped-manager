@@ -48,10 +48,8 @@ class BronzeProcessor:
                 ingest_timestamp=ingest_timestamp
             ))
 
-        tamanho_lote = 1000
-        for i in range(0, len(objetos), tamanho_lote):
-            self.session.bulk_save_objects(objetos[i:i + tamanho_lote])
-            self.session.commit()
+        self.session.bulk_save_objects(objetos)
+        self.session.commit()
 
         return {
             "status": "concluido",
