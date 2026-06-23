@@ -154,10 +154,10 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 
 > Seguir esta ordem evita retrabalho. Atualizado em 2026-06-22.
 
-### Passo 1 — Dados completos no banco
-- [ ] Importar Mar–Jul/2025: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
-- [ ] Backfill após importação: `python scripts/backfill_padronizacao.py --todos`
-- [ ] Confirmar `gold_kpis_mensais` populado para os 7 meses
+### Passo 1 — Dados completos no banco ✅
+- [x] Importar Mar–Jul/2025: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
+- [x] Backfill após importação: `python scripts/backfill_padronizacao.py --todos`
+- [x] Confirmar `gold_kpis_mensais` populado para os 7 meses (Jan–Jul/2025, tenant_id=1)
 
 ### Passo 2 — Corrigir pipeline XML
 - [ ] Adicionar `upload_bytes()` no `xml_parser.py` antes de processar
