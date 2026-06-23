@@ -200,6 +200,21 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [ ] **Dividir `08_admin_revisao.py`** — 1.400+ linhas; separar em módulos por domínio
 - [ ] **Testes de unidade** — parser silver + `processar_descricao`; 20–30 testes dão segurança para refatorar
 - [ ] **Definir tipo de cliente foco** — fiscal (contador) ou gestão (dono de loja)
+- [ ] **Revisão de scripts/** — auditar e remover scripts obsoletos; manter apenas o necessário. Lista atual:
+  - `importar_efd.py` — ✅ pipeline principal, manter
+  - `backfill_padronizacao.py` — ✅ utilitário recorrente, manter
+  - `seed_fabricantes_marcas.py` — ✅ seed idempotente, manter
+  - `importar_xmls_pasta.py` — ⚠ avaliar se ainda necessário com `/importar/xml`
+  - `importar_xmls_bulk.py` — ⚠ avaliar duplicidade com `importar_xmls_pasta.py`
+  - `backfill_catalogo_ean.py` — ⚠ uso pontual; verificar se já foi aplicado definitivamente
+  - `seed_aliases_cervejas.py` — ⚠ provavelmente absorvido por `seed_fabricantes_marcas.py`
+  - `seed_supabase.py` — ⚠ verificar o que faz e se ainda é necessário
+  - `check_cobertura.py` / `check_cobertura2.py` — ⚠ scripts de diagnóstico duplicados; unificar ou remover
+  - `check_categorias_db.py` — ⚠ diagnóstico pontual; avaliar remoção
+  - `apagar_ano.py` — ⚠ operação destrutiva; avaliar se tem uso legítimo ou deve ser removido
+  - `liberar_espaco_supabase.py` — ⚠ operação destrutiva; avaliar necessidade
+  - `_truncate_silver.py` — ⚠ prefixo `_` indica abandono; remover
+  - **Criar** `recalcular_gold_kpis.py` — recalcula gold para todos os tenants com base nas notas_fiscais (evita recálculo manual com tenant_id avulso)
 
 ### Escala (pós 50+ clientes)
 - [ ] **Dados anônimos para indústrias** — modelo IRI/Nielsen; requer ~50–100 lojas + contrato de uso secundário
