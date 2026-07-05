@@ -229,7 +229,7 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 | `docs/dicionario-de-dados.md` | ✅ |
 | `docs/pipeline-de-dados.md` | ⏳ |
 | `docs/pipeline-padronizacao.md` | ⏳ |
-| `docs/guia-de-desenvolvimento.md` | ⏳ |
+| `docs/guia-de-desenvolvimento.md` | ✅ |
 
 ---
 
