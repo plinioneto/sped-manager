@@ -158,6 +158,9 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [x] Importar Mar–Jul/2025: `python scripts/importar_efd.py --pasta "D:/Data Science/Projeto SPED/data/GS" --skip-padronizacao`
 - [x] Backfill após importação: `python scripts/backfill_padronizacao.py --todos`
 - [x] Confirmar `gold_kpis_mensais` populado para os 7 meses (Jan–Jul/2025, tenant_id=1)
+- [x] Reconstruído em projeto Supabase novo após incidente de perda de dados — ver [`docs/incidente-2026-07-supabase.md`](docs/incidente-2026-07-supabase.md)
+- [ ] Reimportar XML da Franmak (entrada + NFC-e) — tenant já cadastrado, dados ainda não importados
+- [ ] Decidir se "A A Miranda Comercial" (CNPJ 05370363000132) deve virar tenant — EFD local existe mas não há cadastro
 
 ### Passo 2 — Corrigir pipeline XML
 - [ ] Adicionar `upload_bytes()` no `xml_parser.py` antes de processar
@@ -202,19 +205,21 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [ ] **Definir tipo de cliente foco** — fiscal (contador) ou gestão (dono de loja)
 - [ ] **Revisão de scripts/** — auditar e remover scripts obsoletos; manter apenas o necessário. Lista atual:
   - `importar_efd.py` — ✅ pipeline principal, manter
-  - `backfill_padronizacao.py` — ✅ utilitário recorrente, manter
+  - `backfill_padronizacao.py` — ✅ utilitário recorrente, manter (bug do filtro `NULL` corrigido em 2026-07-06, ver incidente)
   - `seed_fabricantes_marcas.py` — ✅ seed idempotente, manter
+  - `seed_supabase.py` — ✅ bootstrap completo (categorias + fabricantes/marcas + tenants); confirmado útil na reconstrução pós-incidente de 2026-07, manter
   - `importar_xmls_pasta.py` — ⚠ avaliar se ainda necessário com `/importar/xml`
   - `importar_xmls_bulk.py` — ⚠ avaliar duplicidade com `importar_xmls_pasta.py`
   - `backfill_catalogo_ean.py` — ⚠ uso pontual; verificar se já foi aplicado definitivamente
   - `seed_aliases_cervejas.py` — ⚠ provavelmente absorvido por `seed_fabricantes_marcas.py`
-  - `seed_supabase.py` — ⚠ verificar o que faz e se ainda é necessário
   - `check_cobertura.py` / `check_cobertura2.py` — ⚠ scripts de diagnóstico duplicados; unificar ou remover
   - `check_categorias_db.py` — ⚠ diagnóstico pontual; avaliar remoção
   - `apagar_ano.py` — ⚠ operação destrutiva; avaliar se tem uso legítimo ou deve ser removido
   - `liberar_espaco_supabase.py` — ⚠ operação destrutiva; avaliar necessidade
   - `_truncate_silver.py` — ⚠ prefixo `_` indica abandono; remover
   - **Criar** `recalcular_gold_kpis.py` — recalcula gold para todos os tenants com base nas notas_fiscais (evita recálculo manual com tenant_id avulso)
+- [ ] **Squash das migrations do Alembic** — `8f8fc05b0864_initial_schema.py` usa `Base.metadata.create_all()` (reflete os models atuais), o que quebra a cadeia completa em um banco novo do zero (migrations intermediárias tentam alterar tabelas com nomes que já nasceram diferentes). Hoje contorna-se com `alembic upgrade 8f8fc05b0864 && alembic stamp head`; o ideal é squashar tudo numa migration inicial única e correta. Ver [`docs/incidente-2026-07-supabase.md`](docs/incidente-2026-07-supabase.md)
+- [ ] **Confirmar que nada mais referencia o projeto Supabase antigo** (`gzhcbrfbphqzhpvrsraa`) — checar deploys (Railway/Render), outros `.env` locais e o `.claude/worktrees/` antes de considerar o incidente 100% encerrado
 
 ### Escala (pós 50+ clientes)
 - [ ] **Dados anônimos para indústrias** — modelo IRI/Nielsen; requer ~50–100 lojas + contrato de uso secundário

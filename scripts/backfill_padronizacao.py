@@ -18,6 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from sqlalchemy import or_
+
 from app.utils.db import get_db
 from app.models.produto import Produto
 from app.models.marca import Marca
@@ -47,7 +49,10 @@ def main():
         # Sempre protege classificações manuais, exceto com --force
         if not args.force:
             q = q.filter(
-                ~Produto.origem_padronizacao.in_(["manual", "manual_sem_cat"])
+                or_(
+                    Produto.origem_padronizacao.is_(None),
+                    ~Produto.origem_padronizacao.in_(["manual", "manual_sem_cat"]),
+                )
             )
 
         produtos = q.order_by(Produto.tenant_id, Produto.descr_item).all()
