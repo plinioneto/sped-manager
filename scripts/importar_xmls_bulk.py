@@ -41,6 +41,7 @@ load_dotenv()
 from app.utils.db import get_db
 from app.models.tenant import Tenant
 from app.parser.xml_parser import XmlParser
+from app.services.gold_kpis_service import calcular_kpis_mes
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ def importar(pasta: Path, cnpj: str, ano: str | None, mes: str | None,
     invalidos   = 0
     erros       = 0
     t_inicio    = time.time()
+    meses_tocados: set = set()
 
     if skip_padronizacao:
         print("  (padronização desativada — rode backfill_padronizacao.py depois)")
@@ -158,6 +160,7 @@ def importar(pasta: Path, cnpj: str, ano: str | None, mes: str | None,
                     concluidos += res["concluidos"]
                     duplicatas += res["duplicatas"]
                     invalidos  += res["invalidos"]
+                    meses_tocados |= res["meses_tocados"]
                 except Exception as e:
                     erros += len(batch)
                     print(f"\n  ERRO no lote [{i}]: {e}")
@@ -208,6 +211,15 @@ def importar(pasta: Path, cnpj: str, ano: str | None, mes: str | None,
 
     finally:
         db_ctx.__exit__(None, None, None)
+
+    if meses_tocados:
+        print(f"\n\nRecalculando gold_kpis_mensais para {len(meses_tocados)} mes(es)...")
+        with get_db() as db_gold:
+            for ano, mes in sorted(meses_tocados):
+                try:
+                    calcular_kpis_mes(db_gold, tenant_id, ano, mes)
+                except Exception as e:
+                    print(f"  AVISO gold {ano}-{mes:02d}: {e} (continuando)")
 
     elapsed = time.time() - t_inicio
     print(f"\n\n{'='*60}")

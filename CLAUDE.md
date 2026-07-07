@@ -119,8 +119,8 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 | Silver H005/H010 | ✅ | inventário |
 | Silver K200 | ✅ | saldo de estoque |
 | Silver 0150 | ✅ | participantes → `fornecedores` |
-| XML NFC-e/NF-e | ✅ | `xml_parser.py`; dedup por chv_nfe; ⚠ não sobe ao R2 ainda |
-| Gold KPIs | ✅ | `gold_kpis_service.py`; ⚠ XML não recalcula gold ainda |
+| XML NFC-e/NF-e | ✅ | `xml_parser.py`; dedup por chv_nfe; sobe ao R2 (`xml/{cnpj}/{chv}.xml`) antes de persistir |
+| Gold KPIs | ✅ | `gold_kpis_service.py`; XML recalcula por mês tocado (`processar` direto, `processar_lote` via `meses_tocados` no chamador) |
 
 ### API FastAPI (`api/`)
 
@@ -162,9 +162,9 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [ ] Reimportar XML da Franmak (entrada + NFC-e) — tenant já cadastrado, dados ainda não importados
 - [ ] Decidir se "A A Miranda Comercial" (CNPJ 05370363000132) deve virar tenant — EFD local existe mas não há cadastro
 
-### Passo 2 — Corrigir pipeline XML
-- [ ] Adicionar `upload_bytes()` no `xml_parser.py` antes de processar
-- [ ] Chamar `calcular_kpis_arquivo()` ao final do `xml_parser.py`
+### Passo 2 — Corrigir pipeline XML ✅
+- [x] Adicionar `upload_bytes()` no `xml_parser.py` antes de processar
+- [x] Recalcular gold ao final do processamento (`calcular_kpis_mes`, por mês tocado)
 
 ### Passo 3 — Rotas FastAPI restantes
 - [ ] `api/routers/compras.py` — GET /compras/mensais, /compras/fornecedores

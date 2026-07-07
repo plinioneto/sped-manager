@@ -36,6 +36,8 @@ from app.models.icms_c190 import IcmsC190
 from app.models.produto import Produto
 from app.models.participante import Participante
 from app.models.marca import Marca
+from app.utils.r2 import upload_bytes, r2_key_xml
+from app.services.gold_kpis_service import calcular_kpis_mes
 
 try:
     from app.services.produto_padronizacao import processar_descricao
@@ -228,8 +230,10 @@ class XmlParser:
           3. session.add_all(docs) + flush()       (1 round trip para N docs)
           4. Itens + C190 + Produtos               (sem flush extra)
 
-        O chamador deve fazer session.commit() + expunge_all() ao final.
-        Retorna dict com: concluidos, duplicatas, invalidos, prod_criados.
+        O chamador deve fazer session.commit() + expunge_all() ao final, e só então
+        recalcular o gold para os meses em "meses_tocados" (calcular_kpis_mes faz
+        commit próprio — chamar antes do commit do lote violaria essa ordem).
+        Retorna dict com: concluidos, duplicatas, invalidos, prod_criados, meses_tocados.
         """
         concluidos = duplicatas = invalidos = 0
         prod_criados = 0
@@ -271,11 +275,17 @@ class XmlParser:
             if self._cache_chaves is not None:
                 self._cache_chaves.add(chv_nfe)
 
+            # Bronze — sobe o XML bruto ao R2 antes de processar (não bloqueia em caso de falha)
+            try:
+                upload_bytes(r2_key_xml(self.tenant_cnpj, chv_nfe), conteudo)
+            except Exception as e:
+                print(f"AVISO R2: {e} (continuando)")
+
             pendentes.append((inf_nfe, chv_nfe, mod, ind_oper))
 
         if not pendentes:
             return {"concluidos": 0, "duplicatas": duplicatas,
-                    "invalidos": invalidos, "prod_criados": 0}
+                    "invalidos": invalidos, "prod_criados": 0, "meses_tocados": set()}
 
         # ── Fase 2: upsert participantes (cache-first, sem flush) ─────────────
         for inf_nfe, chv_nfe, mod, ind_oper in pendentes:
@@ -303,11 +313,14 @@ class XmlParser:
             prod_criados += pc
             concluidos   += 1
 
+        meses_tocados = {(doc.dt_doc.year, doc.dt_doc.month) for doc in doc_objs if doc.dt_doc}
+
         return {
             "concluidos":    concluidos,
             "duplicatas":    duplicatas,
             "invalidos":     invalidos,
             "prod_criados":  prod_criados,
+            "meses_tocados": meses_tocados,
         }
 
     # ── Ponto de entrada — arquivo único ──────────────────────────────────────
@@ -359,6 +372,12 @@ class XmlParser:
                 "documentos": 0, "itens": 0, "produtos_criados": 0,
             }
 
+        # Bronze — sobe o XML bruto ao R2 antes de processar (não bloqueia em caso de falha)
+        try:
+            upload_bytes(r2_key_xml(self.tenant_cnpj, chv_nfe), conteudo)
+        except Exception as e:
+            print(f"AVISO R2: {e} (continuando)")
+
         # Persiste tudo em uma transação
         doc = self._criar_documento(inf_nfe, chv_nfe, mod, ind_oper)
         agg, prod_criados = self._processar_itens(inf_nfe, chv_nfe, doc, mod, ind_oper)
@@ -367,6 +386,11 @@ class XmlParser:
             self._cache_chaves.add(chv_nfe)
         if auto_commit:
             self.session.commit()
+            if doc.dt_doc:
+                try:
+                    calcular_kpis_mes(self.session, self.tenant_id, doc.dt_doc.year, doc.dt_doc.month)
+                except Exception as e:
+                    print(f"AVISO gold: {e} (continuando)")
 
         total_itens = sum(v["qtd_itens"] for v in agg.values())
         return {
