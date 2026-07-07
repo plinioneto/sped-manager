@@ -38,7 +38,7 @@ from app.models.icms_c190 import IcmsC190
 from app.models.produto import Produto
 from app.models.participante import Participante
 from app.models.marca import Marca
-from app.utils.r2 import upload_bytes, r2_key_xml
+from app.utils.r2 import upload_bytes, upload_lote, r2_key_xml
 from app.services.gold_kpis_service import calcular_kpis_mes
 
 try:
@@ -242,6 +242,7 @@ class XmlParser:
 
         # ── Fase 1: parse + filtragem (puro Python) ───────────────────────────
         pendentes: list[tuple] = []  # (inf_nfe, chv_nfe, mod, ind_oper)
+        pares_r2: list[tuple[str, bytes]] = []  # (key, conteudo) para upload em lote
 
         for conteudo, nome in lote:
             try:
@@ -260,9 +261,8 @@ class XmlParser:
                 invalidos += 1
                 continue
 
-            mod     = _text(inf_nfe, "ide", "mod")
-            tp_nf   = _text(inf_nfe, "ide", "tpNF")
-            ind_oper = "1" if (tp_nf == "1" or mod == "65") else "0"
+            mod      = _text(inf_nfe, "ide", "mod")
+            ind_oper = self._determinar_ind_oper(inf_nfe, mod)
 
             ok, _ = self._validar_cnpj(inf_nfe, mod, ind_oper)
             if not ok:
@@ -277,13 +277,14 @@ class XmlParser:
             if self._cache_chaves is not None:
                 self._cache_chaves.add(chv_nfe)
 
-            # Bronze — sobe o XML bruto ao R2 antes de processar (não bloqueia em caso de falha)
-            try:
-                upload_bytes(r2_key_xml(self.tenant_cnpj, chv_nfe), conteudo)
-            except Exception as e:
-                print(f"AVISO R2: {e} (continuando)")
-
+            pares_r2.append((r2_key_xml(self.tenant_cnpj, chv_nfe), conteudo))
             pendentes.append((inf_nfe, chv_nfe, mod, ind_oper))
+
+        # Bronze — sobe todo o lote ao R2 em paralelo (cada PUT é I/O-bound,
+        # ~0.5-1s de espera; sequencial inviabilizaria lotes grandes). Não bloqueia
+        # o processamento silver em caso de falha.
+        for key, erro in upload_lote(pares_r2):
+            print(f"AVISO R2 [{key}]: {erro} (continuando)")
 
         if not pendentes:
             return {"concluidos": 0, "duplicatas": duplicatas,
@@ -352,9 +353,8 @@ class XmlParser:
         if not chv_nfe or len(chv_nfe) != 44:
             return {"status": "invalido", "erro": f"Chave NF-e inválida: {chv_nfe!r}", "chv_nfe": chv_nfe or ""}
 
-        mod   = _text(inf_nfe, "ide", "mod")   # "55"=NF-e  "65"=NFC-e
-        tp_nf = _text(inf_nfe, "ide", "tpNF")  # "0"=entrada "1"=saída
-        ind_oper = "1" if (tp_nf == "1" or mod == "65") else "0"
+        mod      = _text(inf_nfe, "ide", "mod")   # "55"=NF-e  "65"=NFC-e
+        ind_oper = self._determinar_ind_oper(inf_nfe, mod)
 
         # Validação de CNPJ
         ok, cnpj_xml = self._validar_cnpj(inf_nfe, mod, ind_oper)
@@ -522,6 +522,25 @@ class XmlParser:
 
     def _extrair_chave(self, root: ET.Element, inf_nfe: ET.Element) -> str:
         return self._extrair_chave_static(root, inf_nfe)
+
+    def _determinar_ind_oper(self, inf_nfe: ET.Element, mod: str) -> str:
+        """
+        Determina ind_oper (0=entrada, 1=saída) do ponto de vista do tenant.
+        Não usa o tpNF cru do XML: tpNF reflete a operação de quem emitiu a nota
+        (o fornecedor, numa compra, sempre marca tpNF=1 porque é uma saída para
+        ELE), não o papel do tenant na transação. Compara CNPJ do tenant com
+        emit/dest — só cai no tpNF como fallback se nenhum dos dois bater.
+        """
+        if mod == "65":
+            return "1"  # NFC-e é sempre venda ao consumidor (saída)
+
+        if _limpar_cnpj(_text(inf_nfe, "emit", "CNPJ")) == self.tenant_cnpj:
+            return "1"  # tenant emitiu → saída
+        if _limpar_cnpj(_text(inf_nfe, "dest", "CNPJ")) == self.tenant_cnpj:
+            return "0"  # tenant recebeu → entrada
+
+        tp_nf = _text(inf_nfe, "ide", "tpNF")
+        return "1" if tp_nf == "1" else "0"
 
     def _validar_cnpj(
         self, inf_nfe: ET.Element, mod: str, ind_oper: str
