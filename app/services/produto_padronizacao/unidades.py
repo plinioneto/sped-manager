@@ -38,6 +38,9 @@ _PATTERN = re.compile(
 )
 
 
+_VALOR_MAXIMO = 100_000  # nenhum produto real pesa/mede isso — acima disso é código colado à unidade
+
+
 def extrair_unidade(texto: str) -> Optional[UnidadeMedida]:
     """
     Extrai a primeira ocorrência de quantidade + unidade no texto.
@@ -48,6 +51,9 @@ def extrair_unidade(texto: str) -> Optional[UnidadeMedida]:
     if not match:
         return None
     valor = float(match.group(1).replace(",", "."))
+    if valor > _VALOR_MAXIMO:
+        # ex: "COD. 9000000390KG" — código de produto colado à unidade, não uma medida real
+        return None
     unidade = _CANONICAL.get(match.group(2).upper(), match.group(2).upper())
     return UnidadeMedida(valor=valor, unidade=unidade)
 

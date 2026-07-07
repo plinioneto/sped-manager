@@ -106,8 +106,9 @@ def main():
                     print(f"  {i}/{total} processados...")
 
             except Exception as e:
+                db.rollback()  # sessão fica inutilizável após erro de flush até isso rodar
                 erros += 1
-                print(f"  [ERRO] {produto.cod_item} — {e}")
+                print(f"  [ERRO] produto id={produto.id} — {e}")
 
         db.commit()
 
