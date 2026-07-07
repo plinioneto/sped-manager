@@ -11,14 +11,16 @@ Fluxo por XML:
   1. Remove namespace → parse com ElementTree (stdlib)
   2. Valida chave NF-e (44 dígitos) e CNPJ do tenant
   3. Checa duplicata por chv_nfe
-  4. Upsert Participante (emit ou dest conforme tipo)
-  5. Cria DocumentoFiscal
-  6. Para cada <det>: upsert Produto + cria ItemFiscal
-  7. Deriva IcmsC190 por agregação CST/CFOP/alíquota
-  8. commit() único ao final
+  4. Bronze: sobe o XML bruto ao R2 (xml/{cnpj}/{chv}.xml)
+  5. Upsert Participante (emit ou dest conforme tipo)
+  6. Cria DocumentoFiscal
+  7. Para cada <det>: upsert Produto; cria ItemFiscal (exceto NFC-e mod=65 — ver abaixo)
+  8. Deriva IcmsC190 por agregação CST/CFOP/alíquota
+  9. commit() único ao final; recalcula gold_kpis_mensais do(s) mês(es) tocado(s)
 
-Bronze ignorado: XML não é linha-a-linha como EFD → vai direto para silver.
-Schema não muda: todos os models já existem com os campos necessários.
+NFC-e (mod=65) não persiste item a item em ItemFiscal — volume proibitivo em escala
+(~300 GB, ver docs/arquitetura-dados.md). O XML bruto no R2 cobre reprocessamento
+sob demanda; notas_fiscais e resumo_fiscal (C190 agregado) continuam completos.
 """
 
 import io
@@ -705,32 +707,35 @@ class XmlParser:
             if criado:
                 prod_criados += 1
 
-            # Documento é novo (verificado via cache de chaves) →
-            # itens desta chave não podem existir no banco; INSERT direto.
             try:
                 aliq_float = float(aliq_str.replace(",", "."))
             except (ValueError, AttributeError):
                 aliq_float = 0.0
 
-            self.session.add(ItemFiscal(
-                tenant_id    = self.tenant_id,
-                chv_nfe      = chv_nfe,
-                documento_id = doc.id,
-                num_item     = num_item,
-                cod_item     = cod_item,
-                descr_compl  = xprod,
-                qtd          = q_com,
-                unid         = u_com,
-                vl_item      = v_prod,
-                vl_desc      = v_desc,
-                cst_icms     = cst,
-                cfop         = cfop,
-                vl_bc_icms   = vbc_icms,
-                aliq_icms    = aliq_float,
-                vl_icms      = v_icms,
-                vl_pis       = v_pis,
-                vl_cofins    = v_cofins,
-            ))
+            # NFC-e de saída não persiste item a item — volume proibitivo em escala
+            # (~300 GB, ver docs/arquitetura-dados.md). XML bruto no R2 cobre reprocessamento.
+            # Documento é novo (verificado via cache de chaves) → itens desta chave
+            # não podem existir no banco; INSERT direto.
+            if mod != "65":
+                self.session.add(ItemFiscal(
+                    tenant_id    = self.tenant_id,
+                    chv_nfe      = chv_nfe,
+                    documento_id = doc.id,
+                    num_item     = num_item,
+                    cod_item     = cod_item,
+                    descr_compl  = xprod,
+                    qtd          = q_com,
+                    unid         = u_com,
+                    vl_item      = v_prod,
+                    vl_desc      = v_desc,
+                    cst_icms     = cst,
+                    cfop         = cfop,
+                    vl_bc_icms   = vbc_icms,
+                    aliq_icms    = aliq_float,
+                    vl_icms      = v_icms,
+                    vl_pis       = v_pis,
+                    vl_cofins    = v_cofins,
+                ))
 
             # Acumula para C190
             chave_c190 = (cst, cfop, aliq_str)
