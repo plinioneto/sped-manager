@@ -197,7 +197,7 @@ def _resolver_fabricante(marca: str) -> str | None:
 
 def identificar_marca_e_fabricante(
     texto: str,
-) -> tuple[str | None, str | None, float]:
+) -> tuple[str | None, str | None, float, str | None]:
     """
     Identifica marca e fabricante a partir do texto (já limpo/expandido).
 
@@ -207,10 +207,14 @@ def identificar_marca_e_fabricante(
 
     Fallback: fuzzy matching com RapidFuzz (score >= 85, tokens >= 4 chars).
 
-    Retorna: (marca_canônica, fabricante, score)
+    Retorna: (marca_canônica, fabricante, score, texto_encontrado)
       - score 1.0    → match exato por token ou bigrama
       - score 0.85+  → match fuzzy (RapidFuzz)
       - score 0.0    → não identificado
+      - texto_encontrado — o alias/trecho literal como apareceu no texto de
+        origem (pode divergir do nome canônico, ex: "COCA" → "COCA COLA").
+        Usado para remover a marca da descrição base sem depender do nome
+        canônico estar presente no texto original.
     """
     tokens = texto.upper().split()
 
@@ -220,25 +224,25 @@ def identificar_marca_e_fabricante(
         # banco primeiro
         if bigrama in _ALIAS_INDEX_DB:
             marca = _ALIAS_INDEX_DB[bigrama]
-            return marca, _resolver_fabricante(marca), 1.0
+            return marca, _resolver_fabricante(marca), 1.0, bigrama
         if bigrama in _ALIAS_INDEX:
             marca = _ALIAS_INDEX[bigrama]
-            return marca, _resolver_fabricante(marca), 1.0
+            return marca, _resolver_fabricante(marca), 1.0, bigrama
 
     for token in tokens:
         if token in _ALIAS_INDEX_DB:
             marca = _ALIAS_INDEX_DB[token]
-            return marca, _resolver_fabricante(marca), 1.0
+            return marca, _resolver_fabricante(marca), 1.0, token
         if token in _ALIAS_INDEX:
             marca = _ALIAS_INDEX[token]
-            return marca, _resolver_fabricante(marca), 1.0
+            return marca, _resolver_fabricante(marca), 1.0, token
 
     # ── Fuzzy matching (fallback) ────────────────────────────────────────────
     if _HAS_RAPIDFUZZ:
         aliases = _todos_aliases()
         alias_keys = list(aliases.keys())
         if not alias_keys:
-            return None, None, 0.0
+            return None, None, 0.0, None
 
         # Testa bigramas primeiro, depois unigramas (excluindo blacklist)
         candidatos = []
@@ -262,6 +266,6 @@ def identificar_marca_e_fabricante(
                 if abs(len(candidato) - len(alias_match)) > 3:
                     continue
                 marca = aliases[alias_match]
-                return marca, _resolver_fabricante(marca), round(score_fuzzy / 100, 2)
+                return marca, _resolver_fabricante(marca), round(score_fuzzy / 100, 2), candidato
 
-    return None, None, 0.0
+    return None, None, 0.0, None

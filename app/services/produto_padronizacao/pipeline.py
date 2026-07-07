@@ -25,7 +25,16 @@ _TIPOS_PRODUTO: set[str] = {
     "DESINFETANTE", "AMACIANTE",
     "CAFE", "CHA", "ACHOCOLATADO", "ENERGETICO",
     "MUSSARELA", "MORTADELA",
+    # Compostos com "DE" no meio (ex: "AZEITE DE OLIVA") — ver _identificar_tipo_produto
+    "AZEITE OLIVA", "OLEO SOJA", "OLEO CANOLA", "OLEO GIRASSOL", "OLEO COCO",
+    "LEITE COCO", "CREME LEITE", "LEITE CONDENSADO",
 }
+
+# Termos de categoria genéricos demais para aparecer na descrição final quando
+# já existe um tipo_produto mais específico (ex: "BEBIDA" antes de "ENERGETICO").
+# Não entra em _STOPWORDS de limpeza.py de propósito — "BEBIDA" ainda precisa
+# estar presente para o matching de expandir_abreviacoes() e categorizador.py.
+_TERMOS_GENERICOS_REDUNDANTES: set[str] = {"BEBIDA", "BEBIDAS"}
 
 # Atributos do produto que devem ser extraídos separadamente.
 # São removidos da descrição antes da categorização (reduz ruído) e
@@ -158,9 +167,9 @@ def processar_descricao(
 
     # 4. Extração de campos estruturados
     um = extrair_unidade(expandida)
-    marca, fabricante, score_marca = identificar_marca_e_fabricante(expandida)
+    marca, fabricante, score_marca, marca_encontrada = identificar_marca_e_fabricante(expandida)
     tipo_embalagem = _identificar_embalagem(expandida)
-    tipo_produto = _identificar_tipo_produto(expandida)
+    tipo_produto, tipo_produto_encontrado = _identificar_tipo_produto(expandida)
 
     # 5. Categorização (usa texto completo para máximo contexto)
     cat: ResultadoCategorizacao | None = None
@@ -170,9 +179,11 @@ def processar_descricao(
         except Exception:
             pass
 
-    # 6. Descrição padronizada (ordem canônica: produto + atributos + embalagem + volume)
+    # 6. Descrição padronizada (ordem canônica: tipo + marca + base + atributos + embalagem + volume)
     descricao_padrao = _montar_descricao_padrao(
-        texto_sem_atributos, um, atributos, tipo_embalagem
+        texto_sem_atributos, um, atributos, tipo_embalagem,
+        tipo_produto=tipo_produto, tipo_produto_encontrado=tipo_produto_encontrado,
+        marca=marca, marca_encontrada=marca_encontrada,
     ).lower()
 
     # 7. Tokens desconhecidos — salva no banco para revisão futura
@@ -221,18 +232,31 @@ def _identificar_embalagem(texto: str) -> Optional[str]:
     return None
 
 
-def _identificar_tipo_produto(texto: str) -> Optional[str]:
+def _identificar_tipo_produto(texto: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Retorna (tipo_canonico, tipo_encontrado).
+    tipo_encontrado é o trecho literal do texto (usado pra remoção da base);
+    tipo_canonico é a forma normalizada exibida na descrição padronizada —
+    diverge quando o composto tem "DE" no meio, ex: "AZEITE DE OLIVA" no texto
+    → tipo_canonico="AZEITE OLIVA", tipo_encontrado="AZEITE DE OLIVA".
+    """
     tokens = texto.upper().split()
-    # bigramas
+    # bigramas adjacentes
     for i in range(len(tokens) - 1):
         bg = f"{tokens[i]} {tokens[i + 1]}"
         if bg in _TIPOS_PRODUTO:
-            return bg
+            return bg, bg
+    # bigramas com "DE" no meio (ex: "AZEITE DE OLIVA" → bate "AZEITE OLIVA")
+    for i in range(len(tokens) - 2):
+        if tokens[i + 1] == "DE":
+            bg = f"{tokens[i]} {tokens[i + 2]}"
+            if bg in _TIPOS_PRODUTO:
+                return bg, f"{tokens[i]} DE {tokens[i + 2]}"
     # unigramas
     for token in tokens:
         if token in _TIPOS_PRODUTO:
-            return token
-    return None
+            return token, token
+    return None, None
 
 
 def _remover_tokens_embalagem(texto: str) -> str:
@@ -243,30 +267,54 @@ def _remover_tokens_embalagem(texto: str) -> str:
     return re.sub(r"\s+", " ", " ".join(limpo)).strip()
 
 
+def _remover_texto(base: str, alvo: Optional[str]) -> str:
+    """Remove a primeira ocorrência de `alvo` (uma ou mais palavras) da base."""
+    if not alvo:
+        return base
+    import re
+    padrao = re.compile(r"\b" + re.escape(alvo) + r"\b", re.IGNORECASE)
+    return re.sub(r"\s+", " ", padrao.sub("", base, count=1)).strip()
+
+
 def _montar_descricao_padrao(
     texto: str,
     um: Optional[UnidadeMedida],
     atributos: list[str] | None = None,
     tipo_embalagem: Optional[str] = None,
+    tipo_produto: Optional[str] = None,
+    tipo_produto_encontrado: Optional[str] = None,
+    marca: Optional[str] = None,
+    marca_encontrada: Optional[str] = None,
 ) -> str:
     """
     Monta descrição padronizada em ordem canônica:
-        [produto / descrição base] [atributos] [embalagem] [volume]
+        [tipo de produto] [marca] [produto / resíduo] [atributos] [embalagem] [volume]
+
+    tipo_produto e marca são extraídos da base e recolocados em posição fixa —
+    duas descrições de origem diferente para o mesmo produto (tenants distintos,
+    grafias distintas) convergem pro mesmo início de string, mesmo quando o
+    resíduo (hoje sem dicionário de sabor/variante) ainda diverge. Subtipos que
+    completam o próprio tipo (azeite DE oliva, óleo DE soja) não sobram no
+    resíduo — entram em _TIPOS_PRODUTO como composto (ex: "AZEITE OLIVA"),
+    reconhecidos por _identificar_tipo_produto mesmo com "DE" no meio do texto
+    original; só sabor/variante de marca (ex: "kuat laranja") fica no resíduo,
+    que por isso vem depois da marca.
 
     Exemplo:
-        "AZEITE OLIVA ANDORINHA EXTRA VIRGEM VD 250ML"
-        → extrair_atributos remove EXTRA VIRGEM → texto_sem_atributos = "AZEITE OLIVA ANDORINHA VD"
-        → _montar_descricao_padrao remove VD do base → base = "AZEITE OLIVA ANDORINHA"
-        → atributos = ["EXTRA VIRGEM"], tipo_embalagem = "VIDRO", volume = "250ML"
+        "AZEITE DE OLIVA ANDORINHA EXTRA VIRGEM VD 250ML"
+        → tipo_produto="AZEITE OLIVA" (tipo_produto_encontrado="AZEITE DE OLIVA")
+        → marca="ANDORINHA" (marca_encontrada="ANDORINHA")
+        → extrair_atributos remove EXTRA VIRGEM → texto_sem_atributos = "AZEITE DE OLIVA ANDORINHA VD"
+        → remove embalagem (VD), tipo_produto_encontrado e marca → resíduo = ""
         → resultado = "AZEITE OLIVA ANDORINHA EXTRA VIRGEM VIDRO 250ML"
     """
     import re
-    _PATTERN = re.compile(
-        r"\b\d+(?:[.,]\d+)?\s*(?:ML|LTS?|CL|KGS?|GRS?|MG|UND?|UNI|UNID|PCS?|CX|DZ|PCT?|RL|PR|FD)\b",
-        re.IGNORECASE,
-    )
-    # 1. Remove padrões de quantidade/volume embutidos no texto
-    base = _PATTERN.sub("", texto).strip()
+    # 1. Remove só o trecho de quantidade/volume que foi de fato extraído (não
+    #    qualquer coisa que "pareça" quantidade — um produto pode ter mais de
+    #    um número com unidade no texto, ex: "50UN 500G", e só um vira `um`).
+    base = texto
+    if um and um.texto_encontrado:
+        base = _remover_texto(base, um.texto_encontrado)
     base = re.sub(r"\s+", " ", base).strip()
 
     # 2. Remove tokens de embalagem que sobram na base
@@ -274,8 +322,24 @@ def _montar_descricao_padrao(
     if tipo_embalagem:
         base = _remover_tokens_embalagem(base)
 
-    # 3. Monta ordem canônica
-    partes = [base]
+    # 3. Remove tipo de produto e marca da base — recolocados em posição fixa
+    #    abaixo. tipo_produto_encontrado/marca_encontrada são os trechos literais
+    #    do texto (podem divergir do valor canônico, ex: "AZEITE DE OLIVA" →
+    #    "AZEITE OLIVA"; "COCA" → "COCA COLA").
+    base = _remover_texto(base, tipo_produto_encontrado)
+    base = _remover_texto(base, marca_encontrada)
+
+    # 3b. Termos de categoria genéricos ("BEBIDA") só são redundância quando já
+    #     temos um tipo mais específico (ex: ENERGETICO) pra mostrar no lugar.
+    #     Não remove em limpar_descricao() porque "BEBIDA" ainda é usado como
+    #     gatilho de contexto em expandir_abreviacoes() e como chave de
+    #     categorização em categorizador.py — remover cedo demais quebraria os dois.
+    if tipo_produto:
+        for termo in _TERMOS_GENERICOS_REDUNDANTES:
+            base = _remover_texto(base, termo)
+
+    # 4. Monta ordem canônica
+    partes = [tipo_produto, marca, base]
     if atributos:
         partes.append(" ".join(atributos))
     if tipo_embalagem:

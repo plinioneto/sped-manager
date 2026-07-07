@@ -7,6 +7,7 @@ from typing import Optional
 class UnidadeMedida:
     valor: float
     unidade: str  # normalizada: ML, L, G, KG, UN, etc.
+    texto_encontrado: str = ""  # trecho literal casado no texto (ex: "500G") — usado para remoção pontual
 
 
 # Aliases → unidade canônica
@@ -33,7 +34,7 @@ _CANONICAL: dict[str, str] = {
 # Padrão regex: número (inteiro ou decimal) + unidade colada ou separada por espaço
 _PATTERN = re.compile(
     r"(\d+(?:[.,]\d+)?)\s*"
-    r"(ML|MIL|LTS?|CL|KGS?|GRS?|MG|UND?|UNI|UNID|PCS?|CX|DZ|PCT?|RL|PR|FD)\b",
+    r"(ML|MIL|LTS?|L|CL|KGS?|GRS?|G|MG|UND?|UNI|UNID|PCS?|CX|DZ|PCT?|RL|PR|FD)\b",
     re.IGNORECASE,
 )
 
@@ -55,7 +56,7 @@ def extrair_unidade(texto: str) -> Optional[UnidadeMedida]:
         # ex: "COD. 9000000390KG" — código de produto colado à unidade, não uma medida real
         return None
     unidade = _CANONICAL.get(match.group(2).upper(), match.group(2).upper())
-    return UnidadeMedida(valor=valor, unidade=unidade)
+    return UnidadeMedida(valor=valor, unidade=unidade, texto_encontrado=match.group(0).strip())
 
 
 def formatar_unidade(um: Optional[UnidadeMedida]) -> str:
