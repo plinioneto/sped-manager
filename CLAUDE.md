@@ -200,6 +200,8 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 
 ### Qualidade
 - [ ] **Categorizador no banco** — tabelas `regras_abreviacao` e `regras_categorizacao` editáveis pelo admin; elimina ciclo "edita Python → deploy"
+- [ ] **Classificação por IA/LLM como fallback** — produtos com `revisao_necessaria=True` (pipeline de regras não cobriu) caem numa chamada de LLM antes de ir pra fila de revisão manual; reduziria o volume da fila e aumentaria a cobertura além dos ~70,6% atuais
+- [ ] **Recalibrar como o score de confiança é calculado** — hoje `categorizador.py` usa constantes fixas por regra (0.98/0.97/0.95/0.90) e Jaccard como fallback (`app/services/produto_padronizacao/categorizador.py:891-981`), sem calibração contra acerto real; motivou o corte por score em `catalogo_repo.py` (2026-07-07) — vale revisar se os números realmente refletem confiança antes de depender mais deles
 - [ ] **Dividir `08_admin_revisao.py`** — 1.400+ linhas; separar em módulos por domínio
 - [ ] **Testes de unidade** — parser silver + `processar_descricao`; 20–30 testes dão segurança para refatorar
 - [ ] **Definir tipo de cliente foco** — fiscal (contador) ou gestão (dono de loja)

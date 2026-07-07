@@ -25,12 +25,17 @@ class CatalogoProdutoRepository:
 
     def upsert_from_produto(self, produto, cod_barra: str) -> CatalogoProduto:
         """Cria ou atualiza entrada no catálogo global com base em um Produto já classificado.
-        Nunca sobrescreve entradas com origem='manual'.
+        Nunca sobrescreve entradas com origem='manual'. Entre classificações automáticas,
+        só sobrescreve se o novo score_categoria for igual ou maior — sem isso, o tenant
+        que reimportasse por último decidiria a descrição pra todo mundo, mesmo com uma
+        classificação pior que a que já estava lá.
         """
         entrada = self.buscar_por_ean(cod_barra)
 
         if entrada:
             if entrada.origem_padronizacao == 'manual':
+                return entrada
+            if (produto.score_categoria or 0) < (entrada.score_categoria or 0):
                 return entrada
             entrada.descricao_padrao    = produto.descricao_padrao
             entrada.tipo_produto        = produto.tipo_produto
