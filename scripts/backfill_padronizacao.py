@@ -2,6 +2,11 @@
 Roda o pipeline de padronização em todos os produtos que ainda não foram
 processados (descricao_padrao IS NULL) ou que precisam de revisão.
 
+Também sincroniza catalogo_produtos pra cada produto classificado com EAN
+válido — não precisa rodar backfill_catalogo_ean.py depois no fluxo comum;
+esse script continua existindo separado só pra re-sincronizar o catálogo
+sem reclassificar tudo (ex: depois de uma mudança em catalogo_repo.py).
+
 Uso:
     cd D:\Data Science\Projeto SPED\Dashboard\sped-manager
     python scripts/backfill_padronizacao.py
@@ -25,6 +30,7 @@ from app.models.produto import Produto
 from app.models.marca import Marca
 from app.services.produto_padronizacao import processar_descricao
 from app.services.produto_padronizacao.identificador import carregar_marcas_do_banco
+from app.repositories.catalogo_repo import CatalogoProdutoRepository, ean_valido
 
 
 def main():
@@ -68,6 +74,8 @@ def main():
         com_cat      = 0
         revisao      = 0
         erros        = 0
+        catalogo_sync = 0
+        catalogo_repo = CatalogoProdutoRepository(db)
 
         for i, produto in enumerate(produtos, 1):
             try:
@@ -98,6 +106,13 @@ def main():
                 if resultado.revisao_necessaria:
                     revisao += 1
 
+                # Sincroniza o catálogo global — upsert_from_produto já protege
+                # entradas 'manual' e não sobrescreve uma classificação melhor
+                # com uma pior (corte por score_categoria).
+                if ean_valido(produto.cod_barra or "") and (produto.categoria_id or produto.grupo_id):
+                    catalogo_repo.upsert_from_produto(produto, produto.cod_barra)
+                    catalogo_sync += 1
+
                 processados += 1
 
                 # Commit em lotes de 500
@@ -119,6 +134,7 @@ def main():
     print(f"  Com marca        : {com_marca}")
     print(f"  Com categoria    : {com_cat}")
     print(f"  Revisao manual   : {revisao}")
+    print(f"  Catalogo sync    : {catalogo_sync}")
     print(f"  Erros            : {erros}")
     print(f"  Taxa classificac.: {com_cat/processados:.0%}" if processados else "")
     print("-" * 40)
