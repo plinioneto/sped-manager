@@ -232,6 +232,9 @@ def _identificar_embalagem(texto: str) -> Optional[str]:
     return None
 
 
+_NEGACOES: set[str] = {"SEM"}  # precede o tipo sem ser o tipo — "SEM ACUCAR" não é tipo="ACUCAR"
+
+
 def _identificar_tipo_produto(texto: str) -> tuple[Optional[str], Optional[str]]:
     """
     Retorna (tipo_canonico, tipo_encontrado).
@@ -239,21 +242,32 @@ def _identificar_tipo_produto(texto: str) -> tuple[Optional[str], Optional[str]]
     tipo_canonico é a forma normalizada exibida na descrição padronizada —
     diverge quando o composto tem "DE" no meio, ex: "AZEITE DE OLIVA" no texto
     → tipo_canonico="AZEITE OLIVA", tipo_encontrado="AZEITE DE OLIVA".
+
+    Ignora matches logo após "SEM" — "COCA COLA SEM ACUCAR" não deve virar
+    tipo_produto="ACUCAR" (o produto é refrigerante, "sem açúcar" é atributo,
+    não o tipo). Não depende de "SEM X" estar cadastrado em _ATRIBUTOS: aqui é
+    uma regra geral de negação, aplicada a qualquer palavra de _TIPOS_PRODUTO.
     """
     tokens = texto.upper().split()
     # bigramas adjacentes
     for i in range(len(tokens) - 1):
+        if i > 0 and tokens[i - 1] in _NEGACOES:
+            continue
         bg = f"{tokens[i]} {tokens[i + 1]}"
         if bg in _TIPOS_PRODUTO:
             return bg, bg
     # bigramas com "DE" no meio (ex: "AZEITE DE OLIVA" → bate "AZEITE OLIVA")
     for i in range(len(tokens) - 2):
+        if i > 0 and tokens[i - 1] in _NEGACOES:
+            continue
         if tokens[i + 1] == "DE":
             bg = f"{tokens[i]} {tokens[i + 2]}"
             if bg in _TIPOS_PRODUTO:
                 return bg, f"{tokens[i]} DE {tokens[i + 2]}"
     # unigramas
-    for token in tokens:
+    for i, token in enumerate(tokens):
+        if i > 0 and tokens[i - 1] in _NEGACOES:
+            continue
         if token in _TIPOS_PRODUTO:
             return token, token
     return None, None
@@ -325,7 +339,7 @@ def _montar_descricao_padrao(
     # 3. Remove tipo de produto e marca da base — recolocados em posição fixa
     #    abaixo. tipo_produto_encontrado/marca_encontrada são os trechos literais
     #    do texto (podem divergir do valor canônico, ex: "AZEITE DE OLIVA" →
-    #    "AZEITE OLIVA"; "COCA" → "COCA COLA").
+    #    "AZEITE OLIVA"; "COCA" → "COCA-COLA").
     base = _remover_texto(base, tipo_produto_encontrado)
     base = _remover_texto(base, marca_encontrada)
 

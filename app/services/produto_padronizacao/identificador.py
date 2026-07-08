@@ -33,7 +33,7 @@ MARCAS_CONHECIDAS: dict[str, dict] = {
     "LYSOL":        {"fabricante": "RECKITT",           "aliases": ["LYSOL"],                         "categoria": "limpeza"},
     "VANISH":       {"fabricante": "RECKITT",           "aliases": ["VANISH"],                        "categoria": "limpeza"},
     # ── Bebidas ───────────────────────────────────────────────────────
-    "COCA COLA":    {"fabricante": "THE COCA-COLA CO",  "aliases": ["COCA", "COCA-COLA", "COCACOLA", "COCA COLA"], "categoria": "bebidas"},
+    "COCA-COLA":    {"fabricante": "THE COCA-COLA CO",  "aliases": ["COCA", "COCA-COLA", "COCACOLA", "COCA COLA"], "categoria": "bebidas"},
     "PEPSI":        {"fabricante": "PEPSICO",           "aliases": ["PEPSI", "PEPSI-COLA"],           "categoria": "bebidas"},
     "GUARANA ANTARCTICA": {"fabricante": "AMBEV",       "aliases": ["GUARANA ANT", "GUARANA ANTARC"], "categoria": "bebidas"},
     "BRAHMA":       {"fabricante": "AMBEV",             "aliases": ["BRAHMA"],                        "categoria": "bebidas"},
@@ -212,7 +212,7 @@ def identificar_marca_e_fabricante(
       - score 0.85+  → match fuzzy (RapidFuzz)
       - score 0.0    → não identificado
       - texto_encontrado — o alias/trecho literal como apareceu no texto de
-        origem (pode divergir do nome canônico, ex: "COCA" → "COCA COLA").
+        origem (pode divergir do nome canônico, ex: "COCA" → "COCA-COLA").
         Usado para remover a marca da descrição base sem depender do nome
         canônico estar presente no texto original.
     """
