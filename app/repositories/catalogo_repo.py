@@ -35,7 +35,12 @@ class CatalogoProdutoRepository:
         if entrada:
             if entrada.origem_padronizacao == 'manual':
                 return entrada
-            if (produto.score_categoria or 0) < (entrada.score_categoria or 0):
+            # float() nos dois lados: produto.score_categoria é float em memória até
+            # o flush, entrada.score_categoria vem do banco como Decimal — comparar
+            # sem normalizar faz 0.98 (float) < Decimal('0.9800') dar True por
+            # imprecisão de ponto flutuante, bloqueando silenciosamente toda
+            # atualização com score igual (o caso mais comum ao reprocessar).
+            if float(produto.score_categoria or 0) < float(entrada.score_categoria or 0):
                 return entrada
             entrada.descricao_padrao    = produto.descricao_padrao
             entrada.tipo_produto        = produto.tipo_produto
