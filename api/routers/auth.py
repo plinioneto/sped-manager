@@ -1,7 +1,7 @@
 """
-POST /auth/token   → login por CNPJ + senha
-POST /auth/senha   → define/troca senha (primeira vez ou reset)
-GET  /auth/me      → dados do tenant autenticado
+POST /auth/token   → login (CNPJ para cliente, e-mail para admin) + senha
+POST /auth/senha   → troca a própria senha (exige autenticação + senha atual)
+GET  /auth/me      → dados do usuário autenticado (+ produtos SaaS ativos, se cliente)
 """
 
 import re
@@ -10,10 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Optional
 
+from app.models.usuario import Usuario
 from app.models.tenant import Tenant
+from app.models.produto_saas import ProdutoSaas
+from app.models.tenant_produto_saas import TenantProdutoSaas
 from api.auth import criar_token, hash_senha, verificar_senha
-from api.deps import get_db, get_tenant
+from api.deps import get_db, get_current_usuario
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -21,13 +25,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    tenant_id: int
+    role: str
+    tenant_id: Optional[int] = None
     nome: str
-    cnpj: str
+    login: str
 
 
 class SenhaRequest(BaseModel):
-    cnpj: str
+    senha_atual: str
     nova_senha: str
 
 
@@ -36,45 +41,70 @@ def login(
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    cnpj   = re.sub(r"\D", "", form.username)
-    tenant = db.query(Tenant).filter(Tenant.cnpj == cnpj, Tenant.ativo == True).first()
+    raw    = form.username.strip()
+    digits = re.sub(r"\D", "", raw)
+    lower  = raw.lower()
 
-    if not tenant:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="CNPJ não cadastrado")
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.login.in_({digits, lower}), Usuario.ativo == True)
+        .first()
+    )
 
-    if not tenant.senha_hash:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Senha não configurada — use POST /auth/senha para definir",
-        )
+    if not usuario:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
 
-    if not verificar_senha(form.password, tenant.senha_hash):
+    if not verificar_senha(form.password, usuario.senha_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta")
 
+    if usuario.role == "cliente":
+        tenant = db.query(Tenant).filter(Tenant.id == usuario.tenant_id).first()
+        if not tenant or not tenant.ativo:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cliente inativo")
+
     return TokenResponse(
-        access_token=criar_token(tenant.id, tenant.cnpj),
-        tenant_id=tenant.id,
-        nome=tenant.nome,
-        cnpj=tenant.cnpj,
+        access_token=criar_token(usuario.id, usuario.role, usuario.tenant_id),
+        role=usuario.role,
+        tenant_id=usuario.tenant_id,
+        nome=usuario.nome,
+        login=usuario.login,
     )
 
 
 @router.post("/senha", status_code=204)
-def definir_senha(body: SenhaRequest, db: Session = Depends(get_db)):
-    """Define senha pela primeira vez. Em produção, proteger com código de convite."""
-    cnpj   = re.sub(r"\D", "", body.cnpj)
-    tenant = db.query(Tenant).filter(Tenant.cnpj == cnpj).first()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="CNPJ não cadastrado")
-    tenant.senha_hash = hash_senha(body.nova_senha)
+def trocar_senha(
+    body: SenhaRequest,
+    usuario: Usuario = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    if not verificar_senha(body.senha_atual, usuario.senha_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha atual incorreta")
+    usuario.senha_hash = hash_senha(body.nova_senha)
     db.commit()
 
 
 @router.get("/me")
-def me(tenant: Tenant = Depends(get_tenant)):
-    return {
-        "tenant_id": tenant.id,
-        "nome":      tenant.nome,
-        "cnpj":      tenant.cnpj,
-        "grupo_id":  tenant.grupo_id,
+def me(
+    usuario: Usuario = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+):
+    out = {
+        "usuario_id": usuario.id,
+        "nome":       usuario.nome,
+        "login":      usuario.login,
+        "role":       usuario.role,
+        "tenant_id":  usuario.tenant_id,
     }
+    if usuario.role == "cliente":
+        slugs = (
+            db.query(ProdutoSaas.slug)
+            .join(TenantProdutoSaas, TenantProdutoSaas.produto_saas_id == ProdutoSaas.id)
+            .filter(
+                TenantProdutoSaas.tenant_id == usuario.tenant_id,
+                TenantProdutoSaas.ativo == True,
+                ProdutoSaas.ativo == True,
+            )
+            .all()
+        )
+        out["produtos_ativos"] = [s[0] for s in slugs]
+    return out

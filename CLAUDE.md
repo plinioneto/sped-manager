@@ -10,8 +10,8 @@ Multi-tenant (uma instância, N clientes). Streamlit legado em transição para 
 | Camada | Tecnologia | Status |
 |--------|-----------|--------|
 | Backend API | FastAPI (`api/`) | ✅ estrutura base criada |
-| Frontend | React + Tremor | ⏳ a criar |
-| Auth | JWT bcrypt (`api/auth.py`) | ✅ implementado |
+| Frontend | React + Tremor (`frontend/`) | ✅ v1 criada (login + admin + dashboard) |
+| Auth | JWT (PyJWT) + bcrypt, roles admin/cliente (`api/auth.py`) | ✅ implementado |
 | Banco | Supabase PostgreSQL (prod) / SQLite (dev) | ✅ ativo |
 | Armazenamento raw | Cloudflare R2 (`app/utils/r2.py`) | ✅ ativo |
 | Interface legada | Streamlit (`app/pages/`) | ⚠ em transição |
@@ -59,6 +59,7 @@ alembic/                migrations
 | InventarioH005/H010 | `inventario_h005/h010` | cabeçalho e itens de inventário |
 | EstoqueK200 | `estoque_k200` | saldo de estoque |
 | GoldKpisMensais | `gold_kpis_mensais` | KPIs pré-calculados por tenant+mês |
+| TenantProdutoSaas | `tenant_produtos_saas` | entitlement — quais produtos SaaS estão ativos por tenant |
 
 ### Globais (sem tenant_id)
 
@@ -70,6 +71,8 @@ alembic/                migrations
 | Departamento/Grupo/Categoria | `departamentos_produto`, `grupos_produto`, `categorias_produto` | hierarquia 18 > 118 > 720 |
 | CatalogoProduto | `catalogo_produtos` | herança de classificação por EAN entre tenants |
 | TokenDesconhecido | `tokens_desconhecidos` | tokens não reconhecidos pelo pipeline |
+| Usuario | `usuarios` | login unificado — `role` admin/cliente; `tenant_id` nulo para admin |
+| ProdutoSaas | `produtos_saas` | catálogo de produtos/módulos SaaS contratáveis (ex: "Análise Sell In") — não confundir com `Produto`/`produtos` (catálogo de SKUs fiscais) |
 
 ---
 
@@ -84,7 +87,7 @@ alembic/                migrations
   if not st.session_state.get("tenant_id"):
       st.switch_page("main.py")
   ```
-- **Auth FastAPI:** JWT Bearer — `Depends(get_tenant)` em toda rota protegida
+- **Auth FastAPI:** JWT Bearer — `Depends(get_tenant)` (role=cliente) ou `Depends(get_admin)` (role=admin) em toda rota protegida; login unificado via tabela `usuarios`
 - **Sessões:** sempre usar `with get_db() as db:` (context manager) — nunca `db.close()` manual
 - **Imports de models:** sempre via `import app.models` (registra todos no Base)
 - **Upsert** em todos os registros silver (nunca insert cego)
@@ -126,11 +129,15 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 
 | Rota | Status |
 |------|--------|
-| `POST /auth/token` | ✅ login CNPJ + senha → JWT |
-| `POST /auth/senha` | ✅ define senha (primeira vez) |
-| `GET /auth/me` | ✅ dados do tenant autenticado |
+| `POST /auth/token` | ✅ login (CNPJ ou e-mail) + senha → JWT com role/tenant_id |
+| `POST /auth/senha` | ✅ troca a própria senha (exige senha atual) |
+| `GET /auth/me` | ✅ dados do usuário autenticado + produtos SaaS ativos (cliente) |
 | `GET /kpis/mensais` | ✅ todos os meses do tenant |
 | `GET /kpis/mensais/{ano}/{mes}` | ✅ mês específico |
+| `GET /admin/clientes` | ✅ lista tenants + entitlement por produto |
+| `GET /admin/produtos` | ✅ catálogo de produtos SaaS |
+| `PUT /admin/clientes/{id}/produtos/{id}` | ✅ ativa/desativa produto para o cliente |
+| `PUT /admin/usuarios/{id}/senha` | ✅ admin reseta senha de qualquer usuário |
 | `/compras/*`, `/fiscal/*`, `/produtos/*` | ⏳ a criar |
 | `POST /importar/efd`, `/importar/xml` | ⏳ a criar |
 
@@ -183,11 +190,13 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [ ] URL pública testada contra Supabase
 
 ### Passo 6 — Frontend React + Tremor
-- [ ] Setup: Vite + React + Tremor + React Query
-- [ ] Tela de login (CNPJ + senha → JWT)
-- [ ] Dashboard: cards KPI + evolução mensal
+- [x] Setup: Vite + React 18 + TS + Tailwind v3 + Tremor + React Query + React Router (`frontend/`)
+- [x] Tela de login (CNPJ ou e-mail + senha → JWT)
+- [x] Módulo admin: Clientes (lista) + Produtos (catálogo + toggle de entitlement por cliente)
+- [x] Dashboard cliente: cards KPI + evolução mensal (aba "Geral") + aba de produto contratável ("Análise Sell In", condicional a entitlement)
 - [ ] Páginas de compras e fiscal
 - [ ] Upload de EFD/XML pela interface
+- [ ] Tela de criação de novo cliente/tenant pelo admin
 - [ ] Deploy no Vercel
 
 ### Passo 7 — Desligar Streamlit

@@ -12,7 +12,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import auth, kpis
+from api.routers import auth, kpis, admin
 
 app = FastAPI(
     title="SPED Manager API",
@@ -33,6 +33,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(kpis.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")
