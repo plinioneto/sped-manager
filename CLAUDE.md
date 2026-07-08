@@ -119,7 +119,7 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 | Silver H005/H010 | ✅ | inventário |
 | Silver K200 | ✅ | saldo de estoque |
 | Silver 0150 | ✅ | participantes → `fornecedores` |
-| XML NFC-e/NF-e | ✅ | `xml_parser.py`; dedup por chv_nfe; sobe ao R2 (`xml/{cnpj}/{chv}.xml`) antes de persistir |
+| XML NFC-e/NF-e | ✅ | `xml_parser.py`; dedup por chv_nfe; sobe ao R2 (`xml/{cnpj}/{chv}.xml`) antes de persistir, em paralelo (`upload_lote`); itens de NFC-e saída (mod=65) não vão para `itens_nota_fiscal` — só entrada |
 | Gold KPIs | ✅ | `gold_kpis_service.py`; XML recalcula por mês tocado (`processar` direto, `processar_lote` via `meses_tocados` no chamador) |
 
 ### API FastAPI (`api/`)
@@ -159,7 +159,7 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [x] Backfill após importação: `python scripts/backfill_padronizacao.py --todos`
 - [x] Confirmar `gold_kpis_mensais` populado para os 7 meses (Jan–Jul/2025, tenant_id=1)
 - [x] Reconstruído em projeto Supabase novo após incidente de perda de dados — ver [`docs/incidente-2026-07-supabase.md`](docs/incidente-2026-07-supabase.md)
-- [ ] Reimportar XML da Franmak (entrada + NFC-e) — tenant já cadastrado, dados ainda não importados
+- [x] Reimportar XML da Franmak (entrada + NFC-e) — 2026-07-08: 248.152 documentos (1.578 entrada + 246.574 NFC-e saída), escopo 2025–2026. Itens de NFC-e saída não persistidos em `itens_nota_fiscal` por decisão de arquitetura (só entrada); upload ao R2 paralelizado (`upload_lote`, ThreadPoolExecutor) — sequencial levaria dias em ~250 mil arquivos
 - [ ] Decidir se "A A Miranda Comercial" (CNPJ 05370363000132) deve virar tenant — EFD local existe mas não há cadastro
 
 ### Passo 2 — Corrigir pipeline XML ✅
@@ -202,6 +202,9 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 - [ ] **Categorizador no banco** — tabelas `regras_abreviacao` e `regras_categorizacao` editáveis pelo admin; elimina ciclo "edita Python → deploy"
 - [ ] **Classificação por IA/LLM como fallback** — produtos com `revisao_necessaria=True` (pipeline de regras não cobriu) caem numa chamada de LLM antes de ir pra fila de revisão manual; reduziria o volume da fila e aumentaria a cobertura além dos ~70,6% atuais
 - [ ] **Recalibrar como o score de confiança é calculado** — hoje `categorizador.py` usa constantes fixas por regra (0.98/0.97/0.95/0.90) e Jaccard como fallback (`app/services/produto_padronizacao/categorizador.py:891-981`), sem calibração contra acerto real; motivou o corte por score em `catalogo_repo.py` (2026-07-07) — vale revisar se os números realmente refletem confiança antes de depender mais deles
+- [ ] **Dicionário de sabor/variante** — hoje só existe `_ATRIBUTOS` (ZERO, LIGHT, TRADICIONAL...); sabor específico por categoria (morango, uva, laranja...) não é extraído como campo próprio, fica misturado no resíduo da descrição padronizada. Diferente de categoria (mundo fechado, 720 categorias) e marca (~centenas), sabor é mundo aberto — nunca vai "terminar" de mapear. Popular só os ~50–100 mais frequentes via fila; o resto fica pro fallback de IA/LLM (item acima) quando existir, não insistir via dicionário manual
+- [ ] **Auditar outras marcas com nome canônico divergente do banco** — achado em 2026-07-08: `identificador.py` tinha `"COCA COLA"` (sem hífen) como chave canônica, mas o banco tem `"COCA-COLA"` (com hífen, grafia correta) cadastrado; como `backfill_padronizacao.py` faz `Marca.nome == resultado.marca`, a marca nunca linkava (`marca_id` ficava `None` em **todo** produto Coca-Cola do sistema, não só um). Corrigido pontualmente, mas pode haver outras marcas do dicionário fixo (`MARCAS_CONHECIDAS` em `identificador.py`) com o mesmo problema — vale comparar as ~90 chaves do dicionário fixo contra `SELECT nome FROM marcas` pra achar divergências de grafia
+- [ ] **Revisar match de categoria por token único (`_melhor_match`)** — corrigido em 2026-07-08 pra exigir que o token seja a primeira palavra da descrição (evitava ex: "HAV KIDS FLORES" batendo grupo Hortifruti/Flores), mas a proteção é heurística (posição, não semântica) — vale medir quantos produtos legítimos perderam classificação automática por isso (ex: itens que citam o ingrediente no meio da descrição) e considerar sinal adicional (marca reconhecida, unidade tipo KG/UN) em vez de só posição
 - [ ] **Dividir `08_admin_revisao.py`** — 1.400+ linhas; separar em módulos por domínio
 - [ ] **Testes de unidade** — parser silver + `processar_descricao`; 20–30 testes dão segurança para refatorar
 - [ ] **Definir tipo de cliente foco** — fiscal (contador) ou gestão (dono de loja)
@@ -212,7 +215,7 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
   - `seed_supabase.py` — ✅ bootstrap completo (categorias + fabricantes/marcas + tenants); confirmado útil na reconstrução pós-incidente de 2026-07, manter
   - `importar_xmls_pasta.py` — ⚠ avaliar se ainda necessário com `/importar/xml`
   - `importar_xmls_bulk.py` — ⚠ avaliar duplicidade com `importar_xmls_pasta.py`
-  - `backfill_catalogo_ean.py` — ⚠ uso pontual; verificar se já foi aplicado definitivamente
+  - `backfill_catalogo_ean.py` — ✅ manter, mas só como utilitário isolado; `backfill_padronizacao.py` já sincroniza `catalogo_produtos` sozinho desde 2026-07-08 (evita o erro de esquecer o segundo passo)
   - `seed_aliases_cervejas.py` — ⚠ provavelmente absorvido por `seed_fabricantes_marcas.py`
   - `check_cobertura.py` / `check_cobertura2.py` — ⚠ scripts de diagnóstico duplicados; unificar ou remover
   - `check_categorias_db.py` — ⚠ diagnóstico pontual; avaliar remoção
@@ -244,7 +247,7 @@ Ver [`docs/arquitetura-dados.md`](docs/arquitetura-dados.md) para o documento co
 
 | Variável | Descrição |
 |----------|-----------|
-| `DATABASE_URL` | PostgreSQL Supabase ou `sqlite:///./sped_manager.db` |
+| `DATABASE_URL` | PostgreSQL Supabase ou `sqlite:///./sped_manager.db`. **Preferir connection pooling** (`postgresql://postgres.{project-ref}:{senha}@aws-{n}-{regiao}.pooler.supabase.com:5432/postgres`) em vez da conexão direta (`db.{project-ref}.supabase.co`) — o hostname direto teve falha de DNS persistente em 2026-07-08 (não era da rede local: outros domínios resolviam normal). String exata do pooler fica no painel Supabase em Settings → Database → Connection pooling (a região/número `aws-N` não dá pra adivinhar) |
 | `JWT_SECRET` | Chave secreta JWT (obrigatório) |
 | `JWT_TTL_HOURS` | Validade do token em horas (padrão: 24) |
 | `R2_ENDPOINT` | Endpoint Cloudflare R2 |
@@ -266,7 +269,7 @@ Pipeline em `app/services/produto_padronizacao/`:
 5. `pipeline.py` — extração de atributos (ZERO, LIGHT…); montagem canônica: base + atributos + embalagem + volume
 6. `categorizador.py` — VOCAB_CATEGORIA → VOCAB_TIPO_PRODUTO → VOCAB_HORTIFRUTI → Jaccard fallback
 
-Cobertura automática: **~70.6%**. Produtos com `origem_padronizacao='manual'` nunca são sobrescritos pelo backfill.
+Cobertura automática: **~70%** (medido em 2026-07-08 após correções de negação/composto/hortifruti, 22.078 produtos, 3 tenants; caiu de ~74% — o fix tira confiança falsa de casos ambíguos, jogando mais itens pra revisão manual em vez de categorizar errado). Produtos com `origem_padronizacao='manual'` nunca são sobrescritos pelo backfill.
 
 Scripts:
 - `scripts/backfill_padronizacao.py --todos` — reprocessa tudo exceto manuais
@@ -367,6 +370,10 @@ Use esta seção para acumular entradas antes de pedir "aplica a fila de padroni
 | 2026-04-07 | Categoria | `vela`/`velas` → Bazar Geral > Utilidades Descartáveis > Velas; `copo` → Bazar Geral > Utilidades da Cozinha > Copo Individual; `tapete` → Têxtil > Cama, Mesa, Banho; `adocante` → Mercearia Doce Light > Adoçantes; `conhaque` → Bebidas > Destilados; `torrada` → Padaria Industrial; `cloro` → Limpeza para Roupas > Alvejantes; `acetona` → Perfumaria > Estética > Removedores; `soda caustica` → Limpeza de Banheiro > Limpeza Pesada; `bucha banho` → Perfumaria > Higiene Corporal > Esponja de Banho; `gel fixador`/`gel capilar` → Perfumaria > Produtos Capilares > Gel Fixador; `mamadeira` → Perfumaria > Seção Infantil; `gel` → Perfumaria > Produtos Capilares; `file de peito` → Perecíveis > Congelados; `caderno` → Bazar Geral > Papelaria; `agua oxigenada` → Perfumaria > Farmácia; `shoyu` → Mercearia Salgada > Temperos > Molho de Soja; `lamina` → Perfumaria > Barbearia > Lâminas; `mexerica`/`tangerina` → Hortifruti > Frutas; `cera` → Limpeza de Pisos; `bucha` → Perfumaria > Higiene Corporal; `escova` → Perfumaria > Higiene Corporal; `sacola`/`bobina`/`palito` → Bazar Geral > Utilidades Descartáveis; `drink` → Bebidas > Destilados; `filtro` → Mercearia Doce > Matinais; `torresmo` → Açougue > Suíno; `reparador` → Perfumaria > Produtos Capilares; `toalha` → Têxtil; `erva` → Bebidas > Matinais; `flanela`/`espuma` → Bazar Geral > Utensílios para Limpeza; `tesoura` → Bazar Geral > Papelaria; `colher` → Bazar Geral > Utilidades da Cozinha; `graxa`/`cadeado`/`extensao`/`mangueira` → Bazar Geral > Ferramentas; `saca rolha` → Bazar Geral > Utilidades da Cozinha; `bobina` → Uso e Consumo > Bobinas Térmicas; `benjamin` → Bazar Geral > Ferramentas > Material Elétrico; `sopao` → Mercearia Salgada > Massas e Sopas > Sopas |
 | 2026-04-07 | Combinação | `PEIXE+POSTAS/FILE` → Congelados > Peixes; `PEIXE+INTEIRO` → Açougue > Peixes; `CACAU+PO` → Culinária Doce > Chocolates em Pó; `AZEITE+VIRGEM` → Azeites > Extra Virgem; `VINAGRE+MACA/ARROZ`; `CHOCOLATE+BARRA`; `NOZ+MOSCADA`; `CERVEJA+LATA/LATAO`; `CERVEJA+LONG/NECK`; `MACARRAO+SEMOLA/OVOS`; `MASSA+PASTEL`; `CREME+CEBOLA` → Sopas; `CALDO+KNORR/MAGGI`; `MOLHO+TOMATE/PIMENTA`; `CREME+LEITE`; `DOCE+LEITE`; `TEMPERO+SAZON`; `LEITE+PO`; `REPARADOR+PONTAS`; `FEIJAO+CARIOCA/PRETO/BRANCO/CORDA/JALO`; `ABRIDOR+LATA/VINHO`; `AFIADOR+FACA`; `ABSORVENTE+ABAS`; `ALICATE+CUTICULA`; `CORTADOR+UNHAS`; `AGUA+COCO`; `CAFE+SOLUVEL` |
 | 2026-04-07 | Marca | BEATS \| Ambev |
+| 2026-07-08 | Marca | Nome canônico de `COCA COLA` corrigido para `COCA-COLA` (com hífen) em `identificador.py` — bate com o cadastro em `marcas`; sem isso `marca_id` ficava `None` em todo produto Coca-Cola |
+| 2026-07-08 | Categoria | `COCA COLA`, `PEPSI COLA` → Bebidas > Refrigerante > Refrigerante Cola (bigrama, evita colisão com o unigrama ambíguo "COLA") |
+| 2026-07-08 | Categoria | `COLA MASSA` → Bazar Geral > Ferramentas e Acessórios > Colas e Adesivos (bigrama; removido o unigrama solto `COLA` que classificava Coca-Cola/Pepsi/Tropical Cola como cola de colar) |
+| 2026-07-08 | Categoria | `AZEITE OLIVA`, `OLEO SOJA`, `OLEO CANOLA`, `OLEO GIRASSOL`, `OLEO COCO`, `LEITE COCO`, `CREME LEITE`, `LEITE CONDENSADO` → adicionados a `_TIPOS_PRODUTO` como compostos (`pipeline.py`), reconhecidos mesmo com "DE" no meio ("AZEITE DE OLIVA") |
 
 ---
 
