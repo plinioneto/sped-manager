@@ -45,12 +45,17 @@ _INDICE_GRUPOS:     list[dict] | None = None
 _INDICE_CATEGORIAS: list[dict] | None = None
 
 
-def _normalizar(texto: str) -> set[str]:
-    """Tokeniza e normaliza: remove acentos, minúsculas, retorna set de tokens."""
+def _normalizar_lista(texto: str) -> list[str]:
+    """Tokeniza e normaliza preservando ordem: remove acentos, minúsculas, lista de tokens."""
     texto = unicodedata.normalize("NFD", texto)
     texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
     texto = re.sub(r"[^A-Za-z0-9\s]", " ", texto).lower()
-    return set(texto.split())
+    return texto.split()
+
+
+def _normalizar(texto: str) -> set[str]:
+    """Tokeniza e normaliza: remove acentos, minúsculas, retorna set de tokens."""
+    return set(_normalizar_lista(texto))
 
 
 def carregar_indice(session: Session) -> None:
@@ -922,17 +927,13 @@ def categorizar(
         if token in _VOCAB_TIPO_PRODUTO:
             return _match_por_grupo_nome(_VOCAB_TIPO_PRODUTO[token], session, score=0.95)
 
-    # 0c. Vocabulário de hortifruti (bigramas primeiro: BATATA DOCE > BATATA)
-    for i in range(len(palavras) - 1):
-        bigrama = f"{palavras[i]} {palavras[i+1]}"
-        if bigrama in _VOCAB_HORTIFRUTI:
-            return _match_por_grupo_nome(_VOCAB_HORTIFRUTI[bigrama], session, score=0.90)
-    for token in palavras:
-        if token in _VOCAB_HORTIFRUTI:
-            return _match_por_grupo_nome(_VOCAB_HORTIFRUTI[token], session, score=0.90)
+    # normalizado igual tokens_item (minúsculo, sem acento) — senão a comparação
+    # de _melhor_match nunca bate (palavras[0] é maiúsculo, tokens_item minúsculo)
+    _lista_normalizada = _normalizar_lista(descricao)
+    primeira_palavra = _lista_normalizada[0] if _lista_normalizada else None
 
     # 1. Tenta match em categorias (mais específico)
-    melhor_cat = _melhor_match(tokens_desc, _INDICE_CATEGORIAS)
+    melhor_cat = _melhor_match(tokens_desc, _INDICE_CATEGORIAS, primeira_palavra)
     if melhor_cat and melhor_cat["score"] >= threshold:
         d = melhor_cat
         return ResultadoCategorizacao(
@@ -946,7 +947,7 @@ def categorizar(
         )
 
     # 2. Fallback: match em grupos (âncora semântica mais confiável)
-    melhor_grp = _melhor_match(tokens_desc, _INDICE_GRUPOS)
+    melhor_grp = _melhor_match(tokens_desc, _INDICE_GRUPOS, primeira_palavra)
     if melhor_grp and melhor_grp["score"] >= threshold:
         d = melhor_grp
         return ResultadoCategorizacao(
@@ -959,12 +960,35 @@ def categorizar(
             score=d["score"],
         )
 
+    # 3. Último recurso: vocabulário de hortifruti (bigramas primeiro: BATATA DOCE > BATATA)
+    #    Roda por último de propósito — nome de fruta/legume sozinho é sinal fraco
+    #    ("CREME SKALA MORANGO", "XAROPE UVA", "HAV KIDS FLORES" não são hortifruti).
+    #    Fica atrás do fallback fuzzy pra dar chance a um match mais específico
+    #    (que já tem proteção anti-token-ambíguo em _melhor_match) antes de assumir
+    #    que é fruta/legume de verdade.
+    #    Só aceita se a fruta/legume for a PRIMEIRA palavra: descrição de hortifruti
+    #    real começa pelo produto ("LARANJA KG", "BATATA KG"); nos falsos positivos
+    #    a fruta aparece no meio/fim como sabor/aroma de outro produto ("CREME
+    #    SKALA MORANGO", "TIC TAC SABORES MORANGO", "XAROPE MORANGO CERESER").
+    if len(palavras) >= 2 and f"{palavras[0]} {palavras[1]}" in _VOCAB_HORTIFRUTI:
+        return _match_por_grupo_nome(_VOCAB_HORTIFRUTI[f"{palavras[0]} {palavras[1]}"], session, score=0.90)
+    if palavras and palavras[0] in _VOCAB_HORTIFRUTI:
+        return _match_por_grupo_nome(_VOCAB_HORTIFRUTI[palavras[0]], session, score=0.90)
+
     return _vazio()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _melhor_match(tokens_desc: set[str], indice: list[dict]) -> dict | None:
+# Conectores sem valor semântico — não contam como token "em comum" no fuzzy match
+_CONECTORES: set[str] = {
+    "de", "da", "do", "das", "dos", "e", "em", "com", "sem", "para",
+    "por", "ao", "a", "o", "as", "os", "no", "na", "nos", "nas",
+}
+
+def _melhor_match(
+    tokens_desc: set[str], indice: list[dict], primeira_palavra: str | None = None
+) -> dict | None:
     """
     Retorna o item do índice com maior score de cobertura.
 
@@ -972,6 +996,14 @@ def _melhor_match(tokens_desc: set[str], indice: list[dict]) -> dict | None:
     Regra anti-falso-positivo: para itens com 2+ tokens, exige intersecao >= 2.
     Isso evita que um único token ambíguo ("BARRA", "ROSA", "CRISTAL")
     cause um match errado com categorias como "SABONETE EM BARRA" ou "SAL ROSA".
+
+    Itens de 1 token só (ex: grupo "FLORES", "SAL", "OLEO") não têm essa proteção
+    — qualquer ocorrência do token em QUALQUER lugar da descrição dá score 1.0,
+    então "HAV KIDS FLORES BEGE" (chinelo estampa floral) batia grupo FLORES
+    (hortifruti) igual a "ROSAS VERMELHAS BUQUE". Pra esses, exige que o token
+    seja a primeira palavra da descrição — hortifruti/commodity de verdade
+    começa pelo produto ("SAL GROSSO 1KG"), não tem ele no meio como
+    ingrediente/aroma de outra coisa ("SAL DE FRUTAS ENO").
     """
     melhor = None
     melhor_score = 0.0
@@ -979,11 +1011,18 @@ def _melhor_match(tokens_desc: set[str], indice: list[dict]) -> dict | None:
         tokens_item = item["tokens"]
         if not tokens_item:
             continue
-        intersecao = len(tokens_desc & tokens_item)
+        # Conectores ("DE", "COM"...) não contam pra interseção — senão "ROSCA DE
+        # COCO" (pão) bate "AGUA DE COCO" só porque "DE"+"COCO" somam 2 tokens em
+        # comum, satisfazendo a regra abaixo sem nenhuma relação real de sentido.
+        intersecao_tokens = (tokens_desc & tokens_item) - _CONECTORES
+        intersecao = len(intersecao_tokens)
         if intersecao == 0:
             continue
         # Anti falso-positivo: itens multi-token exigem ao menos 2 matches
         if len(tokens_item) >= 2 and intersecao < 2:
+            continue
+        # Anti falso-positivo: item de 1 token só precisa ser a primeira palavra
+        if len(tokens_item) == 1 and primeira_palavra not in tokens_item:
             continue
         score = intersecao / len(tokens_item)
         if score > melhor_score:
