@@ -312,7 +312,12 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "CERVEJA LONG":     ("CERVEJA LONG NECK",            None),
     "CERVEJA GARRAFA":  ("CERVEJA GARRAFA",              None),
     # ══ BEBIDAS — REFRIGERANTE ═══════════════════════════════════════
+    # "COCA COLA"/"PEPSI COLA" precisam de entrada própria como bigrama: sem
+    # elas, "REFRIGERANTE COCA COLA ..." não bate "REFRIGERANTE COLA" (COCA
+    # separa as palavras) e cai no unigrama "COLA" → COLAS E ADESIVOS (errado).
     "REFRIGERANTE COLA":    ("REFRIGERANTE COLA",        None),
+    "COCA COLA":            ("REFRIGERANTE COLA",        None),
+    "PEPSI COLA":           ("REFRIGERANTE COLA",        None),
     "REFRIGERANTE GUARANA": ("REFRIGERANTE GUARANA",     None),
     "AGUA TONICA":      ("AGUA TONICA",                  None),
     # ══ BEBIDAS — ÁGUAS ══════════════════════════════════════════════
@@ -558,9 +563,14 @@ _VOCAB_CATEGORIA: dict[str, tuple[str, str | None]] = {
     "VASSOURA":         ("VASSOURAS",                    None),
     "RODO":             ("RODOS",                        None),
     # ══ FERRAMENTAS — COLAS E ADESIVOS ═══════════════════════════════
-    # COLA BRANCA vai para papelaria; demais (Loctite, Super Bonder, etc.) para ferramentas
+    # COLA BRANCA vai para papelaria. NÃO cadastrar "COLA" sozinho: é ambíguo
+    # com "COCA COLA"/"PEPSI COLA"/outras marcas de refrigerante ("PLANETA
+    # COLA", "TROPICAL COLA") — um unigrama aqui tem prioridade sobre o
+    # REFRIGERANTE do vocab de tipo_produto (checado depois) e classificava
+    # bebida como cola de colar com 0.98 de confiança. Cola de colar genérica
+    # (Loctite, Super Bonder etc.) sem marca reconhecida cai em revisão manual.
     "COLA BRANCA":      ("COLAS E FITA ADESIVA",         "ARTIGOS PARA PAPELARIA E ARMARINHO"),
-    "COLA":             ("COLAS E ADESIVOS",             "FERRAMENTAS E ACESSORIOS"),
+    "COLA MASSA":       ("COLAS E ADESIVOS",             "FERRAMENTAS E ACESSORIOS"),
     # ══ AÇOUGUE ══════════════════════════════════════════════════════
     "LINGUICA":         ("LINGUICA GRANEL ATENDIMENTO",  None),
     "SALSICHA":         ("SALSICHA GRANEL ATENDIMENTO",  None),
