@@ -16,3 +16,6 @@ from app.models.participante import Participante
 from app.models.token_desconhecido import TokenDesconhecido
 from app.models.catalogo_produto import CatalogoProduto
 from app.models.gold_kpis_mensais import GoldKpisMensais
+from app.models.usuario import Usuario
+from app.models.produto_saas import ProdutoSaas
+from app.models.tenant_produto_saas import TenantProdutoSaas

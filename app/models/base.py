@@ -10,6 +10,6 @@ def init_db():
         documento_fiscal, icms_c190,
         inventario_h005, inventario_h010, estoque_k200,
         grupo_empresarial, token_desconhecido, catalogo_produto,
-        gold_kpis_mensais,
+        gold_kpis_mensais, usuario, produto_saas, tenant_produto_saas,
     )
     Base.metadata.create_all(bind=engine)

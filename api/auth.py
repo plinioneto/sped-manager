@@ -1,18 +1,18 @@
 """
 Autenticação JWT.
 
-Login: POST /auth/token  { cnpj, senha }
-       → { access_token, token_type }
+Login: POST /auth/token  { username, password }
+       → { access_token, token_type, role, tenant_id }
 
-O token carrega { sub: str(tenant_id), cnpj }.
-Trocar para email+senha no futuro é só mudar o campo de lookup aqui.
+O token carrega { sub: str(usuario_id), role, tenant_id }.
 """
 
 import os
 from datetime import datetime, timedelta
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
+import jwt
+from jwt import PyJWTError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
@@ -20,23 +20,23 @@ SECRET_KEY  = os.environ["JWT_SECRET"]          # obrigatório no .env
 ALGORITHM   = "HS256"
 TOKEN_TTL_H = int(os.getenv("JWT_TTL_HOURS", "24"))
 
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2  = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 def verificar_senha(plain: str, hashed: str) -> bool:
-    return pwd_ctx.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def hash_senha(plain: str) -> str:
-    return pwd_ctx.hash(plain)
+    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def criar_token(tenant_id: int, cnpj: str) -> str:
+def criar_token(usuario_id: int, role: str, tenant_id: int | None) -> str:
     payload = {
-        "sub":  str(tenant_id),
-        "cnpj": cnpj,
-        "exp":  datetime.utcnow() + timedelta(hours=TOKEN_TTL_H),
+        "sub":       str(usuario_id),
+        "role":      role,
+        "tenant_id": tenant_id,
+        "exp":       datetime.utcnow() + timedelta(hours=TOKEN_TTL_H),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -44,7 +44,7 @@ def criar_token(tenant_id: int, cnpj: str) -> str:
 def decodificar_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
+    except PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou expirado",
