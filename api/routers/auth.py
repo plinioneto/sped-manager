@@ -14,6 +14,7 @@ from typing import Optional
 
 from app.models.usuario import Usuario
 from app.models.tenant import Tenant
+from app.models.consultor import Consultor
 from app.models.produto_saas import ProdutoSaas
 from app.models.tenant_produto_saas import TenantProdutoSaas
 from api.auth import criar_token, hash_senha, verificar_senha
@@ -62,6 +63,11 @@ def login(
         if not tenant or not tenant.ativo:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cliente inativo")
 
+    if usuario.role == "consultor":
+        consultor = db.query(Consultor).filter(Consultor.id == usuario.consultor_id).first()
+        if not consultor or not consultor.ativo:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Consultor inativo")
+
     return TokenResponse(
         access_token=criar_token(usuario.id, usuario.role, usuario.tenant_id),
         role=usuario.role,
@@ -89,11 +95,12 @@ def me(
     db: Session = Depends(get_db),
 ):
     out = {
-        "usuario_id": usuario.id,
-        "nome":       usuario.nome,
-        "login":      usuario.login,
-        "role":       usuario.role,
-        "tenant_id":  usuario.tenant_id,
+        "usuario_id":   usuario.id,
+        "nome":         usuario.nome,
+        "login":        usuario.login,
+        "role":         usuario.role,
+        "tenant_id":    usuario.tenant_id,
+        "consultor_id": usuario.consultor_id,
     }
     if usuario.role == "cliente":
         slugs = (

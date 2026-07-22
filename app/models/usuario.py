@@ -7,13 +7,15 @@ from app.models.base import Base
 class Usuario(Base):
     __tablename__ = "usuarios"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    tenant_id  = Column(Integer, ForeignKey("lojas.id"), nullable=True)
-    login      = Column(String, unique=True, nullable=False, index=True)
-    senha_hash = Column(String, nullable=False)
-    nome       = Column(String, nullable=False)
-    role       = Column(String(10), nullable=False)  # 'admin' | 'cliente'
-    ativo      = Column(Boolean, default=True)
-    criado_em  = Column(DateTime, default=datetime.utcnow)
+    id           = Column(Integer, primary_key=True, index=True)
+    tenant_id    = Column(Integer, ForeignKey("lojas.id"), nullable=True)
+    consultor_id = Column(Integer, ForeignKey("consultores.id"), nullable=True, index=True)
+    login        = Column(String, unique=True, nullable=False, index=True)
+    senha_hash   = Column(String, nullable=False)
+    nome         = Column(String, nullable=False)
+    role         = Column(String(10), nullable=False)  # 'admin' | 'consultor' | 'cliente'
+    ativo        = Column(Boolean, default=True)
+    criado_em    = Column(DateTime, default=datetime.utcnow)
 
-    tenant = relationship("Tenant")
+    tenant    = relationship("Tenant")
+    consultor = relationship("Consultor")

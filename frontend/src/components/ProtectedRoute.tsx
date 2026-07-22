@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
-export function ProtectedRoute({ role }: { role: "admin" | "cliente" }) {
+export function ProtectedRoute({ role }: { role: "admin" | "consultor" | "cliente" }) {
   const { usuario, carregando } = useAuth()
 
   if (carregando) return null

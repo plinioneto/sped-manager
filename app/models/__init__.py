@@ -1,4 +1,5 @@
 from app.models.grupo_empresarial import GrupoEmpresarial
+from app.models.consultor import Consultor
 from app.models.tenant import Tenant
 from app.models.fabricante import Fabricante
 from app.models.marca import Marca

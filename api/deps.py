@@ -5,6 +5,7 @@ get_db               → sessão SQLAlchemy (fecha no final do request)
 get_current_usuario  → Usuario autenticado pelo JWT
 get_admin            → Usuario autenticado, exige role='admin'
 get_tenant           → Tenant do Usuario autenticado, exige role='cliente'
+get_consultor        → Consultor do Usuario autenticado, exige role='consultor'
 """
 
 from typing import Generator
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.utils.db import SessionLocal
 from app.models.tenant import Tenant
 from app.models.usuario import Usuario
+from app.models.consultor import Consultor
 from api.auth import decodificar_token, oauth2
 
 
@@ -60,3 +62,15 @@ def get_tenant(
     if not tenant:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Loja não encontrada")
     return tenant
+
+
+def get_consultor(
+    usuario: Usuario = Depends(get_current_usuario),
+    db: Session = Depends(get_db),
+) -> Consultor:
+    if usuario.role != "consultor" or usuario.consultor_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a consultores")
+    consultor = db.query(Consultor).filter(Consultor.id == usuario.consultor_id, Consultor.ativo == True).first()
+    if not consultor:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Consultor não encontrado")
+    return consultor

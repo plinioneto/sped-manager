@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { api } from "../lib/api"
 
-type Role = "admin" | "cliente"
+type Role = "admin" | "consultor" | "cliente"
 
 interface Me {
   usuario_id: number
@@ -9,6 +9,7 @@ interface Me {
   login: string
   role: Role
   tenant_id: number | null
+  consultor_id: number | null
   produtos_ativos?: string[]
 }
 

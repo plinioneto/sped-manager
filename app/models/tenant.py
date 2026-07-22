@@ -15,8 +15,10 @@ class Tenant(Base):
     grupo_id       = Column(Integer, ForeignKey("grupos_empresariais.id"), nullable=True)
     senha_hash     = Column(String, nullable=True)
     codigo_acesso  = Column(String, unique=True, nullable=True)
+    consultor_id   = Column(Integer, ForeignKey("consultores.id"), nullable=True, index=True)
 
     grupo = relationship("GrupoEmpresarial", back_populates="tenants")
+    consultor = relationship("Consultor", back_populates="clientes")
 
     produtos = relationship("Produto", back_populates="tenant")
     documentos_fiscais = relationship("DocumentoFiscal", back_populates="tenant")

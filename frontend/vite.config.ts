@@ -10,6 +10,7 @@ export default defineConfig({
       '/auth': 'http://localhost:8000',
       '/kpis': 'http://localhost:8000',
       '/admin': 'http://localhost:8000',
+      '/consultor': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
     },
     allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],

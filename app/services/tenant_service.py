@@ -56,12 +56,20 @@ class TenantService:
             tenant.senha_hash = hashed.decode("utf-8")
             self.session.commit()
 
-    def criar(self, nome: str, cnpj: str, senha: str | None = None, codigo_acesso: str | None = None):
+    def criar(
+        self,
+        nome: str,
+        cnpj: str,
+        senha: str | None = None,
+        codigo_acesso: str | None = None,
+        consultor_id: int | None = None,
+    ):
         # salva sempre sem máscara
         tenant = Tenant(
             nome=nome,
             cnpj=limpar_cnpj(cnpj),
             codigo_acesso=codigo_acesso.strip() if codigo_acesso else None,
+            consultor_id=consultor_id,
         )
         if senha:
             hashed = bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt())

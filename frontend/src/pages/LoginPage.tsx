@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react"
 import { Navigate, useNavigate } from "react-router-dom"
 import { Card, TextInput, Button, Title, Text } from "@tremor/react"
 import { useAuth } from "../context/AuthContext"
+import { ROTA_POR_ROLE } from "../lib/routes"
 
 export function LoginPage() {
   const { usuario, login } = useAuth()
@@ -12,7 +13,7 @@ export function LoginPage() {
   const [carregando, setCarregando] = useState(false)
 
   if (usuario) {
-    return <Navigate to={usuario.role === "admin" ? "/admin/clientes" : "/dashboard"} replace />
+    return <Navigate to={ROTA_POR_ROLE[usuario.role] ?? "/login"} replace />
   }
 
   const handleSubmit = async (e: FormEvent) => {
